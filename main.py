@@ -32,10 +32,12 @@ import time
 from config import build_url
 from db import get_db_connection, init_db, init_db_lib
 from library import sync_library
+from playlist import main as generate_playlist
 
 
 # store user data
 active = {}
+
 
 # url
 def navidrome_url(endpoint):
@@ -46,22 +48,31 @@ def navidrome_url(endpoint):
 
 # watches what is user/users listening to
 
+
 def Watcher():
     url_response = navidrome_url("getNowPlaying")
-
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
-    # print("\nentires : " , entries)
-    
+
     if not entries:
-        print("nothing is playing")
+        # print("nothing is playing")
         for user_id in list(active.keys()):
             log_history(active.pop(user_id))
             print(f"[STOP] {user_id} stopped")
         return
-    
+
+    # ── NEW: keep only the most recent entry per user ──
+    latest = {}
     for entry in entries:
-        user_id  = entry["username"]
-        song_id  = entry["id"]
+        user_id = entry["username"]
+        if user_id not in latest or entry["minutesAgo"] < latest[user_id]["minutesAgo"]:
+            latest[user_id] = entry
+
+    entries = list(latest.values())  # deduplicated
+    # ─────────────────────────────────────────────────
+
+    for entry in entries:
+        user_id = entry["username"]
+        song_id = entry["id"]
         if user_id in active and active[user_id]["song_id"] == song_id:
             elapsed = time.time() - active[user_id]["start_time"]
 
@@ -73,21 +84,21 @@ def Watcher():
         if user_id not in active or active[user_id]["song_id"] != song_id:
 
             if user_id in active:
-                print(active[user_id])
-                log_history(active[user_id]) 
-                print(active[user_id])
+                # print(active[user_id])
+                log_history(active[user_id])
+                # print(active[user_id])
 
             active[user_id] = {
                 "song_id": song_id,
                 "user_id": user_id,
                 "title": entry.get("title", ""),
                 "album": entry.get("album", ""),
-                "artist": entry.get("artist" , ""),
+                "artist": entry.get("artist", ""),
                 "genre": entry.get("genre", ""),
                 "duration": entry["duration"],
-                "start_time": time.time(), 
+                "start_time": time.time(),
             }
-            print(f"[NEW] {user_id} started: {entry['title']}")
+            # print(f"[NEW] {user_id} started: {entry['title']}")
 
         else:
             # same song still playing → don't touch start_time
@@ -97,7 +108,7 @@ def Watcher():
     for user_id in list(active.keys()):
         if user_id not in current_users:
             log_history(active.pop(user_id))
-            print(f"[STOP] {user_id} stopped")
+            # print(f"[STOP] {user_id} stopped")
 
 
 def signal_system(percent_played, song_id, user_id):
@@ -134,8 +145,8 @@ def log_history(song):
     played = min(time.time() - song["start_time"], song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
     signal = signal_system(percent_played, song["song_id"], song["user_id"])
-    print("percent : " , percent_played)
-    print("signal : " , signal)
+    # print("percent : ", percent_played)
+    # print("signal : ", signal)
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -153,17 +164,20 @@ def log_history(song):
     )
 
     existing = cursor.fetchone()
-    print("existing", existing[0] if existing else None)
+    # print("existing", existing[0] if existing else None)
 
     if existing:
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE listens 
             SET played = ?, percent_played = ?, signal = ?
             WHERE id = ?
-        """, (played, percent_played, signal, existing[0]))
-        print(f"[UPDATE] {song['user_id']} | {song['title']} | {percent_played}%")
+        """,
+            (played, percent_played, signal, existing[0]),
+        )
+        # print(f"[UPDATE] {song['user_id']} | {song['title']} | {percent_played}%")
 
-    else:    
+    else:
         cursor.execute(
             """
                 INSERT INTO listens(
@@ -196,6 +210,8 @@ if __name__ == "__main__":
     init_db_lib()
     sync_library()
     init_db()
+    print("[TuneLog] Generating playlist...")
+    generate_playlist()
     while True:
         Watcher()
 

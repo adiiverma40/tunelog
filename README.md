@@ -90,6 +90,9 @@ PLAYLIST_SIZE = 10
 python main.py
 ```
 
+**Notic :-**
+If you are using Navidrome client, turn on the scrobling feature or it will not report back
+
 TuneLog will:
 - Start watching what's playing every 5 seconds
 - Log listen history to SQLite

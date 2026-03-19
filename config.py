@@ -1,12 +1,15 @@
 # config file, use for creating url
+# API CALL
 
+# TODO : idk how but implement a dynamic users list, i have 3 users i can add it mannualy,
+# if someone is reviewing this, add a way to implement multiple users
 
-#TODO : idk how but implement a dynamic users list, i have 3 users i can add it mannualy, 
-#if someone is reviewing this, add a way to implement multiple users
+# TODO : implement Itunes API search for the songs and write the metadata, add columns for explict content
 
 
 from dotenv import load_dotenv
 import os
+import requests
 
 load_dotenv()
 
@@ -25,7 +28,7 @@ USER_CREDENTIALS = {
 }
 
 
-#default url to pull data from api
+# default url to pull data from api
 def build_url(endpoint):
     return(
         f"{Navidrome_url}/rest/{endpoint}"
@@ -37,7 +40,7 @@ def build_url(endpoint):
         
     )
 
-#url to create playlist for every user
+# url to create playlist for every user
 def build_url_for_user(endpoint, username, password):
     return (
         f"{Navidrome_url}/rest/{endpoint}"
@@ -47,3 +50,12 @@ def build_url_for_user(endpoint, username, password):
         f"&c={app_name}"
         f"&f=json"
     )
+
+
+# https://itunes.apple.com/search?term=tum+mere+ho&entity=song&limit=5
+
+# Itunes api call
+# def getMusicMetaData(term ):
+#     respone = requests(
+#         f"https://itunes.apple.com/search?term={term}&entity=song&limit=5"
+#     )

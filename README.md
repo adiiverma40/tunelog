@@ -47,6 +47,11 @@ TuneLog/
 ## Setup
 **1. Clone the repo**
 
+**2. Download requiremnets**
+```bash
+pip install -r requirements.txt
+```
+
 **2. Configure your environment**
 ```bash
 cp .env.example .env

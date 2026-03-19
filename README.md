@@ -1,6 +1,15 @@
 # TuneLog
 A lightweight, self-hosted music recommendation system that learns your taste from how you actually listen — no ratings, no manual input.
 
+# 🤖 AI Usage
+
+This project was built by me, with AI assistance in specific areas:
+
+- **SQL queries** — helped write and optimise some of the SQLite queries
+- **Boilerplate code** — repetitive setup code like DB connection handlers and URL builders
+- **Documentation** — README formatting and wording
+
+The core logic — signal system, scoring formula, genre injection, playlist slot system, and architecture decisions — was designed and written by me.
 ## How It Works
 TuneLog watches your Navidrome listening activity in the background. It tracks whether you skip, finish, or replay songs, and uses that behavior to build personalised playlists automatically — one per user.
 
@@ -99,6 +108,12 @@ Slot distribution dynamically adjusts as your library gets explored:
 | Partial | ~12% | songs worth another chance |
 | Wildcard | ~8% | good songs not heard in 60+ days |
 | Skip | ~5% | rare re-exposure |
+
+## Database
+
+![Database](Screenshots/tunelog_db.png)
+## Playlist
+![Playlist](Screenshots/playlist_1.png)
 
 ## Roadmap
 - [x] Navidrome API connection

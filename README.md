@@ -67,8 +67,16 @@ admin_password=your_admin_password
 USER_youruser=youruser
 PASSWORD_youruser=yourpassword
 ```
+**3. Change the Size of playlist**
 
-**3. Run**
+Change the playlist size from `playlist.py`
+
+```python
+
+PLAYLIST_SIZE = 10
+```
+
+**4. Run**
 ```bash
 python main.py
 ```

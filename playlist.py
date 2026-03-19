@@ -42,7 +42,7 @@ from db import get_db_connection, get_db_connection_lib, init_db, init_db_lib
 from config import build_url, build_url_for_user, USER_CREDENTIALS
 
 PLAYLIST_NAME = "Tunelog - {}"  # {} filled with user_id
-PLAYLIST_SIZE = 100
+PLAYLIST_SIZE = 50
 WILDCARD_DAY = 60
 
 SIGNAL_WEIGHTS = {
@@ -162,21 +162,21 @@ def get_unheard_songs(scored_ids):
     return unheard, unheard_ratio
 
 
-def get_unheard_by_genre(heard_ids, genre, limit):
-    conn = get_db_connection_lib()
-    if not heard_ids:
-        rows = conn.execute(
-            "SELECT song_id, genre FROM library WHERE genre LIKE ?",
-            (f"%{genre}%",),
-        ).fetchall()
-    else:
-        placeholders = ",".join("?" * len(heard_ids))
-        rows = conn.execute(
-            f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})",
-            (f"%{genre}%", *heard_ids),
-        ).fetchall()
-    conn.close()
-    return [(r[0], r[1]) for r in rows][:limit]
+# def get_unheard_by_genre(heard_ids, genre, limit):
+#     conn = get_db_connection_lib()
+#     if not heard_ids:
+#         rows = conn.execute(
+#             "SELECT song_id, genre FROM library WHERE genre LIKE ?",
+#             (f"%{genre}%",),
+#         ).fetchall()
+#     else:
+#         placeholders = ",".join("?" * len(heard_ids))
+#         rows = conn.execute(
+#             f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})",
+#             (f"%{genre}%", *heard_ids),
+#         ).fetchall()
+#     conn.close()
+#     return [(r[0], r[1]) for r in rows][:limit]
 
 
 def get_wildcard_songs(scores, user_id):

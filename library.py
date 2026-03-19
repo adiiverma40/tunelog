@@ -12,8 +12,11 @@
 # fix : used genre aliases to make bollywood and bollywood music same
 
 import requests
-from config import build_url
+from config import build_url , _extract , itunesApi
 from db import init_db_lib, get_db_connection_lib
+from time import sleep
+
+toggle_itune = False
 
 GENRE_ALIASES = {
     "bollywood music": "bollywood",
@@ -90,29 +93,48 @@ def sync_library():
 
     conn = get_db_connection_lib()
     cursor = conn.cursor()
-
+    progress = 0
     for song in songs:
+        print("toggle Itunes : " , toggle_itune)
+        if toggle_itune:
+            print("[ITUNES]")
+
+            iTunes = itunesApi(song["title"], song["artist"]) or {}
+            print(iTunes)
+            sleep(0.5)
+
+        else:
+            iTunes = {}
         cursor.execute(
             """
-            INSERT INTO library (song_id, title, artist, album, genre, duration)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO library (song_id, title, artist, album, genre, duration , explicit)
+            VALUES (?, ?, ?, ?, ?, ? , ? )
             ON CONFLICT(song_id) DO UPDATE SET
                 title       = excluded.title,
                 artist      = excluded.artist,
                 album       = excluded.album,
                 genre       = excluded.genre,
                 duration    = excluded.duration,
-                last_synced = CURRENT_TIMESTAMP
+                last_synced = CURRENT_TIMESTAMP,
+                explicit    = excluded.explicit
         """,
             (
                 song["id"],
-                song.get("title", ""),
-                song.get("artist", ""),
-                song.get("album", ""),
-                normalise_genre(song.get("genre")),
-                song.get("duration", 0),
+                song["title"],
+                iTunes.get("artist") or song.get("artist", ""),
+                iTunes.get("album") or song.get("album", ""),
+                normalise_genre(iTunes.get("genre") or song.get("genre")),
+                (
+                    (iTunes.get("duration") // 1000)
+                    if iTunes.get("duration")
+                    else song.get("duration", 0)
+                ),
+                iTunes.get("explicit", "notExplicit"),
             ),
         )
+        progress += 1
+        print("Progress : " , progress/len(songs) * 100 , "%")
+        print("Remaing : ", len(songs) - progress)
 
     conn.commit()
     conn.close()

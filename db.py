@@ -19,7 +19,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-#for library sync
+# for library sync
 def get_db_connection_lib():
     os.makedirs(os.path.dirname(DB_PATH_LIB), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_LIB)
@@ -69,7 +69,8 @@ def init_db_lib():
             album       TEXT,
             genre       TEXT,
             duration    INTEGER,
-            last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            explicit    TEXT
         )
     """
     )

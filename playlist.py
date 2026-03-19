@@ -18,6 +18,8 @@
 # - song with every genre other then default gets 2 point
 # - bollywood/rap gets 2 and 2 points each
 # - / gets changed into ,
+# 
+# Implementing star system to grade and push it in navidrome
 
 
 # - songs with a genre tag gets priorities
@@ -190,87 +192,6 @@ def weighted_sample(pool, scores, k):
     k = min(k, len(pool))
     weights = [max(scores.get(sid, 0.01), 0.01) for sid in pool]
     return random.choices(pool, weights=weights, k=k)
-
-
-# def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
-#     n = PLAYLIST_SIZE
-
-#     unheard_pct = min(0.35, unheard_ratio)
-#     wildcard_pct = 0.08
-#     remaining = 1 - unheard_pct - wildcard_pct
-
-#     slots = {
-#         "unheard": max(1, round(n * unheard_pct)),
-#         "wildcard": max(1, round(n * wildcard_pct)),
-#         "positive": max(1, round(n * remaining * 0.35)),
-#         "repeat": max(1, round(n * remaining * 0.35)),
-#         "partial": max(1, round(n * remaining * 0.20)),
-#         "skip": max(1, round(n * remaining * 0.10)),
-#     }
-
-#     def by_signal(signal):
-#         conn = get_db_connection()
-#         rows = conn.execute(
-#             "SELECT DISTINCT song_id FROM listens WHERE signal = ? AND user_id = ?",
-#         (signal, user_id),
-#     ).fetchall()
-#         conn.close()
-#         result = [r[0] for r in rows]
-
-#     # debug
-#         lib = get_db_connection_lib()
-#         for song_id in result:
-#             row = lib.execute(
-#                 "SELECT title, genre FROM library WHERE song_id = ?", (song_id,)
-#             ).fetchone()
-#             if row:
-#                 print(f"  [{signal}] {row[1]} — {row[0]}")
-#         lib.close()
-
-#         return result
-
-
-#     # genre injection replaces random unheard sample
-#     heard_ids = set(scores.keys())
-#     genre_distribution = get_genre_distribution(user_id)
-#     genre_unheard = get_unheard_by_genre_weighted(
-#         heard_ids, genre_distribution, slots["unheard"]
-#     )
-
-#     # fallback to pure random if genre injection doesn't fill the slot
-#     if len(genre_unheard) < slots["unheard"]:
-#         remaining_count = slots["unheard"] - len(genre_unheard)
-#         already_picked = set(genre_unheard)
-#         leftover = [s for s in unheard if s not in already_picked]
-#         genre_unheard += random.sample(leftover, min(remaining_count, len(leftover)))
-
-
-#     playlist = []
-#     playlist += genre_unheard  # ← was random.sample(unheard, ...)
-#     playlist += weighted_sample(wildcards, scores, slots["wildcard"])
-#     playlist += weighted_sample(by_signal("positive"), scores, slots["positive"])
-#     playlist += weighted_sample(by_signal("repeat"), scores, slots["repeat"])
-#     playlist += weighted_sample(by_signal("partial"), scores, slots["partial"])
-#     playlist += weighted_sample(by_signal("skip"), scores, slots["skip"])
-
-#     seen = set()
-#     unique = []
-#     for song_id in playlist:
-#         if song_id not in seen:
-#             seen.add(song_id)
-#             unique.append(song_id)
-
-#     # top-up if dedup caused shortage
-#     if len(unique) < n:
-#         all_lib = get_db_connection_lib().execute("SELECT song_id FROM library").fetchall()
-#         all_ids = [r[0] for r in all_lib]
-#         extras = [s for s in all_ids if s not in seen]
-#         random.shuffle(extras)
-#         unique += extras[: n - len(unique)]
-
-#     random.shuffle(unique)
-#     return unique[:n]
-
 
 def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
     n = PLAYLIST_SIZE

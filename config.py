@@ -10,6 +10,10 @@
 from dotenv import load_dotenv
 import os
 import requests
+from queue import Queue
+
+
+event_queue = Queue()
 
 load_dotenv()
 
@@ -50,6 +54,20 @@ def build_url_for_user(endpoint, username, password):
         f"&c={app_name}"
         f"&f=json"
     )
+
+def login():
+    res= requests.post(f"{Navidrome_url}/auth/login", json={
+        "username" : Navidrome_admin,
+        "password" : navidrome_password
+    }
+    )
+    data = res.json()
+    return {
+        "jwt": data["token"],
+        "subsonic_token": data["subsonicToken"],
+        "subsonic_salt": data["subsonicSalt"],
+        "username": data["username"]
+    }
 
 
 # https://itunes.apple.com/search?term=tum+mere+ho&entity=song&limit=5

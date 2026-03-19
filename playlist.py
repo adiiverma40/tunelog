@@ -1,16 +1,38 @@
 # build playlist depending on user interaction
 # song that user havent listened in 60 days, gets a chance in playlist
-#implemented genre injection, it maps out most song listened from specif genre and give them a high chance in playlist,
-#genre injection sometimes gives songs without metadata less priortiy
-#this can be fixed by listening that song once
+# implemented genre injection, it maps out most song listened from specif genre and give them a high chance in playlist,
+# genre injection sometimes gives songs without metadata less priortiy
+# this can be fixed by listening that song once
 
-#tried to give song that user havent heared a lost of priorty
+# tried to give song that user havent heared a lost of priorty
 
-#playlist  maps like this
+# playlist  maps like this
 # repated song high priorty
 # fully listened less priorty
 # skipped less priorty
-#song from most listened genre high priorty
+# song from most listened genre high priorty
+
+##IMPLEMENETATION:
+# Implemented genre distrubution system
+#  - default gets 1 point
+# - song with every genre other then default gets 2 point
+# - bollywood/rap gets 2 and 2 points each
+# - / gets changed into ,
+
+
+# - songs with a genre tag gets priorities
+# - after genre fitlration it gets back to the default pointing system of skip, listented, partial and repeated
+
+##ISSUES AND FIXES##
+
+# issue : in slots when using int it was giving less then the amount in PLAYLIST_SIZE
+# fix : used round instead of int
+
+# Issue : Every time it chooses playlist alphabetically
+# fix : added a random function , random.shuffle()
+
+# Issue : timezone diffrent gets error
+# fixed : by adding max
 
 
 from datetime import datetime
@@ -20,7 +42,7 @@ from db import get_db_connection, get_db_connection_lib, init_db, init_db_lib
 from config import build_url, build_url_for_user, USER_CREDENTIALS
 
 PLAYLIST_NAME = "Tunelog - {}"  # {} filled with user_id
-PLAYLIST_SIZE = 50
+PLAYLIST_SIZE = 100
 WILDCARD_DAY = 60
 
 SIGNAL_WEIGHTS = {
@@ -44,7 +66,7 @@ def score_song(user_id):
         signal = row[1]
         timestamp = row[2]
 
-        days_since = (datetime.now() - datetime.fromisoformat(timestamp)).days
+        days_since = max((datetime.now() - datetime.fromisoformat(timestamp)).days, 0)
         recency = 1 / (days_since + 1)
         weight = SIGNAL_WEIGHTS.get(signal, 0)
         contribution = weight * recency
@@ -58,33 +80,43 @@ def score_song(user_id):
     }
 
 
-
 def get_genre_distribution(user_id):
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT genre, COUNT(*) as cnt FROM listens WHERE user_id = ? GROUP BY genre ORDER BY cnt DESC",
-        (user_id,),
+        "SELECT genre FROM listens WHERE user_id = ?", (user_id,)
     ).fetchall()
     conn.close()
-    # returns [("Bollywood", 60), ("Bhangra", 25), ...]
-    return [(row[0], row[1]) for row in rows if row[0]]  # filter out NULL genres
+
+    counts = {}
+    for row in rows:
+        if not row[0]:
+            continue
+        for genre in row[0].split(","):
+            genre = genre.strip()
+            if genre:
+                counts[genre] = counts.get(genre, 0) + 1
+
+    return sorted(counts.items(), key=lambda x: x[1], reverse=True)
 
 
 def get_unheard_by_genre(heard_ids, genre, limit):
+    conn = get_db_connection_lib()
     if not heard_ids:
-        placeholders = "SELECT NULL WHERE 1=0"  # empty fallback
-        params = (genre,)
+        rows = conn.execute(
+            "SELECT song_id, genre FROM library WHERE genre LIKE ?",
+            (f"%{genre}%",),
+        ).fetchall()
     else:
         placeholders = ",".join("?" * len(heard_ids))
-        params = (genre, *heard_ids)
-
-    conn = get_db_connection_lib()
-    rows = conn.execute(
-        f"SELECT song_id FROM library WHERE genre = ? AND song_id NOT IN ({placeholders})",
-        params,
-    ).fetchall()
+        rows = conn.execute(
+            f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})",
+            (f"%{genre}%", *heard_ids),
+        ).fetchall()
     conn.close()
-    return [r[0] for r in rows][:limit]
+
+    results = [(r[0], r[1]) for r in rows]
+    random.shuffle(results)  
+    return results[:limit]
 
 
 def get_unheard_by_genre_weighted(heard_ids, genre_distribution, total_slots):
@@ -92,17 +124,29 @@ def get_unheard_by_genre_weighted(heard_ids, genre_distribution, total_slots):
         return []
 
     total_listens = sum(cnt for _, cnt in genre_distribution)
-    result = []
+    scored = {}  # song_id → points
 
     for genre, cnt in genre_distribution:
-        # how many slots this genre gets proportional to listen count
-        genre_slots = round((cnt / total_listens) * total_slots)
+        # genre_slots = round((cnt / total_listens) * total_slots)
+        genre_slots = max(1, round((cnt / total_listens) * total_slots))
         if genre_slots <= 0:
             continue
         songs = get_unheard_by_genre(heard_ids, genre, genre_slots)
-        result += songs
 
-    return result
+        for song_id, song_genre in songs:
+            if song_genre == "default":
+                pts = 1
+            else:
+                pts = len(song_genre.split(",")) * 2  # 2pts per genre tag
+
+            if song_id not in scored:
+                scored[song_id] = pts
+            else:
+                scored[song_id] += pts  # song matched multiple genre pools
+
+    # sort by points descending, return top total_slots
+    sorted_songs = sorted(scored.items(), key=lambda x: x[1], reverse=True)
+    return [song_id for song_id, _ in sorted_songs[:total_slots]]
 
 
 def get_unheard_songs(scored_ids):
@@ -118,6 +162,23 @@ def get_unheard_songs(scored_ids):
     return unheard, unheard_ratio
 
 
+def get_unheard_by_genre(heard_ids, genre, limit):
+    conn = get_db_connection_lib()
+    if not heard_ids:
+        rows = conn.execute(
+            "SELECT song_id, genre FROM library WHERE genre LIKE ?",
+            (f"%{genre}%",),
+        ).fetchall()
+    else:
+        placeholders = ",".join("?" * len(heard_ids))
+        rows = conn.execute(
+            f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})",
+            (f"%{genre}%", *heard_ids),
+        ).fetchall()
+    conn.close()
+    return [(r[0], r[1]) for r in rows][:limit]
+
+
 def get_wildcard_songs(scores, user_id):
     conn = get_db_connection()
     rows = conn.execute(
@@ -130,7 +191,7 @@ def get_wildcard_songs(scores, user_id):
     for row in rows:
         song_id = row[0]
         last_played = row[1]
-        days_since = (datetime.now() - datetime.fromisoformat(last_played)).days
+        days_since = max((datetime.now() - datetime.fromisoformat(last_played)).days, 0)
         if days_since >= WILDCARD_DAY and scores.get(song_id, 0) > 0:
             wildcards.append(song_id)
 
@@ -153,22 +214,44 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
     remaining = 1 - unheard_pct - wildcard_pct
 
     slots = {
-        "unheard": int(n * unheard_pct),
-        "wildcard": int(n * wildcard_pct),
-        "positive": int(n * remaining * 0.35),
-        "repeat": int(n * remaining * 0.35),
-        "partial": int(n * remaining * 0.20),
-        "skip": int(n * remaining * 0.10),
+        "unheard": max(1, round(n * unheard_pct)),
+        "wildcard": max(1, round(n * wildcard_pct)),
+        "positive": max(1, round(n * remaining * 0.35)),
+        "repeat": max(1, round(n * remaining * 0.35)),
+        "partial": max(1, round(n * remaining * 0.20)),
+        "skip": max(1, round(n * remaining * 0.10)),
     }
 
     def by_signal(signal):
         conn = get_db_connection()
         rows = conn.execute(
             "SELECT DISTINCT song_id FROM listens WHERE signal = ? AND user_id = ?",
-            (signal, user_id),
-        ).fetchall()
+        (signal, user_id),
+    ).fetchall()
         conn.close()
-        return [r[0] for r in rows]
+        result = [r[0] for r in rows]
+    
+    # debug
+        lib = get_db_connection_lib()
+        for song_id in result:
+            row = lib.execute(
+                "SELECT title, genre FROM library WHERE song_id = ?", (song_id,)
+            ).fetchone()
+            if row:
+                print(f"  [{signal}] {row[1]} — {row[0]}")
+        lib.close()
+    
+        return result
+
+    # def by_signal(signal):
+    #     conn = get_db_connection()
+    #     rows = conn.execute(
+    #         "SELECT DISTINCT song_id FROM listens WHERE signal = ? AND user_id = ?",
+    #         (signal, user_id),
+    #     ).fetchall()
+    #     conn.close()
+    #     # print(r[0] for r in rows)
+    #     return [r[0] for r in rows]
 
     # ── genre injection replaces random unheard sample ──
     heard_ids = set(scores.keys())
@@ -183,7 +266,7 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
         already_picked = set(genre_unheard)
         leftover = [s for s in unheard if s not in already_picked]
         genre_unheard += random.sample(leftover, min(remaining_count, len(leftover)))
-    # ────────────────────────────────────────────────────
+
 
     playlist = []
     playlist += genre_unheard  # ← was random.sample(unheard, ...)
@@ -200,9 +283,16 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
             seen.add(song_id)
             unique.append(song_id)
 
+    # top-up if dedup caused shortage
+    if len(unique) < n:
+        all_lib = get_db_connection_lib().execute("SELECT song_id FROM library").fetchall()
+        all_ids = [r[0] for r in all_lib]
+        extras = [s for s in all_ids if s not in seen]
+        random.shuffle(extras)
+        unique += extras[: n - len(unique)]
+
     random.shuffle(unique)
     return unique[:n]
-
 
 def push_playlist(song_ids, user_id):
     name = PLAYLIST_NAME.format(user_id)

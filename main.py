@@ -27,12 +27,18 @@
 
 # implement loging when song changes done
 
+
+# ISSUES AND FIXS
+
+
+
 import requests
 import time
 from config import build_url
 from db import get_db_connection, init_db, init_db_lib
 from library import sync_library
 from playlist import main as generate_playlist
+from library import normalise_genre
 
 
 # store user data
@@ -68,7 +74,6 @@ def Watcher():
             latest[user_id] = entry
 
     entries = list(latest.values())  # deduplicated
-    # ─────────────────────────────────────────────────
 
     for entry in entries:
         user_id = entry["username"]
@@ -94,7 +99,12 @@ def Watcher():
                 "title": entry.get("title", ""),
                 "album": entry.get("album", ""),
                 "artist": entry.get("artist", ""),
-                "genre": entry.get("genre", ""),
+                # "genre": entry.get("genre", "default").lower().strip(),
+                # "genre": ",".join(
+                #     g.strip().lower()
+                #     for g in (entry.get("genre") or "default").split("/")   #   BOLLYWOOD/RAP = bollywood,rap
+                # ),
+                "genre": normalise_genre(entry.get("genre")),
                 "duration": entry["duration"],
                 "start_time": time.time(),
             }

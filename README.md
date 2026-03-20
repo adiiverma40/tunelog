@@ -33,6 +33,8 @@ Generated playlists include:
 - **Navidrome** — self-hosted music server (Subsonic API)
 - **Python** — watcher + playlist generator
 - **SQLite** — two local databases (listen history + full library)
+- **FastAPI** — REST API layer (early stage)
+- **React + TypeScript + Vite** — web dashboard (early stage, TailAdmin base)
 
 ## Project Structure
 ```
@@ -43,6 +45,7 @@ TuneLog/
 │   ├── library.py       # syncs full song library from Navidrome into SQLite
 │   ├── db.py            # SQLite schema and connection helpers
 │   ├── config.py        # builds Navidrome API URLs + per-user credentials
+│   ├── api.py           # FastAPI backend — exposes SQLite data to dashboard
 │   └── Data/
 │       ├── tunelog.db   # listen history (auto-created)
 │       └── songlist.db  # full library cache (auto-created)
@@ -59,19 +62,34 @@ TuneLog/
 - Python 3.10+
 - Navidrome instance (local or remote)
 - Docker (optional, recommended for Navidrome)
+
 ## Setup
 
-### For Web UI
+### Web UI (early stage — work in progress)
+
+> ⚠️ The web dashboard is in early development. Data is connected but UI still needs significant polishing. Not production-ready.
+
+**1. Start the API server**
 ```bash
-#Go to frontend folder
-cd frontend
-#Install dependencies
-npm install
-#start server
-npm build dev
+cd backend
+pip install fastapi uvicorn
+uvicorn api:app --reload --port 8000
 ```
-- For now, i havent integrated frontend to docker
-### Docker (recommended)
+
+**2. Start the frontend**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Dashboard will be available at `http://localhost:5173`. Requires the API server running on port 8000.
+
+---
+
+### Docker (recommended for backend)
+
+> Note: Frontend is not yet integrated into Docker. Run it manually as above.
 
 **1. Clone the repo**
 
@@ -96,14 +114,9 @@ cp .env.example .env
 **3. Install dependencies**
 ```bash
 cd backend
-
 pip install -r requirements.txt
 ```
-**4. Run**
-```bash
-python main.py
-```
-Edit `.env` with your Navidrome details:
+**4. Configure `.env`**
 ```env
 base_url=http://localhost:4533
 admin_username=your_admin_username
@@ -113,42 +126,36 @@ admin_password=your_admin_password
 USER_youruser=youruser
 PASSWORD_youruser=yourpassword
 ```
-For multiple users add the following in `config.py`
 
-    USER_CREDENTIALS = {
+For multiple users add the following in `config.py`:
+```python
+USER_CREDENTIALS = {
     os.getenv("admin_username"): os.getenv("admin_password"),
     os.getenv("USER_youruser"): os.getenv("PASSWORD_youruser"),
-    ## Manully add as many user as you have
-    
-    }
+    ## Manually add as many users as you have
+}
+```
 
-
-**3. Change the Size of playlist**
-
-Change the playlist size from `playlist.py`
-
+**5. Change playlist size**
 ```python
-
+# playlist.py
 PLAYLIST_SIZE = 10
 ```
 
-**4. Run**
+**6. Run**
 ```bash
 python main.py
 ```
 
-**Notic :-**
-If you are using Navidrome client, turn on the scrobling feature or it will not report back
+> **Note:** If you are using a Navidrome client, turn on the scrobbling feature or it will not report back.
 
 TuneLog will:
-- Start watching what's playing every 5 seconds
+- Start watching what's playing in real time via SSE
 - Log listen history to SQLite
 - Automatically regenerate personalised playlists every hour (when no one is playing)
 
 ## Playlist Generation
 Playlists are pushed directly to Navidrome and appear under each user's account as **"Tunelog - username"**. They are private — only visible to the playlist owner.
-
-Slot distribution dynamically adjusts as your library gets explored:
 
 | Slot | Share | Notes |
 |---|---|---|
@@ -160,8 +167,8 @@ Slot distribution dynamically adjusts as your library gets explored:
 | Skip | ~5% | rare re-exposure |
 
 ## Database
-
 ![Database](Screenshots/tunelog_db.png)
+
 ## Playlist
 ![Playlist](Screenshots/playlist_1.png)
 
@@ -176,15 +183,17 @@ Slot distribution dynamically adjusts as your library gets explored:
 - [x] Wildcard resurrection (60-day decay)
 - [x] Per-user personalised playlists
 - [x] Playlist pushed directly to Navidrome (private, per-user)
-- [ ] Web UI dashboard
+- [x] Docker support
+- [x] FastAPI backend (early stage)
+- [ ] Web UI dashboard (in progress — needs polish)
+- [ ] Auto library sync scheduler
+- [ ] M3U export
 
 ## Why TuneLog?
 Most self-hosted music servers either have no recommendations or rely on external APIs like Last.fm. TuneLog is fully offline, stores everything locally, and is built around implicit feedback — your listening behaviour is the only input needed.
 
 ---
 > Built for Navidrome. Inspired by how early Last.fm and Spotify worked before they had millions of users.
-
-
 
 ## Credits
 - UI built on [TailAdmin React](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard) (MIT)

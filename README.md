@@ -52,20 +52,37 @@ TuneLog/
 - Python 3.10+
 - Navidrome instance (local or remote)
 - Docker (optional, recommended for Navidrome)
-
 ## Setup
-**1. Clone the repo**
 
-**2. Download requiremnets**
-```bash
-pip install -r requirements.txt
-```
+### Docker (recommended)
+**1. Clone the repo**
 
 **2. Configure your environment**
 ```bash
 cp .env.example .env
+# Edit .env with your Navidrome URL, credentials, etc.
+```
+**3. Run**
+```bash
+docker compose up --build
 ```
 
+### Manual
+**1. Clone the repo**
+
+**2. Configure your environment**
+```bash
+cp .env.example .env
+# Edit .env with your Navidrome URL, credentials, etc.
+```
+**3. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+**4. Run**
+```bash
+python main.py
+```
 Edit `.env` with your Navidrome details:
 ```env
 base_url=http://localhost:4533

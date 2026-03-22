@@ -4,12 +4,39 @@ This document outlines the technical architecture, data flow, and design decisio
 
 ## TODO
 
+
 - Added docker support for frontend
 
 
 - Itunes support is broken, My thinking was that i will implement a rating system, if check if the song has metadata, and explicit metadata, If not then fetch it using itunes and add it songlist database, but its not completed yet
 
 - SSE works fine but when using Navidrome client like Tempo it generate more then 1 event when playing music, this makes Watcher() run more then once, No imminnet problem yet, but it can create an overhead
+
+
+
+## Roadmap
+- [x] Navidrome API connection
+- [x] SQLite listen logger
+- [x] Multi-user support
+- [x] INSERT on new song, UPDATE within 10 min window
+- [x] Signal scoring (skip / partial / positive / repeat)
+- [x] Recency-weighted scoring
+- [x] Genre-injected unheard song discovery
+- [x] Wildcard resurrection (60-day decay)
+- [x] Per-user personalised playlists
+- [x] Playlist pushed directly to Navidrome (private, per-user)
+- [x] Docker support
+- [x] FastAPI backend (early stage)
+- [ ] Web UI dashboard (in progress — needs polish)
+- [ ] Auto library sync scheduler
+- [ ] M3U export
+- [ ] Add stop library sync
+- [ ] Figure out why cpu spikes when using fast sync in docker but not when doing python3
+- [ ] Add more information to users in users page
+- [ ] Add delete user option
+- [ ] Add playlist creation
+- [ ] Figure out if I can use updateplaylist api of navidrome
+- [ ] Use a better approach to the marking stat system, if user listen to one song and get one star and listen again completely it gets flagged as repeat and gets a 5 star
 
 
 

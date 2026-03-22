@@ -9,6 +9,7 @@ import requests
 from config import Navidrome_url
 
 from db import get_db_connection_lib , get_db_connection, get_db_connection_usr
+from db import init_db, init_db_lib, init_db_usr
 
 
 from fastapi import FastAPI
@@ -22,6 +23,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
+    init_db_lib()
+    init_db_usr()
 
 
 class CreateUserData(BaseModel):
@@ -266,3 +274,10 @@ def getUsers(data: AdminAuth):
 # }
 
 # print(createUser(data))
+
+
+if __name__ == "__main__":
+    init_db()
+    init_db_lib()
+    print("asdasd")
+    init_db_usr()

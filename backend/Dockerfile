@@ -18,4 +18,4 @@ WORKDIR /app
 COPY --from=builder /app/deps /app/deps
 COPY . .
 
-CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]

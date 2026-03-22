@@ -37,8 +37,7 @@
 
 
 ##ISSUE: when using mobile client for navidrom, Tempo, it reports twice for the nowplayingcount event in sse
-#           - this issue causes to run watcher multiple times, 
-
+#           - this issue causes to run watcher multiple times,
 
 
 import requests
@@ -52,8 +51,10 @@ from playlist import main as generate_playlist
 from library import normalise_genre
 from watcher import start_sse
 from misc import push_star
+import uvicorn
 # store user data
 active = {}
+
 
 # queue
 # event_queue = Queue()
@@ -243,14 +244,16 @@ if __name__ == "__main__":
     # Database
     init_db()
     init_db_lib()
+
     # sync library
-
     sync_library()
-
     # generate playlist
     print("[TuneLog] Generating playlist...")
-    
     generate_playlist()
+    
+
+    # starts uvicorn server
+    uvicorn.run("api:app", host="0.0.0.0", port=8000)
 
     ##Watcher script
 

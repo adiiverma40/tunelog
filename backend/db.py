@@ -4,17 +4,10 @@
 import sqlite3
 import os
 
-
-# db for loging song history
-DB_PATH_LOG = os.path.join(os.path.dirname(__file__), "Data", "tunelog.db")
-
-# db for song list
-DB_PATH_LIB = os.path.join(os.path.dirname(__file__), "Data", "songlist.db")
-
-
-# DB for USER / admin
-
-DB_PATH_USR = os.path.join(os.path.dirname(__file__), "Data", "users.db")
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # goes up to tunelog/
+DB_PATH_LOG = os.path.join(BASE_DIR, "data", "tunelog.db")
+DB_PATH_LIB = os.path.join(BASE_DIR, "data", "songlist.db")
+DB_PATH_USR = os.path.join(BASE_DIR, "data", "users.db")
 
 # Database connection
 
@@ -34,6 +27,7 @@ def get_db_connection_lib():
 
 # for library sync
 def get_db_connection_usr():
+    
     os.makedirs(os.path.dirname(DB_PATH_USR), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_USR)
     conn.row_factory = sqlite3.Row

@@ -1,7 +1,6 @@
 ### for things i dont know where to put
 
-
-from config import build_url_for_user, USER_CREDENTIALS
+from config import build_url_for_user, getAllUser
 import requests
 
 
@@ -14,6 +13,7 @@ def push_star(song_id, user_id, signal):
     }
     rating = star_map.get(signal, 0)
 
+    USER_CREDENTIALS = getAllUser()
     password = USER_CREDENTIALS.get(user_id)
     if not password:
         print(f"[STAR ERROR] No credentials found for {user_id}")

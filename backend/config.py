@@ -2,6 +2,9 @@
 # API CALL
 
 # TODO : idk how but implement a dynamic users list, i have 3 users i can add it mannualy,
+# to implement dynamic users we will get data from web ui and put it in database, already done, after that we will pull infro from database to make it dynamic
+
+
 # if someone is reviewing this, add a way to implement multiple users
 
 # implement Itunes API search for the songs and write the metadata, add columns for explict content
@@ -15,7 +18,7 @@ import requests
 import re
 from queue import Queue
 from pathlib import Path
-
+from db import get_db_connection_usr
 
 event_queue = Queue()
 
@@ -28,16 +31,18 @@ api_version = "1.16.1"
 app_name = "tunelog"
 
 
-# ADD MORE LINES IF YOU HAVE MORE USERS
-USER_CREDENTIALS = {
-    os.getenv("USER_ADITI"): os.getenv("PASSWORD_aditi"),
-    os.getenv("USER_adii_mobile"): os.getenv("PASSWORD_adii_mobile"),
-    os.getenv("admin_username"): os.getenv("admin_password"),
-}
+def getAllUser():
+    conn = get_db_connection_usr()
+    users = conn.execute("SELECT * FROM user").fetchall()
+
+    USER_CREDENTIALS = {
+        dict(user)["username"]: dict(user)["password"] for user in users
+    }
+
+    return USER_CREDENTIALS
 
 
-
-# Navidrome does not support subsonic api create user endpoint 
+# Navidrome does not support subsonic api create user endpoint
 
 # http://your-server/rest/createUser.view?username=adii&password=1234&email=adii@mail.com&u=admin&p=adminpass&v=1.13.0&c=MyApp&f=json
 

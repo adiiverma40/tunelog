@@ -61,13 +61,15 @@ TuneLog/
 └── Dockerfile
 ```
 
-
 ## Multi User
-- Now Users can be added from web ui, go to Users from web ui
-- For now it only create users in Navidrome
-- TODO: Integrate this in playlist generation
 
-- For playlist for multiple user, you have to manually do it, instruction are further down in readme
+Users can be added directly from the TuneLog web dashboard — no manual config editing needed.
+
+1. Open the web UI at **http://localhost:5173/**
+2. Go to **Users** from the sidebar
+3. Fill in the username and password — TuneLog will create the user in Navidrome and register them automatically
+
+> If you're running via Docker, replace `localhost` with your server's IP address.
 
 
 

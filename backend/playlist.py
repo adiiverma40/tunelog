@@ -18,7 +18,7 @@
 # - song with every genre other then default gets 2 point
 # - bollywood/rap gets 2 and 2 points each
 # - / gets changed into ,
-# 
+#
 # Implementing star system to grade and push it in navidrome
 
 
@@ -37,14 +37,14 @@
 # fixed : by adding max
 
 # Issue : Not generating exact no of song in playlist as playlist size
-# Fix : Added a check loop, if counter is less then playlist size, run the loop again 
+# Fix : Added a check loop, if counter is less then playlist size, run the loop again
 
 
 from datetime import datetime
 import requests
 import random
-from db import get_db_connection, get_db_connection_lib, init_db, init_db_lib
-from config import build_url, build_url_for_user, USER_CREDENTIALS
+from db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+from config import build_url, build_url_for_user, getAllUser
 
 PLAYLIST_NAME = "Tunelog - {}"  # {} filled with user_id
 PLAYLIST_SIZE = 40
@@ -286,6 +286,7 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
 
 
 def push_playlist(song_ids, user_id):
+    USER_CREDENTIALS = getAllUser()
     name = PLAYLIST_NAME.format(user_id)
     password = USER_CREDENTIALS.get(user_id)
 
@@ -318,11 +319,45 @@ def push_playlist(song_ids, user_id):
     print(f"[TuneLog] Playlist pushed for {user_id} — {len(song_ids)} songs")
 
 
+## for user mismatch, two condition user database has less user then lib, it will flag and tell user to add that user via web ui 
+# if user database has higher them it will tell which user has not listened to musci
+
 def get_all_users():
-    conn = get_db_connection()
-    rows = conn.execute("SELECT DISTINCT user_id FROM listens").fetchall()
-    conn.close()
-    return [row[0] for row in rows]
+    # fetch from both DBs
+    listens_conn = get_db_connection()
+    users_conn = get_db_connection_usr()
+
+    listening_users = set(
+        row[0]
+        for row in listens_conn.execute(
+            "SELECT DISTINCT user_id FROM listens"
+        ).fetchall()
+    )
+
+    registered_users = set(
+        row[0] for row in users_conn.execute("SELECT username FROM user").fetchall()
+    )
+
+    listens_conn.close()
+    users_conn.close()
+
+    # users in listens DB but not registered — skip playlist, warn
+    unregistered = listening_users - registered_users
+    if unregistered:
+        print(f"[MISMATCH] These users have listens but are NOT registered in TuneLog:")
+        for u in unregistered:
+            print(f"  → {u} — log this user via the Web UI to generate their playlist")
+
+    # users registered but no listens — just inform, don't skip
+    inactive = registered_users - listening_users
+    if inactive:
+        print(f"[INFO] These users are registered but have no listen history yet:")
+        for u in inactive:
+            print(f"  → {u}")
+
+    # only return users that are registered AND have listens
+    valid_users = registered_users & listening_users
+    return list(valid_users)
 
 
 def main():

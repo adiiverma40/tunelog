@@ -12,6 +12,8 @@ This document outlines the technical architecture, data flow, and design decisio
 
 - SSE works fine but when using Navidrome client like Tempo it generate more then 1 event when playing music, this makes Watcher() run more then once, No imminnet problem yet, but it can create an overhead
 
+- Create a failsafe and change the songlist db depeneding on deleted songs, currently if some songs were delete, playlist will created and based on those deleted songs
+
 
 
 ## Roadmap

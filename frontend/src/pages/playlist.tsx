@@ -9,6 +9,7 @@ import {
   fetchGetUsers,
   PlaylistSong,
   PlaylistStats,
+  fetchLogin
 } from "../API/API";
 import { useNavigate } from "react-router";
 
@@ -87,23 +88,38 @@ export default function Playlist() {
     }
   }, []);
 
-  useEffect(() => {
-    const admin =
-      localStorage.getItem("tunelog_user") ??
-      sessionStorage.getItem("tunelog_user") ??
-      "";
-    const adminPD =
-      localStorage.getItem("tunelog_password") ??
-      sessionStorage.getItem("tunelog_password") ??
-      "";
-    fetchGetUsers({ admin, adminPD }).then((res) => {
-      if (res.status === "ok" && res.users) {
-        const usernames = res.users.map((u) => u.username);
-        setUsers(usernames);
-        if (usernames.length > 0) setSelectedUser(usernames[0]);
-      }
+useEffect(() => {
+  const token =
+    localStorage.getItem("tunelog_token") ||
+    sessionStorage.getItem("tunelog_token");
+
+  if (!token) {
+    navigate("/signin");
+    return;
+  }
+
+  const admin =
+    localStorage.getItem("tunelog_user") ??
+    sessionStorage.getItem("tunelog_user") ??
+    "";
+  const adminPD =
+    localStorage.getItem("tunelog_password") ??
+    sessionStorage.getItem("tunelog_password") ??
+    "";
+
+  // re-login first to ensure user is in DB, then fetch users
+  fetchLogin({ username: admin, password: adminPD })
+    .catch(() => {})
+    .finally(() => {
+      fetchGetUsers({ admin, adminPD }).then((res) => {
+        if (res.status === "ok" && res.users) {
+          const usernames = res.users.map((u) => u.username);
+          setUsers(usernames);
+          if (usernames.length > 0) setSelectedUser(usernames[0]);
+        }
+      });
     });
-  }, []);
+}, []);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -213,7 +229,7 @@ export default function Playlist() {
             },
             {
               label: "Songs in Playlist",
-              value: stats ? stats.total_songs.toLocaleString() : "—",
+              value: stats?.total_songs?.toLocaleString() ?? "—",
             },
             { label: "Showing", value: `${sortedSongs.length} songs` },
             { label: "Top Genre", value: stats?.top_genre ?? "—" },

@@ -39,6 +39,9 @@ pip-wheel-metadata/
 *.db
 *.sqlite3
 *.db-journal
+*.db-shm
+*.db-wal
+
 
 
 # IDE/editor and OS files

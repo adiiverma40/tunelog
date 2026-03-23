@@ -46,7 +46,7 @@ import time
 from datetime import datetime
 # from queue import Queue
 from config import build_url , event_queue
-from db import get_db_connection, init_db, init_db_lib, init_db_usr
+from db import get_db_connection, init_db, init_db_lib, init_db_usr, init_db_playlist
 import library
 from playlist import main as generate_playlist
 from library import normalise_genre
@@ -244,6 +244,7 @@ if __name__ == "__main__":
     init_db()
     init_db_lib()
     init_db_usr()
+    init_db_playlist()
 
 
 

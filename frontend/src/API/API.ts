@@ -29,6 +29,13 @@ export interface SyncStatus {
     explicit_songs: number
     last_sync: string | null
     songs_needing_itunes: number
+    explicit_counts: {
+        explicit:    number
+        notExplicit: number
+        cleaned:     number
+        notInItunes: number
+        pending:     number
+    }
 }
 
 export interface SyncStartResponse {
@@ -82,6 +89,36 @@ export interface GetUsersResponse {
     users?: User[]
     reason?: string
 }
+
+
+
+export interface PlaylistSong {
+    song_id: string
+    title: string
+    artist: string
+    genre: string
+    signal: string
+    explicit: string
+}
+
+export interface PlaylistStats {
+    last_generated: string
+    total_songs: number
+    top_genre: string
+}
+
+export interface PlaylistSongsResponse {
+    status: string
+    stats: PlaylistStats
+    songs: PlaylistSong[]
+}
+
+export interface PlaylistGenerateResponse {
+    status: string
+    songs_added?: number
+    reason?: string
+}
+
 
 // API Calls
 
@@ -142,5 +179,25 @@ export async function fetchGetUsers(data: AdminAuthRequest): Promise<GetUsersRes
         body: JSON.stringify(data)
     })
     if (!res.ok) throw new Error("Failed to get users")
+    return res.json()
+}
+
+
+
+export async function fetchPlaylistSongs(username: string): Promise<PlaylistSongsResponse> {
+    const res = await fetch(`${BASE_URL}/api/playlist/songs?username=${username}`)
+    if (!res.ok) throw new Error("Failed to fetch playlist songs")
+    return res.json()
+}
+
+export async function fetchPlaylistGenerate(
+    username: string,
+    explicit_filter: string = "allow_cleaned",
+    size: number = 50
+): Promise<PlaylistGenerateResponse> {
+    const res = await fetch(
+        `${BASE_URL}/api/playlist/generate?username=${username}&explicit_filter=${explicit_filter}&size=${size}`
+    )
+    if (!res.ok) throw new Error("Failed to generate playlist")
     return res.json()
 }

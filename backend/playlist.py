@@ -22,6 +22,17 @@
 # Implementing star system to grade and push it in navidrome
 
 
+#implementation : explict song filter
+# input from frontend, if they want explict or cleaned or all
+
+
+
+
+
+
+
+
+
 # - songs with a genre tag gets priorities
 # - after genre fitlration it gets back to the default pointing system of skip, listented, partial and repeated
 
@@ -43,7 +54,7 @@
 from datetime import datetime
 import requests
 import random
-from db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+from db import get_db_connection, get_db_connection_lib, get_db_connection_usr , get_db_connection_playlist
 from config import build_url, build_url_for_user, getAllUser
 
 PLAYLIST_NAME = "Tunelog - {}"  # {} filled with user_id
@@ -193,11 +204,34 @@ def weighted_sample(pool, scores, k):
     weights = [max(scores.get(sid, 0.01), 0.01) for sid in pool]
     return random.choices(pool, weights=weights, k=k)
 
-def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
-    n = PLAYLIST_SIZE
+
+def get_allowed_song_ids(explicit_filter: str) -> set:
+    conn = get_db_connection_lib()
+
+    if explicit_filter == "strict":
+        rows = conn.execute(
+            "SELECT song_id FROM library WHERE explicit = 'notExplicit'"
+        ).fetchall()
+    elif explicit_filter == "allow_cleaned":
+        rows = conn.execute(
+            "SELECT song_id FROM library WHERE explicit IN ('notExplicit', 'cleaned', 'notInItunes')"
+        ).fetchall()
+    else:  # all
+        rows = conn.execute("SELECT song_id FROM library").fetchall()
+
+    conn.close()
+    return {row[0] for row in rows}
+
+
+def build_playlist(
+    scores, unheard, wildcards, unheard_ratio, user_id, explicit_filter="allow_cleaned"  , n = PLAYLIST_SIZE):
+    # n = PLAYLIST_SIZE
     playlist_ids = []
     seen_ids = set()
     added_count = 0
+    song_signals = {}
+
+    allowed_ids = get_allowed_song_ids(explicit_filter)
 
     unheard_pct = min(0.35, unheard_ratio)
     wildcard_pct = 0.08
@@ -214,40 +248,40 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
 
     def by_signal(signal, conn):
         rows = conn.execute(
-        "SELECT DISTINCT song_id FROM listens WHERE signal = ? AND user_id = ?",
-        (signal, user_id),
-    ).fetchall()
-        return [r[0] for r in rows]
+            "SELECT DISTINCT song_id FROM listens WHERE signal = ? AND user_id = ?",
+            (signal, user_id),
+        ).fetchall()
+        return [r[0] for r in rows if r[0] in allowed_ids]
 
-    # Prepare pools
     genre_distribution = get_genre_distribution(user_id)
     genre_unheard = get_unheard_by_genre_weighted(
         set(scores.keys()), genre_distribution, slots["unheard"]
     )
 
     conn_log = get_db_connection()
-    # Combined pool logic to draw from
     pools = [
-        ("unheard", genre_unheard + [s for s in unheard if s not in genre_unheard]),
-        ("wildcard", wildcards),
+        (
+            "unheard",
+            [
+                s
+                for s in genre_unheard + [s for s in unheard if s not in genre_unheard]
+                if s in allowed_ids
+            ],
+        ),
+        ("wildcard", [s for s in wildcards if s in allowed_ids]),
         ("positive", by_signal("positive", conn_log)),
         ("repeat", by_signal("repeat", conn_log)),
         ("partial", by_signal("partial", conn_log)),
         ("skip", by_signal("skip", conn_log)),
     ]
 
-    # 1. Fill defined slots first
     for category, pool in pools:
         if not pool:
             continue
 
-        # Determine how many we need for this specific slot
         needed = slots.get(category, 0)
-        # Use weighted sampling for history, random for unheard
         if category == "unheard":
-            candidates = random.sample(
-                pool, min(len(pool), needed * 2)
-            )  # Over-sample to handle dups
+            candidates = random.sample(pool, min(len(pool), needed * 2))
         else:
             candidates = weighted_sample(pool, scores, needed * 2)
 
@@ -256,35 +290,37 @@ def build_playlist(scores, unheard, wildcards, unheard_ratio, user_id):
                 playlist_ids.append(sid)
                 seen_ids.add(sid)
                 added_count += 1
-            if len([x for x in playlist_ids if x in pool]) >= needed:  # Slot filled
+                song_signals[sid] = category
+            if len([x for x in playlist_ids if x in pool]) >= needed:
                 break
 
-    # 2. THE TRACKER LOOP: If still less than PLAYLIST_SIZE, fill until exact
     if added_count < n:
         conn = get_db_connection_lib()
-        all_lib = [r[0] for r in conn.execute("SELECT song_id FROM library").fetchall()]
+        all_lib = [
+            r[0]
+            for r in conn.execute("SELECT song_id FROM library").fetchall()
+            if r[0] in allowed_ids  # filter here too
+        ]
         conn.close()
         random.shuffle(all_lib)
 
-        # Loop runs until added_count matches PLAYLIST_SIZE
         idx = 0
         while added_count < n:
-            # If we run out of library songs (rare), break to avoid infinite loop
             if idx >= len(all_lib):
                 break
-
             candidate_id = all_lib[idx]
             if candidate_id not in seen_ids:
                 playlist_ids.append(candidate_id)
                 seen_ids.add(candidate_id)
                 added_count += 1
+                song_signals[candidate_id] = "unheard"
             idx += 1
 
     random.shuffle(playlist_ids)
-    return playlist_ids[:n]
+    return playlist_ids[:n], song_signals
 
 
-def push_playlist(song_ids, user_id):
+def push_playlist(song_ids, user_id, song_signals):
     USER_CREDENTIALS = getAllUser()
     name = PLAYLIST_NAME.format(user_id)
     password = USER_CREDENTIALS.get(user_id)
@@ -293,7 +329,6 @@ def push_playlist(song_ids, user_id):
         print(f"[TuneLog] No credentials found for {user_id}, skipping")
         return
 
-    # use user-specific URL for all calls
     r = requests.get(build_url_for_user("getPlaylists", user_id, password)).json()
     playlists = r["subsonic-response"]["playlists"].get("playlist", [])
 
@@ -317,12 +352,44 @@ def push_playlist(song_ids, user_id):
 
     print(f"[TuneLog] Playlist pushed for {user_id} — {len(song_ids)} songs")
 
+    conn_lib = get_db_connection_lib()
+    placeholders = ",".join("?" * len(song_ids))
+    rows = conn_lib.execute(
+        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
+        song_ids,
+    ).fetchall()
+    conn_lib.close()
+
+    conn = get_db_connection_playlist()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM playlist WHERE username = ?", (user_id,))
+    cursor.executemany(
+        """
+        INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                user_id,
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                song_signals.get(row[0]) or "unheard",
+                row[4],
+            )
+            for row in rows
+        ],
+    )
+    conn.commit()
+    conn.close()
+    print(f"[TuneLog] Playlist saved to DB for {user_id} — {len(rows)} songs")
+
 
 ## for user mismatch, two condition user database has less user then lib, it will flag and tell user to add that user via web ui
 # if user database has higher them it will tell which user has not listened to musci
 
 def get_all_users():
-    # fetch from both DBs
     listens_conn = get_db_connection()
     users_conn = get_db_connection_usr()
 
@@ -340,35 +407,39 @@ def get_all_users():
     listens_conn.close()
     users_conn.close()
 
-    # users in listens DB but not registered — skip playlist, warn
     unregistered = listening_users - registered_users
     if unregistered:
         print(f"[MISMATCH] These users have listens but are NOT registered in TuneLog:")
         for u in unregistered:
             print(f"  → {u} — log this user via the Web UI to generate their playlist")
 
-    # users registered but no listens — just inform, don't skip
     inactive = registered_users - listening_users
     if inactive:
         print(f"[INFO] These users are registered but have no listen history yet:")
         for u in inactive:
             print(f"  → {u}")
 
-    # only return users that are registered AND have listens
     valid_users = registered_users & listening_users
     return list(valid_users)
 
 
 def main():
-    users = get_all_users()  # dynamically pulls all known users from DB
+    users = get_all_users()
 
     for user_id in users:
         print(f"[TuneLog] Building playlist for {user_id}...")
         scores = score_song(user_id)
         unheard, unheard_ratio = get_unheard_songs(scores)
         wildcards = get_wildcard_songs(scores, user_id)
-        playlist = build_playlist(scores, unheard, wildcards, unheard_ratio, user_id)
-        push_playlist(playlist, user_id)
+        playlist, song_signals = build_playlist(
+            scores,
+            unheard,
+            wildcards,
+            unheard_ratio,
+            user_id,
+            explicit_filter="allow_cleaned",
+        )
+        push_playlist(playlist, user_id, song_signals)
 
 
 if __name__ == "__main__":

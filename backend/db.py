@@ -14,6 +14,7 @@ else:
 DB_PATH_LOG = os.path.join(DATA_DIR, "tunelog.db")
 DB_PATH_LIB = os.path.join(DATA_DIR, "songlist.db")
 DB_PATH_USR = os.path.join(DATA_DIR, "users.db")
+DB_PATH_PLTS = os.path.join(DATA_DIR, "playlist.db")
 
 
 # db connection
@@ -35,10 +36,18 @@ def get_db_connection_lib():
     return conn
 
 
-# for library sync
+# for users
 def get_db_connection_usr():
     os.makedirs(os.path.dirname(DB_PATH_USR), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_USR, timeout=30)  
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# for playlist
+def get_db_connection_playlist():
+    os.makedirs(os.path.dirname(DB_PATH_PLTS), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH_PLTS, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -114,8 +123,33 @@ def init_db_lib():
     conn.close()
 
 
+def init_db_playlist():
+    conn = get_db_connection_playlist()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS playlist (
+            username  TEXT NOT NULL,
+            title     TEXT,
+            artist    TEXT,
+            genre     TEXT,
+            signal    TEXT,
+            explicit  TEXT,
+            song_id   TEXT NOT NULL,
+            generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, song_id)
+        )
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
     init_db()
     init_db_lib()
     print("asdasd")
     init_db_usr()
+    init_db_playlist()

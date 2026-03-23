@@ -16,6 +16,7 @@ import BasicTables from "./pages/Tables/BasicTables";
 import FormElements from "./pages/Forms/FormElements";
 import LibrarySync from "./pages/librarySync";
 import AppLayout from "./layout/AppLayout";
+import Playlist from "./pages/playlist";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 
@@ -32,7 +33,8 @@ export default function App() {
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />
-            <Route path="/librarySync" element={<LibrarySync/>} />
+            <Route path="/librarySync" element={<LibrarySync />} />
+            <Route path="/playlist" element={<Playlist />} />
 
             {/* Forms */}
             <Route path="/form-elements" element={<FormElements />} />

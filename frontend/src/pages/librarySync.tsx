@@ -1,10 +1,12 @@
 
 
+
 import { useState, useEffect, useRef } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Switch from "../components/form/switch/Switch";
 import Button from "../components/ui/button/Button";
+import { useNavigate } from "react-router";
 import {
   fetchSyncStatus,
   fetchSyncStart,
@@ -23,46 +25,51 @@ export default function LibrarySync() {
   const [useItunes, setUseItunes] = useState(false);
   const [autoSyncHour, setAutoSyncHour] = useState<number>(2);
   const [settingsSaved, setSettingsSaved] = useState(false);
-  const [waitingForSync, setWaitingForSync] = useState(false); 
+  const [waitingForSync, setWaitingForSync] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncStartedRef = useRef(false);
 
 
-const calcExpectedTime = () => {
-  if (!syncData) return "—";
+const navigate = useNavigate();
 
-  const itunesActive = syncData.use_itunes || useItunes;
+useEffect(() => {
+  const token =
+    localStorage.getItem("tunelog_token") ||
+    sessionStorage.getItem("tunelog_token");
 
-  if (itunesActive) {
-    const totalNeeding = syncData.songs_needing_itunes ?? syncData.total_songs;
-    const remaining = Math.ceil(totalNeeding * (1 - syncData.progress / 100));
-    const minutes = Math.ceil(remaining / 60);
-
-    if (isSyncing) {
-      return remaining <= 0 ? "Almost done" : `~${minutes} min remaining`;
-    }
-
-    const totalMinutes = Math.ceil(totalNeeding / 60);
-    return totalMinutes < 1 ? "< 1 min" : `~${totalMinutes} min`;
+  if (!token) {
+    navigate("/signin");
+    return;
   }
+}, []);
 
-  return "~2 min";
-};
+  const calcExpectedTime = () => {
+    if (!syncData) return "—";
+    const itunesActive = syncData.use_itunes || useItunes;
+    if (itunesActive) {
+      const totalNeeding =
+        syncData.songs_needing_itunes ?? syncData.total_songs;
+      const remaining = Math.ceil(totalNeeding * (1 - syncData.progress / 100));
+      const minutes = Math.ceil(remaining / 60);
+      if (isSyncing) {
+        return remaining <= 0 ? "Almost done" : `~${minutes} min remaining`;
+      }
+      const totalMinutes = Math.ceil(totalNeeding / 60);
+      return totalMinutes < 1 ? "< 1 min" : `~${totalMinutes} min`;
+    }
+    return "~2 min";
+  };
 
   useEffect(() => {
     fetchSyncStatus().then((data) => {
       setSyncData(data);
       setAutoSyncHour(Math.min(Math.max(data.auto_sync ?? 2, 0), 23));
       setUseItunes(data.use_itunes);
-      
-      
       if (data.is_syncing) {
         syncStartedRef.current = true;
         startPolling();
-        console.log("polling started")
       }
     });
-
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -72,19 +79,16 @@ const calcExpectedTime = () => {
     pollRef.current = setInterval(() => {
       fetchSyncStatus().then((data) => {
         setSyncData(data);
-
         if (data.is_syncing) {
           syncStartedRef.current = true;
           setWaitingForSync(false);
         }
-
         if (syncStartedRef.current && !data.is_syncing) {
           clearInterval(pollRef.current!);
           pollRef.current = null;
           syncStartedRef.current = false;
           setWaitingForSync(false);
         }
-
         if (!data.is_syncing && data.progress >= 100) {
           clearInterval(pollRef.current!);
           pollRef.current = null;
@@ -101,7 +105,7 @@ const calcExpectedTime = () => {
         prev ? { ...prev, is_syncing: false, progress: 0 } : prev,
       );
       syncStartedRef.current = false;
-      setWaitingForSync(true); 
+      setWaitingForSync(true);
       startPolling();
     });
   };
@@ -127,36 +131,28 @@ const calcExpectedTime = () => {
   const progress = syncData?.progress ?? 0;
   const isSyncing = syncData?.is_syncing ?? false;
 
-const formatLastSync = (raw: string | null) => {
-  if (!raw) return "Never";
+  const formatLastSync = (raw: string | null) => {
+    if (!raw) return "Never";
+    const date = new Date(raw.replace(" ", "T") + "Z");
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-  const normalized = raw.replace(" ", "T") +"Z";
-  const date = new Date(normalized);
-
-  return date.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
- const syncStatusText = () => {
-   if (waitingForSync) return "Waiting for sync to start...";
-
-   if (isSyncing) {
-     const syncType = syncData?.use_itunes ? "Slow sync" : "Fast sync";
-     const totalSongs = syncData?.total_songs || 0;
-
-     // Calculate song count and round to the nearest whole number
-     const songCount = Math.round((progress / 100) * totalSongs);
-
-     return `${syncType} in progress... ${progress}% or ${songCount} songs`;
-   }
-
-   if (progress === 100) return "Sync complete";
-
-   return "Ready to sync";
- };
+  const syncStatusText = () => {
+    if (waitingForSync) return "Waiting for sync to start...";
+    if (isSyncing) {
+      const syncType = syncData?.use_itunes ? "Slow sync" : "Fast sync";
+      const totalSongs = syncData?.total_songs || 0;
+      const songCount = Math.round((progress / 100) * totalSongs);
+      return `${syncType} in progress... ${progress}% or ${songCount} songs`;
+    }
+    if (progress === 100) return "Sync complete";
+    return "Ready to sync";
+  };
 
   return (
     <div>
@@ -167,7 +163,7 @@ const formatLastSync = (raw: string | null) => {
       <PageBreadcrumb pageTitle="Library Sync" />
 
       <div className="grid grid-cols-12 gap-4 md:gap-6">
-        {/* Stats Row */}
+        {/* ── Stats Row ── */}
         <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             {
@@ -175,17 +171,16 @@ const formatLastSync = (raw: string | null) => {
               value: syncData?.total_songs.toLocaleString() ?? "—",
             },
             {
-              label: "Explicit Songs",
-              value: syncData?.explicit_songs.toLocaleString() ?? "—",
+              label: "Pending iTunes",
+              value: syncData?.explicit_counts?.pending ?? "—",
+              valueStyle: "text-blue-400",
+              dot: "bg-blue-400",
             },
             {
               label: "Last Sync",
               value: formatLastSync(syncData?.last_sync ?? null),
             },
-            {
-              label: "Expected Sync Time",
-              value: calcExpectedTime(),
-            },
+            { label: "Expected Sync Time", value: calcExpectedTime() },
           ].map((item) => (
             <div
               key={item.label}
@@ -201,7 +196,62 @@ const formatLastSync = (raw: string | null) => {
           ))}
         </div>
 
-        {/* Sync Controls */}
+        {/* ── iTunes Breakdown Row ── */}
+        <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-5">
+          {[
+            {
+              label: "Clean",
+              value: syncData?.explicit_counts?.notExplicit ?? "—",
+              valueStyle: "text-green-500",
+              dot: "bg-green-500",
+            },
+            {
+              label: "Cleaned",
+              value: syncData?.explicit_counts?.cleaned ?? "—",
+              valueStyle: "text-yellow-500",
+              dot: "bg-yellow-500",
+            },
+            {
+              label: "Explicit",
+              value: syncData?.explicit_counts?.explicit ?? "—",
+              valueStyle: "text-red-500",
+              dot: "bg-red-500",
+            },
+            {
+              label: "Not in iTunes",
+              value: syncData?.explicit_counts?.notInItunes ?? "—",
+              valueStyle: "text-gray-400",
+              dot: "bg-gray-400",
+            },
+            // {
+            //   label: "Pending iTunes",
+            //   value: syncData?.explicit_counts?.pending ?? "—",
+            //   valueStyle: "text-blue-400",
+            //   dot: "bg-blue-400",
+            // },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <span
+                  className={`h-2 w-2 rounded-full flex-shrink-0 ${item.dot}`}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {item.label}
+                </p>
+              </div>
+              <p className={`text-xl font-semibold ${item.valueStyle}`}>
+                {typeof item.value === "number"
+                  ? item.value.toLocaleString()
+                  : item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Sync Controls ── */}
         <div className="col-span-12 xl:col-span-7 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">
             Manual Sync
@@ -210,7 +260,6 @@ const formatLastSync = (raw: string | null) => {
             Pulls the latest songs from Navidrome into TuneLog's database.
           </p>
 
-          {/* Progress Bar */}
           <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 mb-4 overflow-hidden">
             <div
               className="h-3 rounded-full bg-brand-500 transition-all duration-300"
@@ -235,7 +284,6 @@ const formatLastSync = (raw: string | null) => {
             <div className="text-xs text-gray-400 -mt-1 ml-1">
               Skips explicit tag fetching — expected ~2 min
             </div>
-
             <Button
               onClick={handleSlowSync}
               disabled={isSyncing || waitingForSync}
@@ -250,7 +298,7 @@ const formatLastSync = (raw: string | null) => {
           </div>
         </div>
 
-        {/* Settings Panel */}
+        {/* ── Settings Panel ── */}
         <div className="col-span-12 xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-6">
             Sync Settings

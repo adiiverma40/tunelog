@@ -39,8 +39,14 @@ const navItems: NavItem[] = [
   {
     name: "Library Sync",
     icon: <ListIcon />,
-     path: "/librarySync",
+    path: "/librarySync",
   },
+  {
+    name: "Playlist",
+    icon: <ListIcon />,
+    path: "/playlist",
+  },
+
   // {
   //   name: "Tables",
   //   icon: <TableIcon />,

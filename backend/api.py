@@ -8,8 +8,17 @@ from pydantic import BaseModel
 import requests
 from config import Navidrome_url
 
-from db import get_db_connection_lib , get_db_connection, get_db_connection_usr
+from db import get_db_connection_lib , get_db_connection, get_db_connection_usr , get_db_connection_playlist
 from db import init_db, init_db_lib, init_db_usr
+
+from playlist import (
+    score_song,
+    get_unheard_songs,
+    get_wildcard_songs,
+    build_playlist,
+    push_playlist,
+)
+
 # from library import isSyncing, progress, auto_sync, toggle_itune , startSyncSong
 import library
 
@@ -296,6 +305,18 @@ def syncStatus():
         "SELECT COUNT(*) FROM library WHERE explicit IS NULL"
     ).fetchone()[0]
 
+    not_explicit = cursor.execute(
+        "SELECT COUNT(*) FROM library WHERE explicit = 'notExplicit'"
+    ).fetchone()[0]
+
+    cleaned = cursor.execute(
+        "SELECT COUNT(*) FROM library WHERE explicit = 'cleaned'"
+    ).fetchone()[0]
+
+    not_in_itunes = cursor.execute(
+        "SELECT COUNT(*) FROM library WHERE explicit = 'notInItunes'"
+    ).fetchone()[0]
+
     conn.close()
 
     return {
@@ -308,6 +329,13 @@ def syncStatus():
         "explicit_songs": explicit_songs,
         "last_sync": last_sync[0] if last_sync else None,
         "songs_needing_itunes": songs_needing_itunes,
+        "explicit_counts": {
+            "explicit": explicit_songs,
+            "notExplicit": not_explicit,
+            "cleaned": cleaned,
+            "notInItunes": not_in_itunes,
+            "pending": songs_needing_itunes,
+        },
     }
 
 
@@ -321,6 +349,76 @@ def startSync(use_itunes: bool = False):
 def syncSetting(auto_sync_hour: int = 2, use_itunes: bool = False):
     library.setSyncSettings(auto_sync_hour, use_itunes)
     return {"status": "ok"}
+
+
+# playlist api
+
+
+@app.get("/api/playlist/songs")
+def getSongsFromPlaylist(username: str):
+    if not username:
+        return {"status": "ERROR, no username"}
+
+    conn = get_db_connection_playlist()
+    rows = conn.execute(
+        "SELECT song_id, title, artist, genre, signal, explicit, generated_at FROM playlist WHERE username = ?",
+        (username,),
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        return {"status": "ok", "songs": [], "stats": {}}
+
+    genre_counts = {}
+    for row in rows:
+        genre = row[3]
+        if genre:
+            genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+    top_genre = max(genre_counts, key=genre_counts.get) if genre_counts else None
+    last_generated = rows[0][6] 
+
+    stats = {
+        "last_generated": last_generated,
+        "total_songs": len(rows),
+        "top_genre": top_genre,
+    }
+
+    songs = [
+        {
+            "song_id": row[0],
+            "title": row[1],
+            "artist": row[2],
+            "genre": row[3],
+            "signal": row[4],
+            "explicit": row[5],
+        }
+        for row in rows
+    ]
+
+    return {"status": "ok", "stats": stats, "songs": songs}
+
+
+@app.get("/api/playlist/generate")
+def generatePlaylist(
+    username: str, explicit_filter: str = "allow_cleaned", size: int = 50
+):
+    try:
+        scores = score_song(username)
+        unheard, unheard_ratio = get_unheard_songs(scores)
+        wildcards = get_wildcard_songs(scores, username)
+        playlist, song_signals = build_playlist(
+            scores, unheard, wildcards, unheard_ratio, username, explicit_filter , size
+        )
+        push_playlist(playlist, username, song_signals)
+
+        return {
+            "status": "ok",
+            "songs_added": len(playlist),
+        }
+
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
 
 
 if __name__ == "__main__":

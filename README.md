@@ -20,6 +20,9 @@ The core logic — signal system, scoring formula, genre injection, playlist slo
 
 - Give users option to choose the amount of signal they want in the playlist by how much, right now its hardcoded but it can be added, but the playlist.py will change a lot, there is so many edge cases to handle in for that option, what if the amount of singal is less then why users wants, but it will a good feature to have, - for future
 
+## ISSUES :
+- Doing fast sync only added half of the songs from playlist , do fast sync multiple times to get all songs, same for slow sync
+
 ## How It Works
 TuneLog watches your Navidrome listening activity in the background. It tracks whether you skip, finish, or replay songs, and uses that behavior to build personalised playlists automatically — one per user.
 

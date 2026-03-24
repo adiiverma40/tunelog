@@ -95,25 +95,11 @@ Users can be added directly from the TuneLog web dashboard — no manual config 
 
 > ⚠️ The web dashboard is in early development. Data is connected but UI still needs significant polishing. Not production-ready.
 
-**1. Start the API server**
-```bash
-cd backend
-pip install fastapi uvicorn
-uvicorn api:app --reload --port 8000
-```
-
-**2. Start the frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
 Dashboard will be available at `http://localhost:5173`. Requires the API server running on port 8000.
 
 ---
 
-### Docker (recommended for backend)
+### Docker (recommended)
 
 **1. Clone the repo**
 
@@ -128,52 +114,48 @@ docker compose up --build
 ```
 
 ### Manual
+> **Note:** if you have run docker before dont do this, docker marks data folder as root and will not be to write in dabase using this method
+
 **1. Clone the repo**
 
-**2. Configure your environment**
+**2. Start the API server**
+```bash
+cd backend
+pip install fastapi uvicorn
+uvicorn api:app --reload --port 8000
+```
+
+**3. Start the frontend**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+
+**4. Configure your environment**
 ```bash
 cp .env.example .env
 # Edit .env with your Navidrome URL, credentials, etc.
 ```
-**3. Install dependencies**
+**5. Install dependencies**
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
-**4. Configure `.env`**
+**6. Configure `.env`**
 ```env
 BASE_URL=http://your-navidrome-ip:4533
 ADMIN_USERNAME=your_admin_username
 ADMIN_PASSWORD=your_admin_password
 
-# Per-user credentials
-USER_username1=username1
-PASSWORD_username1=yourpassword
-
-USER_username2=username2
-PASSWORD_username2=yourpassword
 
 # API
 VITE_API_URL=http://localhost:8000
 # VITE_API_URL=http://backend:8000  ← use this when running via Docker
 ```
 
-For multiple users add the following in `config.py`:
-```python
-USER_CREDENTIALS = {
-    os.getenv("admin_username"): os.getenv("admin_password"),
-    os.getenv("USER_youruser"): os.getenv("PASSWORD_youruser"),
-    ## Manually add as many users as you have
-}
-```
-
-**5. Change playlist size**
-```python
-# playlist.py
-PLAYLIST_SIZE = 10
-```
-
-**6. Run**
+**7. Run**
 ```bash
 python main.py
 ```
@@ -197,11 +179,7 @@ Playlists are pushed directly to Navidrome and appear under each user's account 
 | Wildcard | ~8% | good songs not heard in 60+ days |
 | Skip | ~5% | rare re-exposure |
 
-## Database
-![Database](Screenshots/tunelog_db.png)
-
-## Playlist
-![Playlist](Screenshots/playlist_1.png)
+## Check images on screenshots folder
 
 ## Roadmap
 - [x] Navidrome API connection

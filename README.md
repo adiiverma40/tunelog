@@ -219,11 +219,9 @@ Playlists are pushed directly to Navidrome and appear under each user's account 
 - [x] Docker support
 - [x] FastAPI backend (early stage)
 - [ ] Web UI dashboard (in progress — needs polish)
-- [ ] Auto library sync scheduler
+- [x] Auto library sync scheduler
 - [ ] M3U export
 
-## Why TuneLog?
-Most self-hosted music servers either have no recommendations or rely on external APIs like Last.fm. TuneLog is fully offline, stores everything locally, and is built around implicit feedback — your listening behaviour is the only input needed.
 
 ---
 > Built for Navidrome. Inspired by how early Last.fm and Spotify worked before they had millions of users.

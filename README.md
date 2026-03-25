@@ -37,6 +37,9 @@ The core logic — signal system, scoring formula, genre injection, playlist slo
 - I havent cleaned up the og code of ui so in some cases you will see tailwind, ig., in using ui in phone
 - IF YOU RAN IT BY DOCKER DO NOT RAN WITH MANUAL (`python main.py`) , DOCKER MARKS THE DATA FILE AS ITS ROOT AND python WILL NOT BE ABLE TO WRITE IN IT
 
+- There is a chance that it will crash if there is no song data in song list you try to do custom playlist generation like skip : 0 and repeat : 1 as it will fail as database has no data for song
+
+
 ## How It Works
 TuneLog watches your Navidrome listening activity in the background. It tracks whether you skip, finish, or replay songs, and uses that behavior to build personalised playlists automatically — one per user.
 

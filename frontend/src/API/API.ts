@@ -69,6 +69,7 @@ export interface CreateUserRequest {
   adminPD: string;
   email: string;
   name: string;
+  isUpdate : boolean
 }
 
 export interface CreateUserResponse {

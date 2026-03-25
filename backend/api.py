@@ -65,6 +65,7 @@ class CreateUserData(BaseModel):
     adminPD: str
     email: str
     name: str
+    isUpdate: bool = False
 
 
 class LoginData(BaseModel):
@@ -204,22 +205,112 @@ def createUser(data: CreateUserData):
     adminPD = data.adminPD
     email = data.email
     name = data.name
+    isUpdate = data.isUpdate
 
-    if username and password and isAdmin is not None and admin and adminPD:
-        token = getJWT(admin, adminPD)
-        if not token:
-            return {"status": "failed", "reason": "Invalid admin credentials"}
+    print("Creating user.....")
 
-        # check if user already exists in DB
-        conn = get_db_connection_usr()
-        existing = conn.execute(
-            "SELECT * FROM user WHERE username = ?", (username,)
-        ).fetchone()
+    if not (username and admin and adminPD):
+        return {
+            "status": "failed",
+            "reason": "Missing required fields",
+        }
+    print("Getting tocker from navidrome")
+    token = getJWT(admin, adminPD)
+    if not token:
+        return {"status": "failed", "reason": "Invalid admin credentials"}
 
-        if existing:
+    conn = get_db_connection_usr()
+
+    existing = conn.execute(
+        "SELECT * FROM user WHERE username = ?", (username,)
+    ).fetchone()
+
+
+    if existing:
+        conn.close()
+        return {"status": "failed", "reason": "User already exists in DB"}
+
+    print("isUpdate : ", isUpdate)
+    if isUpdate:
+        print(f"[TuneLog] Syncing user: {username}")
+
+        try:
+            res = requests.get(
+                f"{Navidrome_url}/api/user",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-ND-Authorization": f"Bearer {token}",
+                },
+            )
+
+            if res.status_code != 200:
+                conn.close()
+                return {
+                    "status": "failed",
+                    "reason": "Failed to fetch users from Navidrome",
+                }
+
+            users = res.json()
+
+            user_exists = any(u.get("userName") == username for u in users)
+
+            if user_exists:
+                print(f"[TuneLog] User {username} exists in Navidrome --> adding to DB")
+
+                conn.execute(
+                    "INSERT INTO user (username, password, isAdmin) VALUES (?, ?, ?)",
+                    (username, password, isAdmin),
+                )
+                conn.commit()
+                conn.close()
+
+                return {
+                    "status": "success",
+                    "reason": "User synced from Navidrome",
+                }
+
+            print(f"[TuneLog] User {username} not found --> creating in Navidrome")
+
+            res_create = requests.post(
+                f"{Navidrome_url}/api/user",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-ND-Authorization": f"Bearer {token}",
+                },
+                json={
+                    "userName": username,
+                    "name": name,
+                    "password": password,
+                    "isAdmin": isAdmin,
+                    "email": email,
+                },
+            )
+
+            if res_create.status_code == 200:
+                conn.execute(
+                    "INSERT INTO user (username, password, isAdmin) VALUES (?, ?, ?)",
+                    (username, password, isAdmin),
+                )
+                conn.commit()
+                conn.close()
+
+                return {
+                    "status": "success",
+                    "reason": "User created in Navidrome and DB",
+                }
+
+            else:
+                conn.close()
+                return {
+                    "status": "failed",
+                    "reason": "Failed to create user in Navidrome",
+                }
+
+        except Exception as e:
             conn.close()
-            return {"status": "failed", "reason": "User already exists"}
+            return {"status": "failed", "reason": str(e)}
 
+    if username and password and isAdmin is not None:
         res = requests.post(
             f"{Navidrome_url}/api/user",
             headers={
@@ -234,7 +325,6 @@ def createUser(data: CreateUserData):
                 "email": email,
             },
         )
-        print("response came", res.json())
 
         if res.status_code == 200:
             conn.execute(
@@ -247,26 +337,14 @@ def createUser(data: CreateUserData):
             return {
                 "status": "success",
                 "reason": "User created successfully",
-                "username": username,
-                "password": password,
-                "isAdmin": isAdmin,
-                "admin": admin,
-                "Admin Password": adminPD,
             }
+
         else:
             conn.close()
-            return {"status": "failed", "reason": "Navidrome API returned false"}
+            return {"status": "failed", "reason": "Navidrome API failed"}
 
-    else:
-        return {
-            "status": "failed",
-            "reason": "All values are not entered",
-            "username": username,
-            "password": password,
-            "isAdmin": isAdmin,
-            "admin": admin,
-            "Admin Password": adminPD,
-        }
+    conn.close()
+    return {"status": "failed", "reason": "Invalid input"}
 
 
 @app.post("/admin/get-users")

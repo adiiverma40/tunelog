@@ -20,6 +20,7 @@ export default function UserProfiles() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [toggleisAdmin, setToggleIsAdmin] = useState(false);
+  const [toggleUpdateUser, setToggleUpdateUser] = useState(false);
   const [createError, setCreateError] = useState("");
 
   const getAdminCredentials = () => {
@@ -50,6 +51,7 @@ export default function UserProfiles() {
     }
 
     const { admin, adminPD } = getAdminCredentials();
+    
     fetchCreateUser({
       name,
       username,
@@ -58,6 +60,7 @@ export default function UserProfiles() {
       admin,
       adminPD,
       email: "",
+      isUpdate : toggleUpdateUser
     }).then((data) => {
       if (data.status === "success") {
         setCreateError("");
@@ -65,10 +68,12 @@ export default function UserProfiles() {
         setUsername("");
         setPassword("");
         setToggleIsAdmin(false);
+        setToggleUpdateUser(false)
         closeModal();
         loadUsers();
       } else {
         setCreateError(data.reason ?? "Failed to create user");
+        console.log("Is Update : " , toggleUpdateUser)
       }
     });
   };
@@ -128,7 +133,7 @@ export default function UserProfiles() {
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[700px] m-4">
         <div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">
           <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-            Create User
+            Create User/Add User
           </h4>
           <p className="text-sm text-gray-400 mb-6">
             Creates the user in both Navidrome and TuneLog.
@@ -172,6 +177,11 @@ export default function UserProfiles() {
               label="Is Admin"
               defaultChecked={toggleisAdmin}
               onChange={(checked) => setToggleIsAdmin(checked)}
+            />
+            <Switch
+              label="Update user"
+              defaultChecked={toggleUpdateUser}
+              onChange={(checked) => setToggleUpdateUser(checked)}
             />
             <Button size="sm" variant="outline" onClick={closeModal}>
               Close

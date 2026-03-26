@@ -13,6 +13,7 @@ This project was built by me, with AI assistance in specific areas:
 The core logic — signal system, scoring formula, genre injection, playlist slot system, and architecture decisions — was designed and written by me.
 
 ## TODO: 
+- Add fallbacks for musicbrainz api call
 - Add a better api system for search excilit tag of songs,
    I have some ideas how to do it,
   currently in my songlist db in excilipt col there is notinitunes in some song, thats becuase some of the songs has noisy title ig : DJ Alok Main aur tu remix, these makes itunes to return wrong info

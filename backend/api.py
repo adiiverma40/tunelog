@@ -41,7 +41,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        # "*"
+        "*"
         #    "*"   use only if u want to access this with other devices, ig., mobile
     ],
     allow_methods=["*"],

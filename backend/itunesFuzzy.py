@@ -23,6 +23,7 @@ import urllib.parse
 
 from db import get_db_connection_lib
 
+totalTries = 0
 
 def score(input_title, input_artist, album="", restitle="", resartist="", resalbum=""):
     t_score = fuzz.token_set_ratio(input_title, restitle)
@@ -212,6 +213,7 @@ def musicbrainz_search(query: str, entity: str = "recording", limit: int = 10):
 
 
 def fuzzyScoreMatch(response, song, isAlbum=False):
+    global totalTries
 
     tries = 0
 
@@ -248,8 +250,11 @@ def fuzzyScoreMatch(response, song, isAlbum=False):
             )
         )
         tries += 1
+        totalTries += 1 
 
         results.append((fuzzyScore, res))
+        if totalTries == 500:
+            return None , 0 
 
     if not results:
         return None, 0
@@ -258,7 +263,7 @@ def fuzzyScoreMatch(response, song, isAlbum=False):
     bestScore, bestMatch = results[0]
 
     print(
-        f"[FUZZY][Try : {tries}] Best score: {bestScore} → {bestMatch.get('trackName')} by {bestMatch.get('artistName')}"
+        f"[FUZZY][Total tries : {totalTries}] Best score: {bestScore} → {bestMatch.get('trackName')} by {bestMatch.get('artistName')}"
     )
 
     return (bestMatch, bestScore) if bestScore >= 70 else (None, bestScore)

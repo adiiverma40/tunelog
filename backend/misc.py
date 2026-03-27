@@ -88,7 +88,7 @@ def push_star(song, signal):
         return
 
     songScore = rowSongScore / totalWeight
-    print(f"Total calculated score: {songScore:.2f}")
+    # print(f"Total calculated score: {songScore:.2f}")
 
     if songScore >= 2.5:
         final_rating = 5
@@ -101,7 +101,7 @@ def push_star(song, signal):
     else:
         final_rating = 1
 
-    print(f"Final score for {song['title']}: {final_rating}")
+    # print(f"Final score for {song['title']}: {final_rating}")
 
     conn.close()
 
@@ -117,7 +117,7 @@ def push_star(song, signal):
 
     try:
         requests.get(url)
-        print(f"[STAR] {user_id} | {song['title']} --> {final_rating} stars ({signal})")
+        print(f"[STAR] {user_id} | {song['title']} --> {final_rating} stars")
     except Exception as e:
         print(f"[STAR ERROR] {user_id} | {e}")
 

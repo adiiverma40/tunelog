@@ -49,7 +49,7 @@ npm run dev
 ```
 
 
-## 🧠 How It Works
+## How It Works
 TuneLog uses **Implicit Feedback**. Instead of manual ratings, it watches "Signals" via the Navidrome SSE (Server-Sent Events) stream to judge your interest.
 
 ### The Signal System
@@ -69,7 +69,7 @@ TuneLog manages a balanced "Diet" of music across several slots:
 
 ---
 
-## 📝 Roadmap & TODO
+## Roadmap & TODO
 
 ### **High Priority**
 - [ ] **Spotify/External Import:** Support CSV imports (via Exportify) with fuzzy matching to Navidrome library.
@@ -84,7 +84,7 @@ TuneLog manages a balanced "Diet" of music across several slots:
 
 ---
 
-## 🛠 Project Structure
+## Project Structure
 ```text
 TuneLog/
 ├── backend/
@@ -101,7 +101,7 @@ TuneLog/
 
 ---
 
-## 🤝 Credits & Stack
+## Credits & Stack
 * **Navidrome:** Self-hosted music server (Subsonic API).
 * **FastAPI:** REST layer for the Dashboard.
 * **RapidFuzz:** High-performance fuzzy matching for metadata.

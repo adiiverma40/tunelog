@@ -304,7 +304,7 @@ if __name__ == "__main__":
         current_day = now.date()
         settings = library.getSyncSettings()
         auto_sync_hour = settings["auto_sync"]
-        print("Current Hour : " ,  current_hour)
+        # print("Current Hour : " ,  current_hour)
         if (
             current_hour == auto_sync_hour
             and current_day != last_auto_sync_day

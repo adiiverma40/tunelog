@@ -13,6 +13,7 @@ This project was built by me, with AI assistance in specific areas:
 The core logic — signal system, scoring formula, genre injection, playlist slot system, and architecture decisions — was designed and written by me.
 
 ## TODO: 
+- Add option to import playlist from spotify, or external links, using fuzzy matching 
 - Add fallbacks for musicbrainz api call
 - Add a better api system for search excilit tag of songs,
    I have some ideas how to do it,

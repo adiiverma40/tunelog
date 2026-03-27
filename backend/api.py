@@ -8,7 +8,6 @@ from pydantic import BaseModel
 import requests
 from typing import Optional
 from config import Navidrome_url
-
 from db import (
     get_db_connection_lib,
     get_db_connection,
@@ -16,7 +15,6 @@ from db import (
     get_db_connection_playlist,
 )
 from db import init_db, init_db_lib, init_db_usr
-
 from playlist import (
     score_song,
     get_unheard_songs,
@@ -27,11 +25,7 @@ from playlist import (
     songSlots,
     signalWeights
 )
-
-# from library import isSyncing, progress, auto_sync, toggle_itune , startSyncSong
 import library
-
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -84,6 +78,15 @@ class PlaylistOptions(BaseModel):
     size: int = 50
     slots: Optional[dict] = None     
     weights: Optional[dict] = None   
+
+
+class UpdateMarkingPayload(BaseModel):
+    song_id: str
+    explicit: str
+
+
+VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
+
 
 # ping
 
@@ -146,15 +149,6 @@ def stats():
         "most_played_artists": mostPlayedArtists,
         "most_played_songs": mostPlayedSongs,
     }
-
-
-# http://your-server/rest/createUser.view?username=adii&password=1234&email=adii@mail.com&u=admin&p=adminpass&v=1.13.0&c=MyApp&f=json
-
-
-# {"subsonic-response":
-# {"status": "ok",
-# "version": "1.16.1"}
-# }
 
 
 def getJWT(admin_username, admin_password):
@@ -358,7 +352,6 @@ def getUsers(data: AdminAuth):
     users = conn.execute("SELECT * FROM user").fetchall()
     conn.close()
 
-    # explicitly map columns so frontend always gets the right shape
     return {
         "status": "ok",
         "users": [
@@ -371,15 +364,6 @@ def getUsers(data: AdminAuth):
         ],
     }
 
-
-# const PLACEHOLDER_STATS = {
-#   totalListens: 103,
-#   skips: 133,
-#   repeat: 44,
-#   complete: 89,
-#   partial: 57,
-#   lastLogged: "Mar 12, 2025",
-# };
 
 
 @app.get("/admin/getUserData")
@@ -428,20 +412,6 @@ def getUserData(username: str = "", password: str = ""):
         }
 
 
-# http://your-server/rest/ping.view?u=joe&t=26719a1196d2a940705a59634eb18eab&s=c19b2d&v=1.12.0&c=myapp
-
-
-# data = {
-#     "username": "asdasd",
-#     "password": "sdfasdf",
-#     "isAdmin": True,
-#     "admin": "adii",
-#     "adminPD": "adutya11@",
-#     "email": ""
-# }
-
-
-# print(createUser(data))
 @app.get("/api/sync/stop")
 def stopSync():
     library._stopSync = True
@@ -480,7 +450,13 @@ def syncStatus():
         "SELECT COUNT(*) FROM library WHERE explicit = 'notInItunes'"
     ).fetchone()[0]
 
+    manual_needed = cursor.execute(
+        "SELECT COUNT(*) FROM library WHERE explicit = 'manual'"
+    ).fetchone()[0]
+
     conn.close()
+
+    print("sending sync data to frontend : manual : " , manual_needed)
 
     return {
         "is_syncing": library._isSyncing,
@@ -497,6 +473,7 @@ def syncStatus():
             "notExplicit": not_explicit,
             "cleaned": cleaned,
             "notInItunes": not_in_itunes,
+            "manual" : manual_needed,
             "pending": songs_needing_itunes,
         },
     }
@@ -514,8 +491,52 @@ def syncSetting(auto_sync_hour: int = 2, use_itunes: bool = False):
     return {"status": "ok"}
 
 
-# playlist api
+@app.get("/api/library/marking")
+def manualMarking():
+    print("sending data from library marked manual")
 
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+    rows = cursor.execute("SELECT * FROM library WHERE explicit = 'manual'").fetchall()
+    conn.close()
+
+    songs = [
+        {
+            "song_id": row["song_id"],
+            "title": row["title"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "genre": row["genre"],
+            "duration": row["duration"],
+            "explicit": row["explicit"],
+        }
+        for row in rows
+    ]
+
+    return {"status": "ok", "songs": songs}
+
+
+@app.post("/api/library/marking")
+def updateMarking(payload: UpdateMarkingPayload):
+    print("Recived Manual Markings")
+    print("Song ID : " , payload.song_id , "Updated Tag to : " , payload.explicit)
+
+    if payload.explicit not in VALID_EXPLICIT:
+        return {"status": "error", "reason": "Invalid explicit value"}, 400
+
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE library SET explicit = ? WHERE song_id = ?",
+        (payload.explicit, payload.song_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "song_id": payload.song_id, "explicit": payload.explicit}
+
+
+# playlist api
 
 @app.get("/api/playlist/songs")
 def getSongsFromPlaylist(username: str):

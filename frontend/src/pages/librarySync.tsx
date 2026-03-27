@@ -28,6 +28,7 @@ export default function LibrarySync() {
   const syncStartedRef = useRef(false);
 
   const navigate = useNavigate();
+  console.log(syncData)
 
   useEffect(() => {
     const token =
@@ -168,7 +169,6 @@ export default function LibrarySync() {
       <PageBreadcrumb pageTitle="Library Sync" />
 
       <div className="grid grid-cols-12 gap-4 md:gap-6">
-        
         <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             {
@@ -226,6 +226,13 @@ export default function LibrarySync() {
               label: "Not in iTunes",
               value: syncData?.explicit_counts?.notInItunes ?? "—",
               valueStyle: "text-gray-400",
+              dot: "bg-gray-400",
+            },
+
+            {
+              label: "Manual",
+              value: syncData?.explicit_counts?.manual ?? "—",
+              valueStyle: "text-red-400",
               dot: "bg-gray-400",
             },
           ].map((item) => (
@@ -303,9 +310,8 @@ export default function LibrarySync() {
                   variant="primary"
                   className="w-full !bg-red-500/10 !text-red-400 !shadow-none border border-red-500/40 hover:!bg-red-500/20"
                   onClick={stopSyncing}
-                 
                 >
-                ⏹ Stop Sync
+                  ⏹ Stop Sync
                 </Button>
                 <div className="text-xs text-gray-400 mt-1.5 ml-1">
                   Stops the sync after the current batch completes.
@@ -315,8 +321,6 @@ export default function LibrarySync() {
           </div>
         </div>
 
-
-        
         <div className="col-span-12 xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-6">
             Sync Settings

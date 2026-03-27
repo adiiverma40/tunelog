@@ -1,6 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL;
 
-
 export interface Stats {
   total_songs: number;
   total_listens: number;
@@ -33,6 +32,7 @@ export interface SyncStatus {
     notExplicit: number;
     cleaned: number;
     notInItunes: number;
+    manual: number;
     pending: number;
   };
 }
@@ -69,7 +69,7 @@ export interface CreateUserRequest {
   adminPD: string;
   email: string;
   name: string;
-  isUpdate : boolean
+  isUpdate: boolean;
 }
 
 export interface CreateUserResponse {
@@ -158,8 +158,6 @@ export interface PlaylistSongsResponse {
   songs: PlaylistSong[];
 }
 
-
-
 export interface PlaylistGenerateResponse {
   status: "ok" | "error";
   songs_added?: number;
@@ -173,6 +171,17 @@ export interface MonthlyListen {
   count: number;
 }
 
+export interface ManualMarkingSong {
+  song_id: string;
+  title: string;
+  artist: string;
+  album: string;
+  genre: string | null;
+  duration: number | null;
+  explicit: string | null;
+}
+
+export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
 
 export async function fetchPing(): Promise<{ status: string }> {
   const res = await fetch(`${BASE_URL}/api/ping`);
@@ -312,9 +321,6 @@ export async function fetchMonthlyListens(): Promise<MonthlyListen[]> {
   return res.json();
 }
 
-
-
-
 export async function fetchPlaylistGenerate(
   username: string,
   explicit_filter: string = "allow_cleaned",
@@ -353,4 +359,26 @@ export async function appendPlaylist(
       reason: error instanceof Error ? error.message : "Unknown network error",
     };
   }
+}
+
+export async function fetchManualMarkingSongs(): Promise<{
+  status: string;
+  songs: ManualMarkingSong[];
+}> {
+  const res = await fetch(`${BASE_URL}/api/library/marking`);
+  if (!res.ok) throw new Error("Failed to fetch marking songs");
+  return res.json();
+}
+
+export async function updateExplicitTag(
+  song_id: string,
+  explicit: ExplicitTag,
+): Promise<{ status: string; song_id: string; explicit: string }> {
+  const res = await fetch(`${BASE_URL}/api/library/marking`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ song_id, explicit }),
+  });
+  if (!res.ok) throw new Error("Failed to update explicit tag");
+  return res.json();
 }

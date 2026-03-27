@@ -31,6 +31,7 @@ The core logic — signal system, scoring formula, genre injection, playlist slo
 
 
 ## ISSUES :
+- Due to some wried issue in logic, songs still appear in playlist marked with skip
 - when doing auto sync, progress does not get reflect in dashboard
 - Currently i havent how well this project work with Symfonium app, as it uses caching and i need live data of skips to work, other options works well(I think) - if you know let me know 
 - Doing fast sync only added half of the songs from playlist , do fast sync multiple times to get all songs, same for slow sync

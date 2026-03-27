@@ -197,7 +197,7 @@ def mb_to_itunes_format(mb_response):
     return results
 
 
-def musicbrainz_search(query: str, entity: str = "recording", limit: int = 10):
+def musicbrainz_search(query: str, entity: str = "recording", limit: int = 10 ) :
     base_url = f"https://musicbrainz.org/ws/2/{entity}"
     headers = {"User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog/)"}
     try:
@@ -212,7 +212,7 @@ def musicbrainz_search(query: str, entity: str = "recording", limit: int = 10):
         return None
 
 
-def fuzzyScoreMatch(response, song, isAlbum=False):
+def fuzzyScoreMatch(response, song, isAlbum=False , tryLimit : int = 500):
     global totalTries
 
     tries = 0
@@ -228,6 +228,10 @@ def fuzzyScoreMatch(response, song, isAlbum=False):
     results = []
 
     for res in response:
+        if totalTries >= tryLimit:   # ✅ >= not ==, checked BEFORE processing
+            print(f"[FUZZY] Hit {tryLimit} try limit, stopping.")
+            return None, 0
+
         messytitle = res.get("trackName")
         messyartist = res.get("artistName")
         messyalbum = res.get("collectionName")

@@ -48,6 +48,28 @@ cd frontend
 npm run dev
 ```
 
+### .env
+```bash
+
+
+#Navidrome
+
+#base_url = navidrome ip 
+
+base_url = http://192.168.29.118:4533
+
+# Admin and password
+
+admin_username = username # (username used while creating navidrome account )
+admin_password = password # (Password used while creating navidrome account)
+
+# vite api url 
+
+# VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://192.168.29.118:8000
+
+```
+
 
 ## How It Works
 TuneLog uses **Implicit Feedback**. Instead of manual ratings, it watches "Signals" via the Navidrome SSE (Server-Sent Events) stream to judge your interest.

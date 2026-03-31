@@ -32,6 +32,8 @@ This document outlines the technical architecture, data flow, and design decisio
 - [x] Figure out if I can use updateplaylist api of navidrome
 - [x] Use a better approach to the marking stat system, if user listen to one song and get one star and listen again completely it gets flagged as repeat and gets a 5 star
 
+## Dropped Idea 
+- **Star Rating Import** - Navidrome does not support Star rating using api
 
 
 ## CURRENTLY : 

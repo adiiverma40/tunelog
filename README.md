@@ -114,10 +114,10 @@ Added a option to import playlist from csv files, you can download csv for spoti
 ## Roadmap & TODO
 
 ### **High Priority**
-- [ ] **Spotify/External Import:** Support CSV imports (via Exportify) with fuzzy matching to Navidrome library.
-- [ ] **Dynamic Genre Multiplier:** Replace hardcoded aliases with calculated weights based on total listen time per genre.
+- [x] **Spotify/External Import:** Support CSV imports (via Exportify) with fuzzy matching to Navidrome library.
+- [x] **Dynamic Genre Multiplier:** Replace hardcoded aliases with calculated weights based on total listen time per genre.
 - [ ] **Notification Bridge:** Real-time "Now Playing" popups on the React Dashboard.
-- [ ] **Star Migration:** Import existing Navidrome Star ratings into the DB to solve the "Cold Start" problem.
+- [x] **Star Migration:** Import existing Navidrome Star ratings into the DB to solve the "Cold Start" problem. - dropped
 
 ### **Features & UI**
 - [x] **Manual Marking UI:** Allow users to manually override a signal if the automation gets it wrong.

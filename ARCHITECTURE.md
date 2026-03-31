@@ -695,6 +695,22 @@ The `/api/user/profile` endpoint is the most complex, performing cross-database 
 
 ---
 
+### CSV IMPORT 
+- Currently it is using fuzzy matching to get the best choice.
+- I have counted for situtation like Only title, only title and artist and title, artist, album
+- If title, artist and album all are present it checks for fuzzy score of artist and album if they are higher then 80, it checks for title score
+- If artist is high and album is low, it checks for title and duration diff, if title score is high and duration diff is +- 10% it passes it
+
+I dont have enough data to test it fully, if you are willing to give me feedback it would be appriciated
+
+---
+
+
+
+
+
+
+
 ### API Design Decisions
 * **Application-Level Joins**: Since metadata and listen logs reside in separate SQLite files, the API performs the "Join" logic in Python to keep the databases modular and portable.
 * **Stateless Frontend**: The frontend never calculates stats. It receives pre-computed objects (e.g., `top_genre`, `signal_map`) to ensure the Dashboard remains fast on low-power devices.

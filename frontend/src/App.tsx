@@ -11,6 +11,7 @@ import Home from "./pages/Dashboard/Home";
 import UserProfilePage from "./pages/userProfile";
 import ManualMarking from "./pages/manualMark";
 import GenreMatch from "./pages/genreMatching";
+import Import from "./pages/import";
 export default function App() {
   return (
     <>
@@ -26,6 +27,8 @@ export default function App() {
             <Route path="/users/:username" element={<UserProfilePage />} />
             <Route path="/manual" element={<ManualMarking />} />
             <Route path="/genre" element={<GenreMatch />} />
+
+            <Route path="/import" element={<Import />} />
           </Route>
 
           <Route path="/signin" element={<SignIn />} />

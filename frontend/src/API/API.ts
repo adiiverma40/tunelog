@@ -206,6 +206,33 @@ export interface AutoMatchResponse {
   "genre Updated": number;
 }
 
+
+export interface ImportResponse {
+  status: "success" | "failed";
+  message?: string;
+  reason?: string;
+  data?: {
+    matched_ids: string[];
+    results: {
+      title: string;
+      artist: string;
+      found: boolean;
+      song_id: string | null;
+    }[];
+    summary: {
+      total: number;
+      matched: number;
+      not_found: number;
+    };
+  };
+}
+
+export interface PlaylistCreateRequest {
+  // username: string;
+  song_ids: string[];
+  playlist_name: string;
+}
+
 export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
 
 export async function fetchPing(): Promise<{ status: string }> {
@@ -486,3 +513,32 @@ export async function autoMatchGenres(): Promise<AutoMatchResponse> {
   if (!res.ok) throw new Error("Failed to auto match genres");
   return res.json();
 }
+
+
+export async function fetchImportCSV(file: File): Promise<ImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csv`, {
+    method: "POST",
+    body: formData,
+  
+  });
+
+  if (!res.ok) throw new Error("Failed to upload CSV");
+  return res.json();
+}
+
+export async function fetchCreatePlaylistFromIds(
+  data: PlaylistCreateRequest
+): Promise<{ status: string; message: string; reason?: string }> {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csvPlaylist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  console.log(data)
+  if (!res.ok) throw new Error("Failed to create playlist");
+  return res.json();
+}
+

@@ -4,6 +4,8 @@ python-dotenv==1.2.2
 pydantic==2.12.5
 requests==2.32.5
 mutagen==1.47.0
-yt-dlp==2026.3.13
+# yt-dlp==2026.3.13
 rapidfuzz
+pandas
+python-multipart
 # backports.zoneinfo

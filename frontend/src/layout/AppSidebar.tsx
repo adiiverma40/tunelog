@@ -6,9 +6,13 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
+  // ListIcon,
   // PageIcon,
   UserCircleIcon,
+  DownloadIcon,
+  PencilIcon,
+  PageIcon,
+  AudioIcon
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -32,22 +36,27 @@ const navItems: NavItem[] = [
   },
   {
     name: "Library Sync",
-    icon: <ListIcon />,
+    icon: <PageIcon />,
     path: "/librarySync",
   },
   {
     name: "Playlist",
-    icon: <ListIcon />,
+    icon: <AudioIcon />,
     path: "/playlist",
   },
   {
+    name: "Import",
+    icon: <DownloadIcon />,
+    path: "/import",
+  },
+  {
     name: "Manual marking",
-    icon: <ListIcon />,
+    icon: <PencilIcon />,
     path: "/manual",
   },
   {
     name: "Genre Matching",
-    icon: <ListIcon />,
+    icon: <PencilIcon />,
     path: "/genre",
   },
 ];

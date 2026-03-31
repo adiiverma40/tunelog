@@ -6,6 +6,10 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
+import os
+import shutil
+import tempfile
+from fastapi import UploadFile, File, HTTPException
 from typing import Optional
 from config import Navidrome_url
 from db import (
@@ -30,6 +34,9 @@ from itunesFuzzy import useFallBackMethods
 
 from genre import readJson, writeJson, DeleteDataJson , autoGenre , sync_database_to_json
 from misc import UpdateDBgenre
+from importPlaylist import fuzzymatching
+
+from playlist import push_playlist
 
 from threading import Thread
 from fastapi import FastAPI
@@ -91,6 +98,10 @@ class UpdateMarkingPayload(BaseModel):
     explicit: str
 
 
+class csvPlaylist(BaseModel):
+    song_ids: list[str]
+    playlist_name: str
+
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
 
 
@@ -143,8 +154,9 @@ def stats():
 
     countSongsLib = conn_lib.execute("SELECT COUNT(*) FROM library").fetchone()[0]
 
-    countPlayedSongs = conn_log.execute("SELECT COUNT(*) FROM listens").fetchone()[0]
-
+    countPlayedSongs = conn_log.execute(
+    "SELECT COUNT(DISTINCT song_id) FROM listens"
+).fetchone()[0]
     signal_rows = conn_log.execute(
         "SELECT signal, COUNT(*) as count FROM listens GROUP BY signal"
     ).fetchall()
@@ -488,7 +500,7 @@ def syncStatus():
 
     conn.close()
 
-    print("sending sync data to frontend : manual : " , manual_needed)
+    # print("sending sync data to frontend : manual : " , manual_needed)
 
     return {
         "is_syncing": library._isSyncing,
@@ -1022,6 +1034,54 @@ def autoMatchGenre():
 
     return {"unmapped": remaining_data, "genre_updated": update}
 
+
+@app.post("/api/import/csv")
+async def import_csv(file: UploadFile = File(...)):
+    print("reciving file")
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV.")
+
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, file.filename)
+
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        match_results = fuzzymatching(temp_path)
+
+        return {
+            "status": "success",
+            "message": f"Processed {match_results['summary']['total']} songs.",
+            "data": match_results
+        }
+    except Exception as e:
+        print(f"Error during fuzzy matching: {e}")
+        return {
+            "status": "failed", 
+            "reason": str(e)
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.post("/api/import/csvPlaylist")
+def csvPlaylist(data  : csvPlaylist):
+    print(" creating playlist from csv")
+    songIdv = data.song_ids
+    name = data.playlist_name
+    print(songIdv)
+    try:
+        if songIdv:
+            push_playlist(songIdv , "adii" , {} , name , True)
+            return {
+                "status" : "success"
+            }
+    except Exception as e:
+        return {
+            "status" : e
+        }
 
 if __name__ == "__main__":
     init_db()

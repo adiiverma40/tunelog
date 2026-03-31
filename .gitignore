@@ -86,3 +86,6 @@ dist-ssr
 
 
 genre.json
+
+
+*.csv

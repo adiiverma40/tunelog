@@ -101,6 +101,15 @@ Added a option to match genre automatically, this is needed for better genre inj
 
 ---
 
+### **CSV IMPORT**
+Added a option to import playlist from csv files, you can download csv for spotify from [Exportify](https://exportify.net/).
+- Currently I dont know how it works, My library has limited songs and Messy meta data, so I am getting matching results of 14 songs out of 50
+- I havent tested with other csv file. But I think it can handle other files as well, as long as it have Title, artist name and album name
+- For workings read `Architecture.md`
+
+
+
+
 
 ## Roadmap & TODO
 

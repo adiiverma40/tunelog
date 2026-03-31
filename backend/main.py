@@ -53,43 +53,31 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
-# from queue import Queue
 from config import build_url, event_queue
 from db import get_db_connection, init_db, init_db_lib, init_db_usr, init_db_playlist , get_db_connection_lib
 from itunesFuzzy import useFallBackMethods
 import library
-# from playlist import main as generate_playlist
 from library import normalise_genre
 from watcher import start_sse
 from misc import push_star
 import uvicorn
 
-# store user data
 active = {}
 
 
-# queue
-# event_queue = Queue()
-
-
-# url
 def navidrome_url(endpoint):
     url = build_url(endpoint)
     response = requests.get(url)
     return response.json()
 
 
-# watches what is user/users listening to
-
 
 def Watcher():
     url_response = navidrome_url("getNowPlaying")
-    # print(url_response)
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
 
     now = time.time()
 
-    # ── flush stale entries (paused > 10 mins) ──
     for user_id in list(active.keys()):
         if now - active[user_id]["last_seen"] > 600:
             print(f"[STALE] {user_id} flushed: {active[user_id]['title']}")
@@ -179,46 +167,13 @@ def signal_system(percent_played, song_id, user_id):
 
 
 def log_history(song):
-    # print(song)
-    # played = min(time.time() - song["start_time"], song["duration"])
-    # percent_played = min(round((played / song["duration"]) * 100), 100)
-    # signal = signal_system(percent_played, song["song_id"], song["user_id"])
-    # print("percent : ", percent_played)
     played = min(song["actual_played"], song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
     signal = signal_system(percent_played, song["song_id"], song["user_id"])
 
 
-    # print("signal : ", signal)
     conn = get_db_connection()
     cursor = conn.cursor()
-
-
-    # cursor.execute(
-    #     """
-    #     SELECT id FROM listens
-    #     WHERE song_id = ? and user_id = ? 
-    #     AND timestamp >= datetime('now', '-10 minutes')
-    #     ORDER BY timestamp DESC 
-    #     LIMIT 1
-    #     """,
-    #     (song["song_id"], song["user_id"]),
-    # )
-
-    # existing = cursor.fetchone()
-
-    # if existing:
-    #     cursor.execute(
-    #         """
-    #         UPDATE listens 
-    #         SET played = ?, percent_played = ?, signal = ?
-    #         WHERE id = ?
-    #     """,
-    #         (played, percent_played, signal, existing[0]),
-    #     )
-    #     # print(f"[UPDATE] {song['user_id']} | {song['title']} | {percent_played}%")
-
-    # else:
     cursor.execute(
             """
                 INSERT INTO listens(
@@ -328,11 +283,7 @@ if __name__ == "__main__":
             event = event_queue.get(
                 timeout=2
             )  
-            # print("in while loop : ", event)
             if event == "nowPlaying":
-                # n += 1
-                # print("Its fucking working")
-                # print(n)
                 Watcher()
         except Exception as e:
             if "Empty" not in str(type(e).__name__):

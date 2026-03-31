@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import LibraryMetrics from "../../components/ecommerce/LibraryMetrics";
-import MonthlyPlayed from "../../components/ecommerce/MonthlyPlayed";
-import MostSkippedPercentage from "../../components/ecommerce/MostSkippedPercentage";
-import MostPlaysbyUser from "../../components/ecommerce/MostPlaysbyUser";
-import MostHeardArtist from "../../components/ecommerce/MostHeardArtist";
+import LibraryMetrics from "../../components/dashboardItems/LibraryMetrics";
+import MonthlyPlayed from "../../components/dashboardItems/MonthlyPlayed";
+import MostSkippedPercentage from "../../components/dashboardItems/MostSkippedPercentage";
+import MostPlaysbyUser from "../../components/dashboardItems/MostPlaysbyUser";
+import MostHeardArtist from "../../components/dashboardItems/MostHeardArtist";
 import PageMeta from "../../components/common/PageMeta";
 import { fetchLogin, fetchStats, Stats, fetchGetUsers } from "../../API/API";
 

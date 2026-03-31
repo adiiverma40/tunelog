@@ -1,11 +1,7 @@
-fastapi==0.135.1
-uvicorn==0.42.0
-python-dotenv==1.2.2
+fastapi==0.135.2
+pandas==3.0.2
 pydantic==2.12.5
-requests==2.32.5
-mutagen==1.47.0
-# yt-dlp==2026.3.13
-rapidfuzz
-pandas
-python-multipart
-# backports.zoneinfo
+python-dotenv==1.2.2
+rapidfuzz==3.14.3
+Requests==2.33.1
+uvicorn==0.42.0

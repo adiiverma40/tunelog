@@ -221,7 +221,7 @@ def login(data: LoginData):
         ).fetchone()
 
         if existing:
-            print("username already in database")
+            print("[TUNELOG]username already in database")
         else:
             cursor.execute(
                 "INSERT INTO user (username, password, isAdmin) VALUES (?, ?, ?)",
@@ -460,7 +460,7 @@ def getUserData(username: str = "", password: str = ""):
 @app.get("/api/sync/stop")
 def stopSync():
     library._stopSync = True
-    print("stopping request recived")
+    # print("stopping request recived")
     return {"status": "ok", "response": "stopped syncing"}
 
 
@@ -542,7 +542,7 @@ def syncSetting(
 
 @app.get("/api/library/marking")
 def manualMarking():
-    print("sending data from library marked manual")
+    # print("sending data from library marked manual")
 
     conn = get_db_connection_lib()
     cursor = conn.cursor()
@@ -970,7 +970,7 @@ def stopFallback():
 
 @app.get("/api/genre/read")
 def readGenre():
-    print("Request recived to read data from json")
+    # print("Request recived to read data from json")
     data = readJson()
     # print(data)
     # autoGenre(data)
@@ -1027,7 +1027,7 @@ def GetGenreFromDb():
 
 @app.get("/api/genre/auto")
 def autoMatchGenre():
-    print("Auto match Request Recived")
+    # print("Auto match Request Recived")
     data = readJson()
     update = autoGenre(data) 
     sync_database_to_json()

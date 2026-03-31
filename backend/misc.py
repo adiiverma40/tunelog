@@ -88,11 +88,7 @@ def push_star(song, signal):
 
     for i, row in enumerate(rows):
         hisTimeStamp = row["timestamp"]
-        # try:
-        #     rowDt_object = datetime.strptime(hisTimeStamp, format_str)
-        # except ValueError:
-        #     continue
-
+      
         weightage = 0.9** i 
 
         rowSignal = row["signal"]
@@ -119,8 +115,7 @@ def push_star(song, signal):
         return
 
     songScore = rowSongScore / totalWeight
-    # print(f"Total calculated score: {songScore:.2f}")
-
+   
     if songScore >= 2.5:
         final_rating = 5
     elif songScore >= 1.5:
@@ -167,9 +162,7 @@ def UpdateDBgenre(data, connLib=None):
         close_lib = True
 
     cursor_lib = conn_lib.cursor()
-    # print("Updates to make : " , data)
     cursor_log.executemany("UPDATE listens SET genre = ? WHERE genre = ?", data)
-
     cursor_lib.executemany("UPDATE library SET genre = ? WHERE genre = ?", data)
 
     conn_log.commit()

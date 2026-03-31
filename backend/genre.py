@@ -32,12 +32,6 @@
 # fix: stop looking if exact match or fuzzy score = 100
 
 
-import json
-from rapidfuzz import fuzz
-from misc import UpdateDBgenre
-from db import get_db_connection , get_db_connection_lib
-
-FILE_PATH = "./data/genre.json"
 # data = {
 #     "Bollywood": ["Hindi OST", "Hindi", "Bollywood Pop"],
 #     "Hip-Hop": ["Rap", "RnB"],
@@ -45,6 +39,13 @@ FILE_PATH = "./data/genre.json"
 # }
 
 
+import json
+from rapidfuzz import fuzz
+from misc import UpdateDBgenre
+from db import get_db_connection , get_db_connection_lib
+
+
+FILE_PATH = "./data/genre.json"
 def writeJson(genre, noisyGenre):
     try:
         with open(FILE_PATH, "r") as file:
@@ -125,7 +126,6 @@ def score(input , output):
 
 
 # changing autogenre just to write in json
-
 def autoGenre(data = readJson()):
     conn_lib = get_db_connection_lib()
     cursor = conn_lib.cursor()
@@ -195,46 +195,28 @@ def autoGenre(data = readJson()):
     return {"status": "No changes needed", "updated_count": 0}
 
 
-# data = readJson()
-
-# update = autoGenre(data)
-
-# print(update)
-
 
 def sync_database_to_json():
     print("Syncing Genre to Mapped genre")
     data = readJson()
-
     conn_lib = get_db_connection_lib()
     cursor = conn_lib.cursor()
-
     genres = cursor.execute("SELECT DISTINCT genre FROM library").fetchall()
-
     conn_lib.close()
-
     genre_set = {g[0].strip().lower() for g in genres if g[0]}
-
     updates_to_make = []
-
     for category, values in data.items():
         category_clean = category.strip().lower()
-
         for value in values:
             value_clean = value.strip().lower()
-
             if value_clean == category_clean:
                 continue
-
             if value_clean not in genre_set:
                 continue
-
             updates_to_make.append((category_clean, value_clean))
-
     if updates_to_make:
         print(f"Syncing DB: Found {len(updates_to_make)} mappings to enforce.")
         # print("Update to makes :", updates_to_make)
         return UpdateDBgenre(updates_to_make)
     else:
         return {"status": "Database already matches JSON categories"}
-# sync_database_to_json()

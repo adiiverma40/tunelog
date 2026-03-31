@@ -4,36 +4,6 @@ interface Props {
   stats: Stats | null;
 }
 
-// const SIGNAL_STYLE: Record<
-//   string,
-//   { color: string; bg: string; border: string; label: string }
-// > = {
-//   skip: {
-//     color: "text-red-400",
-//     bg: "bg-red-500/10",
-//     border: "border-red-500/20",
-//     label: "Skip",
-//   },
-//   partial: {
-//     color: "text-yellow-400",
-//     bg: "bg-yellow-500/10",
-//     border: "border-yellow-500/20",
-//     label: "Partial",
-//   },
-//   positive: {
-//     color: "text-green-400",
-//     bg: "bg-green-500/10",
-//     border: "border-green-500/20",
-//     label: "Complete",
-//   },
-//   repeat: {
-//     color: "text-purple-400",
-//     bg: "bg-purple-500/10",
-//     border: "border-purple-500/20",
-//     label: "Repeat",
-//   },
-// };
-
 export default function MostSkippedPercentage({ stats }: Props) {
   const songs = stats?.most_played_songs ?? [];
   const total = stats?.total_listens ?? 0;

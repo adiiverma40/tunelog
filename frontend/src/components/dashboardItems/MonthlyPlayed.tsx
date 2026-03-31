@@ -8,7 +8,6 @@ export default function MonthlyPlayed() {
   useEffect(() => {
     fetchMonthlyListens()
       .then((res) => {
-        // Map the YYYY-MM string to a short month name
         const formatted = res.map((item) => {
           const date = new Date(item.month + "-01");
           return {
@@ -70,7 +69,7 @@ export default function MonthlyPlayed() {
                         ? "bg-brand-500 shadow-lg shadow-brand-500/20"
                         : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
                     }`}
-                    style={{ height: `${Math.max(pct, 5)}%` }} // Ensure at least a sliver is visible
+                    style={{ height: `${Math.max(pct, 5)}%` }} 
                   />
                 </div>
                 <span className="text-xs font-medium text-gray-400 mt-1">

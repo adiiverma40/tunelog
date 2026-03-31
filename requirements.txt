@@ -1,8 +1,0 @@
-fastapi==0.135.1
-python-dotenv==1.2.2
-requests==2.32.5
-uvicorn==0.42.0
-rapidfuzz
-# backports.zoneinfo
-python-multipart
-pandas

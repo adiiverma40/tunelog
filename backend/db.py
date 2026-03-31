@@ -154,6 +154,6 @@ def init_db_playlist():
 if __name__ == "__main__":
     init_db()
     init_db_lib()
-    print("asdasd")
+    # print("asdasd")
     init_db_usr()
     init_db_playlist()

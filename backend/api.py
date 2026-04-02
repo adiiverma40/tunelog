@@ -611,9 +611,10 @@ def generatePlaylist(data: PlaylistOptions):
     try:
         if data.slots:
             songSlots(data.slots)
+            # print("api song slots : " , data.slots)
         if data.weights:
             signalWeights(data.weights)
-
+            # print("api signal weight " , data.weights)
         scores = score_song(username)
         unheard, unheard_ratio = get_unheard_songs(scores)
         wildcards = get_wildcard_songs(scores, username)
@@ -641,7 +642,7 @@ def appendPlaylist_api(data: PlaylistOptions):
     username = data.username
     explicit_filter = data.explicit_filter
     size = data.size
-
+    injection = data.injection
     console.log(f"[cyan]Append Playlist:[/cyan] {username} | Size: {size}")
 
     try:
@@ -660,7 +661,8 @@ def appendPlaylist_api(data: PlaylistOptions):
             return {"status": "error", "reason": "User not found in TuneLog database"}
 
         password = row[0]
-        success = appendPlaylist(username, password, explicit_filter, size)
+        # success = appendPlaylist(username, password, explicit_filter, size)
+        success = appendPlaylist(username, password, explicit_filter, size, injection)
 
         if success:
             return {

@@ -48,34 +48,33 @@ const SIGNAL_ORDER: (keyof SlotValues)[] = [
   "partial",
   "skip",
 ];
-
 const PRESETS: Preset[] = [
   {
     id: "balanced",
     label: "Balanced",
     desc: "Default mix — equal weight on liked and unheard",
-    slots: { positive: 0.35, repeat: 0.35, partial: 0.2, skip: 0.1 },
+    slots: { positive: 0.35, repeat: 0.35, partial: 0.25, skip: 0.05 },
     weights: { repeat: 3, positive: 2, partial: 1, skip: -2 },
   },
   {
     id: "discovery",
     label: "Discovery",
     desc: "More unheard songs, fewer repeats",
-    slots: { positive: 0.25, repeat: 0.15, partial: 0.35, skip: 0.25 },
+    slots: { positive: 0.2, repeat: 0.15, partial: 0.6, skip: 0.05 },
     weights: { repeat: 2, positive: 2, partial: 2, skip: -1 },
   },
   {
     id: "favorites",
     label: "Favourites",
     desc: "Heavy on repeats and positives — your best songs",
-    slots: { positive: 0.45, repeat: 0.45, partial: 0.08, skip: 0.02 },
-    weights: { repeat: 5, positive: 3, partial: 1, skip: -3 },
+    slots: { positive: 0.45, repeat: 0.45, partial: 0.1, skip: 0 },
+    weights: { repeat: 5, positive: 3, partial: 1, skip: 0 },
   },
   {
     id: "custom",
     label: "Custom",
     desc: "Set your own slot ratios and signal weights",
-    slots: { positive: 0.35, repeat: 0.35, partial: 0.2, skip: 0.1 },
+    slots: { positive: 0.35, repeat: 0.35, partial: 0.25, skip: 0.05 },
     weights: { repeat: 3, positive: 2, partial: 1, skip: -2 },
   },
 ];

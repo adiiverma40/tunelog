@@ -2,6 +2,10 @@
 
 This document outlines the technical architecture, data flow, and design decisions made during TuneLog development.
 
+## Recent changes : 
+- changed scoring system 
+
+
 ## Roadmap
 - [ ] Add delete user option
 - [ ] Figure out why cpu spikes when using fast sync in docker but not when doing python3
@@ -106,14 +110,22 @@ TuneLog classifies every listen into one of five signals based on `percent_playe
 | repeat | replayed | +3 |
 
 ### Scoring Formula
-```
-score = signal_weight × recency_multiplier
-recency_multiplier = 1 / (days_since + 1)
-final_score = average of all contributions for that song
-```
-Recent listens are weighted higher. A repeat yesterday outweighs a repeat from 3 months ago.
 
----
+- Before used time as a recency multipler
+- changed to normal addition, when user click create playlist a hardcoded preset of songs or by ui gets to backend
+- using the ratio and weightage the score of song is calculated
+- for 1st 3 song(recent)  get a multipler of 2 
+- also if the total score is less then 0 we skip this
+- if the size of this is less then assian size then we do this again
+
+**ISSUES** 
+- issues ariases when genre injection is off and user tries to create a new playlist of only repeated song
+- if db dont have enough song of repeat tag, it adds unheard song to fill the empty slots
+
+
+
+
+
 
 ## Auto Genre Match
 
@@ -368,7 +380,7 @@ Songs are ranked within the unheard pool by points:
 
 ---
 
-## Playlist Slot System
+## Playlist Slot System - can be changed from ui 
 
 ### The Problem: Fixed Slot Truncation
 Using `int()` to calculate slot sizes caused slots to truncate to 0 at small playlist sizes — `n=10` produced only 6 songs because `int(10 * 0.08) = 0` silently dropped the wildcard slot entirely.

@@ -90,7 +90,7 @@ TuneLog uses **Implicit Feedback**. Instead of manual ratings, it watches "Signa
 | **Played 80–100%** | `positive` | +2 | Solid interest; increases playlist frequency. |
 | **Replayed < 24h** | `repeat` | +3 | Highest signal; moves to "Heavy Rotation." |
 
-### Smart Playlist Generation
+### Smart Playlist Generation 
 - Can be changed from DashBoard
 
 * TuneLog manages a balanced "Diet" of music across several slots:
@@ -100,6 +100,7 @@ TuneLog uses **Implicit Feedback**. Instead of manual ratings, it watches "Signa
 * **Wildcards:** Resurrects "Lost Favorites" you haven't heard in 60+ days.
 * **Second Chances:** Occasional re-exposure to "Skips" (configurable via UI) to account for changing moods.
 
+- updated check architecture.md
 ---
 
 ### **Auto Genre Match**

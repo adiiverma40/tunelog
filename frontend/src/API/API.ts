@@ -378,7 +378,7 @@ export async function fetchPlaylistGenerate(
   size: number = 50,
   slots?: Record<string, number>,
   weights?: Record<string, number>,
-  injection:Boolean = true
+  injection:boolean = true
 ): Promise<PlaylistGenerateResponse> {
   const res = await fetch(`${BASE_URL}/api/playlist/generate`, {
     method: "POST",
@@ -395,7 +395,7 @@ export async function appendPlaylist(
   size: number = 50,
   slots?: Record<string, number>,
   weights?: Record<string, number>,
-  injection: Boolean = true
+  injection: boolean = true
 ): Promise<PlaylistGenerateResponse> {
   try {
     const res = await fetch(`${BASE_URL}/api/playlist/append`, {

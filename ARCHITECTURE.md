@@ -27,7 +27,7 @@ I have plans to implement plugin for navidrome for better monitoring of user int
 
 
 ## CURRENTLY : 
- - currently cleaning up the code and adding error handling
+ - currently working on `tunelog reporter`
 
 
 ## Table of Contents

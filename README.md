@@ -62,19 +62,15 @@ npm run dev
 
 ### .env
 ```bash
-#Navidrome
-#base_url = navidrome ip 
-# base_url = http://192.168.29.118:4533 # THIS IS MINE IP ADDRESS
+# Use your local IP so the Docker container can talk to the host machine
+BASE_URL=http://192.168.29.118:4533
 
-# Admin and password
-admin_username = username # (username used while creating navidrome account )
-admin_password = password # (Password used while creating navidrome account)
+# Your Navidrome login credentials
+ADMIN_USERNAME=adii
+ADMIN_PASSWORD=1234
 
-# vite api url 
-
-# VITE_API_URL=http://localhost:8000
-# VITE_API_URL=http://192.168.29.118:8000 # THIS IS MINE 
-
+# Use the local IP so your Browser (Frontend) can find the Backend API
+VITE_API_URL=http://192.168.29.118:8000
 ```
 - You can get your ip address by doing, `ipconfig` in windows and `ip a` in linux or use `localhost` if its works for you
 

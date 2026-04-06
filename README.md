@@ -62,15 +62,20 @@ npm run dev
 
 ### .env
 ```bash
-# Use your local IP so the Docker container can talk to the host machine
-BASE_URL=http://192.168.29.118:4533
+#Navidrome Server
+BASE_URL=http://192.168.29.118:4533 #Chnage your ip 
+ADMIN_USERNAME=adii # change username
+ADMIN_PASSWORD=1234 # Change password
 
-# Your Navidrome login credentials
-ADMIN_USERNAME=adii
-ADMIN_PASSWORD=1234
+# Frontend / API
+VITE_API_URL=http://192.168.29.118:8000 # change ip
 
-# Use the local IP so your Browser (Frontend) can find the Backend API
-VITE_API_URL=http://192.168.29.118:8000
+# Logging 
+# Forces the logs to save exactly where Docker is listening for the volume mount
+LOG_DIR=/app/logs
+LOG_MAX_SIZE=10 MB
+LOG_RETENTION_DAYS=7 days
+LOG_LEVEL=DEBUG
 ```
 - You can get your ip address by doing, `ipconfig` in windows and `ip a` in linux or use `localhost` if its works for you
 

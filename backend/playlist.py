@@ -157,7 +157,7 @@ def score_batch(user_id, song_ids, conn):
     all_rows = []
     for sid in song_ids:
         rows = conn.execute(
-            "SELECT song_id, signal FROM listens WHERE user_id = ? AND song_id = ? ORDER BY id ASC LIMIT 20",
+            "SELECT song_id, signal FROM listens WHERE user_id = ? AND song_id = ? ORDER BY id DESC LIMIT 20",
             (user_id, sid),
         ).fetchall()
         all_rows.extend(rows)

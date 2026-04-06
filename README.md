@@ -125,6 +125,14 @@ Added better error handling, i took some help from ai
 For more info read architecture.md
 
 
+### **Logging**
+Added a loging system that logs the info, its purpose is to refine the playlist generation script better
+- Before this i was not able to distinguish btw why this song was choosen to be in playlist and why this was not choosen
+- This can also be used to get the reason of why script broke
+- By default the scrip is set `INFO` for Main and `DEBUG` for playlist
+- If you want to contirebute you can do so by sumbitting `playlist.jsonl` so that i can make the script better
+
+
 ## Roadmap & TODO
 
 - [] **Notification Bridge:** Real-time "Now Playing" popups on the React Dashboard.

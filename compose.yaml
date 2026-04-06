@@ -8,6 +8,7 @@ services:
     stdin_open: true
     volumes:
       - ./data:/app/data
+      - ./backend/logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - FORCE_COLOR=1

@@ -1,4 +1,4 @@
-### for things i dont know where to put
+# for things i dont know where to put
 
 
 # ISSUES : if user skip a song and then listen it once complete, one the 1st listen it will mark as 1 star but then he listen again so it will marked as repeated song and hence getting 5 star
@@ -51,8 +51,36 @@ from rich.panel import Panel
 from rich.columns import Columns
 import sqlite3
 from datetime import datetime
+import os
+import json
+import sys
+from datetime import datetime
+from loguru import logger
+
+
+import os
+import sys
+import json
+from loguru import logger
+
+
+
+
 
 console = Console()
+
+
+
+LOG_MAX_SIZE      = os.getenv("LOG_MAX_SIZE", "10 MB")
+LOG_RETENTION     = os.getenv("LOG_RETENTION_DAYS", "7 days")
+LOG_LEVEL         = os.getenv("LOG_LEVEL", "DEBUG").upper()
+
+LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
+MAIN_LOG_FILE     = os.path.join(LOG_DIR, "main.log")
+PLAYLIST_LOG_FILE = os.path.join(LOG_DIR, "playlist.jsonl")
+
+os.makedirs(LOG_DIR, exist_ok=True)
+
 
 star_map = {
     "skip": -2.0,
@@ -289,3 +317,153 @@ def UpdateDBgenre(data, connLib=None):
         "updated_rows_lib": cursor_lib.rowcount,
         "updated_rows_log": cursor_log.rowcount,
     }
+
+
+# setup logger  
+
+_initialized = False
+
+def setup_logger():
+    global _initialized
+    if _initialized:
+        return
+    _initialized = True
+
+    logger.remove()
+    _setup_sinks()
+
+def _setup_sinks():
+    logger.add(
+        sys.stderr,
+        level="INFO",
+        colorize=True,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | <cyan>{extra[source]:<10}</cyan> | {message}",
+        filter=lambda r: "source" in r["extra"],
+    )
+
+    logger.add(
+        MAIN_LOG_FILE,
+        level=LOG_LEVEL,
+        rotation=LOG_MAX_SIZE,
+        retention=LOG_RETENTION,
+        compression="zip",
+        encoding="utf-8",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
+        filter=lambda r: r["extra"].get("source") == "main",
+    )
+
+    def _jsonl_format(record):
+        entry = {
+            "time":    record["time"].isoformat(),
+            "level":   record["level"].name,
+            "source":  "playlist",
+            "message": record["message"],
+            **{k: v for k, v in record["extra"].items() if k != "source"}
+        }
+        record["extra"]["raw_json"] = json.dumps(entry)
+        return "{extra[raw_json]}\n"
+
+    logger.add(
+        PLAYLIST_LOG_FILE,
+        level=LOG_LEVEL,
+        rotation=LOG_MAX_SIZE,
+        retention=LOG_RETENTION,
+        compression="zip",
+        encoding="utf-8",
+        format=_jsonl_format,
+        filter=lambda r: r["extra"].get("source") == "playlist",
+    )
+
+_main_logger     = logger.bind(source="main")
+_playlist_logger = logger.bind(source="playlist")
+
+def log(level: str, message: str, source: str = "main", **kwargs):
+    """Base logging function."""
+    target = _playlist_logger if source == "playlist" else _main_logger
+    if kwargs:
+        target = target.bind(**kwargs)
+    getattr(target, level.lower())(message)
+
+
+# playlist logging helpers
+
+def log_scores(user_id, scores, signal_contributions, titles):
+    for song_id, data in scores.items():
+        title = titles.get(song_id, "Unknown Title")
+        log(
+            "debug",
+            f"[score] '{title}' ({song_id}) → score={data['score']:.2f}  dominant={data.get('dominant_signal')}  last_signal={data['signal']}",
+            source="playlist",
+            event="song_scored",
+            user_id=user_id,
+            song_id=song_id,
+            title=title,
+            score=data["score"],
+            dominant_signal=data.get("dominant_signal"),
+            last_signal=data["signal"],
+            signal_breakdown=signal_contributions.get(song_id, {}),
+        )
+
+def log_slot(user_id, song_id, title, score, slot, accepted, reason):
+    status = "ACCEPTED" if accepted else "REJECTED"
+    log(
+        "debug",
+        f"[slot:{slot}] {status} '{title}' ({song_id})  score={score:.2f}  reason={reason}",
+        source="playlist",
+        event="slot_decision",
+        user_id=user_id,
+        song_id=song_id,
+        title=title,
+        score=score,
+        slot=slot,
+        accepted=accepted,
+        reason=reason,
+    )
+
+def log_wildcard(user_id, wildcards, selected):
+    log(
+        "debug",
+        f"[wildcard] pool={len(wildcards)}  selected={len(selected)}  ids={selected}",
+        source="playlist",
+        event="wildcard_selection",
+        user_id=user_id,
+        pool_size=len(wildcards),
+        selected_count=len(selected),
+    )
+
+def log_genre_injection(user_id, genre_distribution, adjusted_size, selected):
+    top_genres = genre_distribution[:5]
+    log(
+        "debug",
+        f"[genre_injection] slots={adjusted_size}  got={len(selected)}  top_genres={top_genres}",
+        source="playlist",
+        event="genre_injection",
+        user_id=user_id,
+        requested_slots=adjusted_size,
+        selected_count=len(selected),
+        top_genres=top_genres,
+    )
+
+def log_pool(user_id, method, song_id, title, signal):
+    log(
+        "debug",
+        f"[selection:{method}] '{title}' ({song_id})  signal={signal}",
+        source="playlist",
+        event="final_selection",
+        user_id=user_id,
+        method=method,
+        song_id=song_id,
+        title=title,
+        signal=signal,
+    )
+
+def log_summary(user_id, size, counts):
+    log(
+        "info",
+        f"[summary] user={user_id}  total={size}  distribution={counts}",
+        source="playlist",
+        event="playlist_summary",
+        user_id=user_id,
+        total=size,
+        distribution=counts,
+    )

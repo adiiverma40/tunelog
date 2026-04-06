@@ -430,33 +430,12 @@ days_since = max((datetime.now() - datetime.fromisoformat(timestamp)).days, 0)
 
 TuneLog supports multiple Navidrome users. Each user gets their own independently generated playlist based on their personal listen history.
 
-### Configuration
 
-TuneLog uses a `.env` file to store credentials. This file is **never committed to Git** — it lives only on your machine.
+## Logging
+using  `loguru` module to create log files for `playlist.py` and everything else
 
-Create a `.env` file in the root directory:
-```env
-# User 1
-USER1_USERNAME=alice
-USER1_PASSWORD=yourpassword
 
-# User 2
-USER2_USERNAME=bob
-USER2_PASSWORD=yourpassword
-```
 
-> Add as many `USERn_*` blocks as you have users. Each user must have both fields.
-
-### In config.py
-```python
-# ADD MORE LINES IF YOU HAVE MORE USERS
-USER_CREDENTIALS = {
-    os.getenv("USER_ADITI"): os.getenv("PASSWORD_aditi"),
-    os.getenv("USER_adii_mobile"): os.getenv("PASSWORD_adii_mobile"),
-    os.getenv("admin_username"): os.getenv("admin_password"),
-    # Add as many users as you want
-}
-```
 ## Web UI & API Layer
 
 TuneLog utilizes a FastAPI backend to bridge the Gap between the Navidrome API and the React-based Dashboard. It manages three distinct SQLite databases: `tunelog.db` (listens), `songlist.db` (library), and `users.db` (app users).

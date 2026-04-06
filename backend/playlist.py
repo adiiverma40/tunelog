@@ -12,13 +12,13 @@
 # skipped less priorty
 # song from most listened genre high priorty
 
-##IMPLEMENETATION:
+# #IMPLEMENETATION:
 # Implemented genre distrubution system
 #  - default gets 1 point
 # - song with every genre other then default gets 2 point
 # - bollywood/rap gets 2 and 2 points each
 # - / gets changed into ,
-#
+
 # Implementing star system to grade and push it in navidrome
 
 
@@ -54,7 +54,7 @@
 # - songs with a genre tag gets priorities
 # - after genre fitlration it gets back to the default pointing system of skip, listented, partial and repeated
 
-##ISSUES AND FIXES##
+# #ISSUES AND FIXES##
 
 # issue : in slots when using int it was giving less then the amount in PLAYLIST_SIZE
 # fix : used round instead of int
@@ -85,9 +85,25 @@
 # we will take 3 times the playlist size in the pool, if its not satify the playlist size we will take another 40 some
 
 
+
+
 from datetime import datetime
 import requests
 import random
+import heapq
+from rich.console import Console
+from rich.table import Table
+
+from misc import (
+    log, 
+    log_scores, 
+    log_slot, 
+    log_wildcard, 
+    log_genre_injection, 
+    log_pool, 
+    log_summary
+)
+
 from db import (
     get_db_connection,
     get_db_connection_lib,
@@ -95,10 +111,6 @@ from db import (
     get_db_connection_playlist,
 )
 from config import build_url, build_url_for_user, getAllUser
-import heapq
-
-from rich.console import Console
-from rich.table import Table
 
 console = Console(log_path=False, log_time=False)
 
@@ -107,8 +119,6 @@ PLAYLIST_NAME = "Tunelog - {}"
 PLAYLIST_SIZE = 40
 WILDCARD_DAY = 60
 
-# gloabl defaults
-
 SIGNAL_WEIGHTS = {
     "repeat": 3,
     "positive": 2,
@@ -116,14 +126,13 @@ SIGNAL_WEIGHTS = {
     "skip": -2,
 }
 
-
 slotsValue = {
     "positive": 0.35,
     "repeat": 0.35,
     "partial": 0.25,
     "skip": 0.05,
-
 }
+
 
 def signalWeights(weights: dict):
     global SIGNAL_WEIGHTS
@@ -134,16 +143,13 @@ def signalWeights(weights: dict):
         "skip": weights.get("skip", -2),
     }
 
-
 def songSlots(values):
-    # print("songSlots")
     global slotsValue
-
     slotsValue = {
-    "positive":  values["positive"],
-    "repeat":  values['repeat'],
-    "partial":  values['partial'],
-    "skip":  values['skip'],
+        "positive": values["positive"],
+        "repeat": values["repeat"],
+        "partial": values["partial"],
+        "skip": values["skip"],
     }
 
 
@@ -176,7 +182,6 @@ def score_batch(user_id, song_ids, conn):
 
     return scores
 
-
 def score_song(user_id):
     conn = get_db_connection()
     song_rows = conn.execute(
@@ -200,7 +205,7 @@ def score_song(user_id):
 
     scores = {}
     listen_count = {}
-    signal_contributions = {} 
+    signal_contributions = {}
 
     for song_id, signal in all_rows:
         signal_weight = SIGNAL_WEIGHTS.get(signal, 0)
@@ -215,37 +220,50 @@ def score_song(user_id):
         weighted = signal_weight * multiplier
 
         scores[song_id]["score"] += weighted
-        scores[song_id]["signal"] = signal 
+        scores[song_id]["signal"] = signal
         signal_contributions[song_id][signal] = (
             signal_contributions[song_id].get(signal, 0) + weighted
         )
 
- 
     for song_id in scores:
         contribs = signal_contributions[song_id]
         positive_contribs = {s: v for s, v in contribs.items() if v > 0}
         if positive_contribs:
-            scores[song_id]["dominant_signal"] = max(
-                positive_contribs, key=positive_contribs.get
-            )
+            scores[song_id]["dominant_signal"] = max(positive_contribs, key=positive_contribs.get)
         elif contribs:
             scores[song_id]["dominant_signal"] = max(contribs, key=contribs.get)
         else:
             scores[song_id]["dominant_signal"] = scores[song_id]["signal"]
 
+    conn_lib = get_db_connection_lib()
+    titles = {}
+    if scores:
+        placeholders = ",".join("?" * len(scores.keys()))
+        rows = conn_lib.execute(f"SELECT song_id, title FROM library WHERE song_id IN ({placeholders})", list(scores.keys())).fetchall()
+        titles = {r[0]: r[1] for r in rows}
+    conn_lib.close()
+
+    log_scores(user_id, scores, signal_contributions, titles)
     return scores
 
 
-def fill_slots(scores, slots, slot_sizes, allowed_ids=None):
+
+def fill_slots(scores, slots, slot_sizes, allowed_songs=None, user_id="unknown"):
     for song_id, data in scores.items():
         score = data["score"]
         target_slot = data.get("dominant_signal") or data["signal"]
+        title = allowed_songs.get(song_id, "Unknown Title") if allowed_songs else "Unknown Title"
 
         if score < 0 or target_slot is None:
+            log_slot(user_id, song_id, title, score, target_slot or "none", False, "score_negative_or_no_signal")
             continue
-        if allowed_ids is not None and song_id not in allowed_ids:
+
+        if allowed_songs is not None and song_id not in allowed_songs:
+            log_slot(user_id, song_id, title, score, target_slot, False, "not_in_allowed_ids")
             continue
+
         if target_slot not in slots:
+            log_slot(user_id, song_id, title, score, target_slot, False, "slot_not_found")
             continue
 
         max_size = slot_sizes[target_slot]
@@ -253,16 +271,19 @@ def fill_slots(scores, slots, slot_sizes, allowed_ids=None):
 
         if len(heap) < max_size:
             heapq.heappush(heap, (score, song_id))
+            log_slot(user_id, song_id, title, score, target_slot, True, "accepted")
         else:
             if score > heap[0][0]:
                 heapq.heapreplace(heap, (score, song_id))
+                log_slot(user_id, song_id, title, score, target_slot, True, "replaced_min")
+            else:
+                log_slot(user_id, song_id, title, score, target_slot, False, "slot_full_low_score")
+
 
 
 def get_genre_distribution(user_id):
     conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT genre FROM listens WHERE user_id = ?", (user_id,)
-    ).fetchall()
+    rows = conn.execute("SELECT genre FROM listens WHERE user_id = ?", (user_id,)).fetchall()
     conn.close()
 
     counts = {}
@@ -276,26 +297,18 @@ def get_genre_distribution(user_id):
 
     return sorted(counts.items(), key=lambda x: x[1], reverse=True)
 
-
 def get_unheard_by_genre(heard_ids, genre, limit):
     conn = get_db_connection_lib()
     if not heard_ids:
-        rows = conn.execute(
-            "SELECT song_id, genre FROM library WHERE genre LIKE ?",
-            (f"%{genre}%",),
-        ).fetchall()
+        rows = conn.execute("SELECT song_id, genre FROM library WHERE genre LIKE ?", (f"%{genre}%",)).fetchall()
     else:
         placeholders = ",".join("?" * len(heard_ids))
-        rows = conn.execute(
-            f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})",
-            (f"%{genre}%", *heard_ids),
-        ).fetchall()
+        rows = conn.execute(f"SELECT song_id, genre FROM library WHERE genre LIKE ? AND song_id NOT IN ({placeholders})", (f"%{genre}%", *heard_ids)).fetchall()
     conn.close()
 
     results = [(r[0], r[1]) for r in rows]
     random.shuffle(results)
     return results[:limit]
-
 
 def get_unheard_by_genre_weighted(heard_ids, genre_distribution, total_slots):
     if not genre_distribution or total_slots <= 0:
@@ -311,19 +324,11 @@ def get_unheard_by_genre_weighted(heard_ids, genre_distribution, total_slots):
         songs = get_unheard_by_genre(heard_ids, genre, genre_slots)
 
         for song_id, song_genre in songs:
-            if song_genre == "default":
-                pts = 1
-            else:
-                pts = len(song_genre.split(",")) * 2
-
-            if song_id not in scored:
-                scored[song_id] = pts
-            else:
-                scored[song_id] += pts
+            pts = 1 if song_genre == "default" else len(song_genre.split(",")) * 2
+            scored[song_id] = scored.get(song_id, 0) + pts
 
     sorted_songs = sorted(scored.items(), key=lambda x: x[1], reverse=True)
     return [song_id for song_id, _ in sorted_songs[:total_slots]]
-
 
 def get_unheard_songs(scored_ids):
     conn = get_db_connection_lib()
@@ -337,13 +342,9 @@ def get_unheard_songs(scored_ids):
 
     return unheard, unheard_ratio
 
-
 def get_wildcard_songs(scores, user_id):
     conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT song_id, MAX(timestamp) as last_played FROM listens WHERE user_id = ? GROUP BY song_id",
-        (user_id,),
-    ).fetchall()
+    rows = conn.execute("SELECT song_id, MAX(timestamp) as last_played FROM listens WHERE user_id = ? GROUP BY song_id", (user_id,)).fetchall()
     conn.close()
 
     wildcards = []
@@ -351,14 +352,11 @@ def get_wildcard_songs(scores, user_id):
         song_id = row[0]
         last_played = row[1]
         days_since = max((datetime.now() - datetime.fromisoformat(last_played)).days, 0)
-   
-        song_data = scores.get(song_id)
-        song_score = song_data["score"] if song_data else 0
+        song_score = scores.get(song_id, {}).get("score", 0)
+
         if days_since >= WILDCARD_DAY and song_score > 0:
             wildcards.append(song_id)
-
     return wildcards
-
 
 def weighted_sample(pool, scores, k):
     if not pool or k <= 0:
@@ -381,68 +379,51 @@ def weighted_sample(pool, scores, k):
         weights_copy.pop(idx)
     return selected
 
-
-def get_allowed_song_ids(explicit_filter: str) -> set:
+def get_allowed_songs(explicit_filter: str) -> dict:
+    """Returns a mapping of {song_id: title} for allowed songs."""
     conn = get_db_connection_lib()
-
     if explicit_filter == "strict":
-        rows = conn.execute(
-            "SELECT song_id FROM library WHERE explicit = 'notExplicit'"
-        ).fetchall()
+        rows = conn.execute("SELECT song_id, title FROM library WHERE explicit = 'notExplicit'").fetchall()
     elif explicit_filter == "allow_cleaned":
-        rows = conn.execute(
-            "SELECT song_id FROM library WHERE explicit IN ('notExplicit', 'cleaned', 'notInItunes')"
-        ).fetchall()
-    else: 
-        rows = conn.execute("SELECT song_id FROM library").fetchall()
-
+        rows = conn.execute("SELECT song_id, title FROM library WHERE explicit IN ('notExplicit', 'cleaned', 'notInItunes')").fetchall()
+    else:
+        rows = conn.execute("SELECT song_id, title FROM library").fetchall()
     conn.close()
-    return {row[0] for row in rows}
+    return {row[0]: row[1] for row in rows}
+
 
 
 def getPlaylistId(username):
     conn = get_db_connection_usr()
     cursor = conn.cursor()
-
-    result = cursor.execute(
-        "SELECT playlistId FROM user WHERE username = ?", (username,)
-    ).fetchone()
-
+    result = cursor.execute("SELECT playlistId FROM user WHERE username = ?", (username,)).fetchone()
     conn.close()
-
     if result:
         return result[0]
     return None
 
-
-def createPlaylistIfDeleteByNavidrome(base_url , name , data , user_id):
+def createPlaylistIfDeleteByNavidrome(base_url, name, data, user_id):
     try:
         create_url = f"{base_url}&name={name}"
         r2 = requests.post(create_url, data=data).json()
 
-        if (
-                "subsonic-response" not in r2
-                or r2["subsonic-response"]["status"] == "failed"
-        ):
+        if "subsonic-response" not in r2 or r2["subsonic-response"]["status"] == "failed":
             print("[ERROR] Failed to recreate playlist")
             return
 
         new_id = r2["subsonic-response"]["playlist"]["id"]
-
         conn_usr = get_db_connection_usr()
-        conn_usr.execute(
-                "UPDATE user SET playlistId = ? WHERE username = ?",
-                (new_id, user_id),
-            )
+        conn_usr.execute("UPDATE user SET playlistId = ? WHERE username = ?", (new_id, user_id))
         conn_usr.commit()
         conn_usr.close()
 
         print(f"[TuneLog] Recreated playlist with new ID {new_id}")
         return new_id
-
     except Exception as e:
         print(f"[ERROR] Failed to recreate playlist: {e}")
         return
+
+
 
 def build_playlist(
     scores,
@@ -454,7 +435,7 @@ def build_playlist(
     size,
     injection=True,
 ):
-    allowed_ids = get_allowed_song_ids(explicit_filter)
+    allowed_songs = get_allowed_songs(explicit_filter)
     song_signals = {}
 
     if injection:
@@ -466,33 +447,29 @@ def build_playlist(
         unheard_size = 0
         wildcard_size = 0
 
-    slot_sizes = {
-        signal: max(1, round(ratio * signal_size))
-        for signal, ratio in slotsValue.items()
-    }
+    slot_sizes = {signal: max(1, round(ratio * signal_size)) for signal, ratio in slotsValue.items()}
     slots = {signal: [] for signal in slotsValue}
-    fill_slots(scores, slots, slot_sizes, allowed_ids)
+
+    fill_slots(scores, slots, slot_sizes, allowed_songs, user_id=user_id)
 
     signal_songs = []
     for signal, heap in slots.items():
         for score, song_id in heap:
             signal_songs.append(song_id)
-            song_signals[song_id] = scores.get(song_id, {}).get(
-                "dominant_signal", signal
-            )
+            song_signals[song_id] = scores.get(song_id, {}).get("dominant_signal", signal)
+
+    for sid in signal_songs:
+        log_pool(user_id, "signal_slot", sid, allowed_songs.get(sid, "Unknown"), song_signals.get(sid, "unknown"))
 
     wildcard_songs = []
     if injection:
-        wildcard_pool = [
-            sid for sid in wildcards if sid in allowed_ids and sid not in song_signals
-        ]
-        wildcard_songs = weighted_sample(
-            wildcard_pool,
-            {sid: scores.get(sid, {}).get("score", 1) for sid in wildcard_pool},
-            wildcard_size,
-        )
+        wildcard_pool = [sid for sid in wildcards if sid in allowed_songs and sid not in song_signals]
+        wildcard_songs = weighted_sample(wildcard_pool, {sid: scores.get(sid, {}).get("score", 1) for sid in wildcard_pool}, wildcard_size)
+        
         for sid in wildcard_songs:
             song_signals[sid] = "wildcard"
+            log_pool(user_id, "wildcard_random", sid, allowed_songs.get(sid, "Unknown"), "wildcard")
+        log_wildcard(user_id, wildcard_pool, wildcard_songs)
 
     leftover = wildcard_size - len(wildcard_songs)
 
@@ -501,14 +478,13 @@ def build_playlist(
         heard_so_far = set(song_signals.keys())
         adjusted_unheard_size = unheard_size + leftover
         genre_distribution = get_genre_distribution(user_id)
-        genre_songs = get_unheard_by_genre_weighted(
-            heard_so_far, genre_distribution, adjusted_unheard_size
-        )
-        genre_songs = [
-            sid for sid in genre_songs if sid in allowed_ids and sid not in heard_so_far
-        ][:adjusted_unheard_size]
+        genre_songs = get_unheard_by_genre_weighted(heard_so_far, genre_distribution, adjusted_unheard_size)
+        genre_songs = [sid for sid in genre_songs if sid in allowed_songs and sid not in heard_so_far][:adjusted_unheard_size]
+        
         for sid in genre_songs:
             song_signals[sid] = "unheard"
+            log_pool(user_id, "genre_injection", sid, allowed_songs.get(sid, "Unknown"), "unheard")
+        log_genre_injection(user_id, genre_distribution, adjusted_unheard_size, genre_songs)
 
     seen = set()
     final_ids = []
@@ -520,37 +496,31 @@ def build_playlist(
     if len(final_ids) < size:
         needed = size - len(final_ids)
         backfill = [
-            sid
-            for sid, data in sorted(
-                scores.items(), key=lambda x: x[1]["score"], reverse=True
-            )
-            if sid not in seen and sid in allowed_ids and data["score"] >= 0
+            sid for sid, data in sorted(scores.items(), key=lambda x: x[1]["score"], reverse=True)
+            if sid not in seen and sid in allowed_songs and data["score"] >= 0
         ][:needed]
+        
         for sid in backfill:
             song_signals[sid] = scores[sid]["signal"]
-        final_ids += backfill
-        seen.update(backfill)
-
-    if len(final_ids) < size:
-        needed = size - len(final_ids)
-        remaining_unheard = [
-            sid for sid in unheard if sid in allowed_ids and sid not in seen
-        ]
-        random.shuffle(remaining_unheard)
-        for sid in remaining_unheard[:needed]:
-            song_signals[sid] = "unheard"
+            log_pool(user_id, "score_backfill", sid, allowed_songs.get(sid, "Unknown"), scores[sid]["signal"])
             final_ids.append(sid)
             seen.add(sid)
 
     if len(final_ids) < size:
-        console.log(
-            f"[yellow]Failsafe triggered:[/yellow] {len(final_ids)}/{size}, expanding window..."
-        )
+        needed = size - len(final_ids)
+        remaining_unheard = [sid for sid in unheard if sid in allowed_songs and sid not in seen]
+        random.shuffle(remaining_unheard)
+        
+        for sid in remaining_unheard[:needed]:
+            song_signals[sid] = "unheard"
+            log_pool(user_id, "unheard_random", sid, allowed_songs.get(sid, "Unknown"), "unheard")
+            final_ids.append(sid)
+            seen.add(sid)
+
+    if len(final_ids) < size:
+        console.log(f"[yellow]Failsafe triggered:[/yellow] {len(final_ids)}/{size}, expanding window...")
         conn = get_db_connection()
-        extra_rows = conn.execute(
-            "SELECT DISTINCT song_id FROM listens WHERE user_id = ? ORDER BY id DESC LIMIT ?",
-            (user_id, size * 10),
-        ).fetchall()
+        extra_rows = conn.execute("SELECT DISTINCT song_id FROM listens WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id, size * 10)).fetchall()
         conn.close()
 
         extra_ids = [row[0] for row in extra_rows if row[0] not in seen]
@@ -558,23 +528,18 @@ def build_playlist(
             extra_conn = get_db_connection()
             extra_scores = score_batch(user_id, extra_ids, extra_conn)
             extra_conn.close()
-            for sid, data in sorted(
-                extra_scores.items(), key=lambda x: x[1]["score"], reverse=True
-            ):
+            for sid, data in sorted(extra_scores.items(), key=lambda x: x[1]["score"], reverse=True):
                 if len(final_ids) >= size:
                     break
-                if sid not in seen and sid in allowed_ids and data["score"] >= 0:
+                if sid not in seen and sid in allowed_songs and data["score"] >= 0:
                     song_signals[sid] = data["signal"]
+                    log_pool(user_id, "failsafe_fallback", sid, allowed_songs.get(sid, "Unknown"), data["signal"])
                     final_ids.append(sid)
                     seen.add(sid)
 
     signal_color = {
-        "repeat": "green",
-        "positive": "cyan",
-        "partial": "yellow",
-        "skip": "red",
-        "wildcard": "magenta",
-        "unheard": "blue",
+        "repeat": "green", "positive": "cyan", "partial": "yellow",
+        "skip": "red", "wildcard": "magenta", "unheard": "blue",
     }
 
     counts = {}
@@ -582,9 +547,7 @@ def build_playlist(
         sig = song_signals.get(sid, "unheard")
         counts[sig] = counts.get(sig, 0) + 1
 
-    table = Table(
-        title=f"Playlist · {user_id} · {len(final_ids[:size])} songs", show_header=True
-    )
+    table = Table(title=f"Playlist · {user_id} · {len(final_ids[:size])} songs", show_header=True)
     table.add_column("Type", style="bold")
     table.add_column("Songs", justify="right")
 
@@ -593,8 +556,10 @@ def build_playlist(
         table.add_row(f"[{color}]{sig}[/{color}]", str(count))
 
     console.print(table)
+    log_summary(user_id, len(final_ids[:size]), counts)
 
     return final_ids[:size], song_signals
+
 
 
 
@@ -603,110 +568,40 @@ def appendPlaylist(user_id, password, explicit_filter, size, injection=True):
     unheard, unheard_ratio = get_unheard_songs(scores)
     wildcards = get_wildcard_songs(scores, user_id)
     playlist, song_signals = build_playlist(
-        scores,
-        unheard,
-        wildcards,
-        unheard_ratio,
-        user_id,
-        explicit_filter,
-        size,
-        injection,
+        scores, unheard, wildcards, unheard_ratio, user_id, explicit_filter, size, injection
     )
 
     stored_playlist_id = getPlaylistId(user_id)
     name = PLAYLIST_NAME.format(user_id)
 
     if stored_playlist_id and stored_playlist_id != "no users/playlist id":
-        url = (
-            build_url_for_user("updatePlaylist", user_id, password)
-            + f"&playlistId={stored_playlist_id}"
-        )
+        url = build_url_for_user("updatePlaylist", user_id, password) + f"&playlistId={stored_playlist_id}"
         data = [("songIdToAdd", sid) for sid in playlist]
-        console.log(
-            f"[cyan]Appending {len(playlist)} songs → playlist {stored_playlist_id} for {user_id}[/cyan]"
-        )
     else:
         url = build_url_for_user("createPlaylist", user_id, password) + f"&name={name}"
         data = [("songId", sid) for sid in playlist]
-        console.log(
-            f"[cyan]No playlist ID found, creating new playlist for {user_id}[/cyan]"
-        )
 
     try:
         r = requests.post(url, data=data).json()
-
         if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
-            error = (
-                r.get("subsonic-response", {})
-                .get("error", {})
-                .get("message", "Unknown error")
-            )
-            console.log(f"[red]Append failed:[/red] {error}")
+            error = r.get("subsonic-response", {}).get("error", {}).get("message", "Unknown error")
+            log("error", f"Append failed: {error}", source="playlist", user_id=user_id, event="error")
+            return False
 
-            if stored_playlist_id and "not found" in error.lower():
-                console.log(
-                    f"[yellow]Playlist {stored_playlist_id} missing, restoring from DB...[/yellow]"
-                )
-
-                conn = get_db_connection_playlist()
-                rows = conn.execute(
-                    "SELECT song_id FROM playlist WHERE username = ?", (user_id,)
-                ).fetchall()
-                conn.close()
-
-                old_song_ids = [row[0] for row in rows]
-                combined_song_ids = list(dict.fromkeys(old_song_ids + playlist))
-
-                create_url = (
-                    build_url_for_user("createPlaylist", user_id, password)
-                    + f"&name={name}"
-                )
-                create_data = [("songId", sid) for sid in combined_song_ids]
-                r2 = requests.post(create_url, data=create_data).json()
-
-                if (
-                    "subsonic-response" not in r2
-                    or r2["subsonic-response"]["status"] == "failed"
-                ):
-                    console.log("[red]Failed to restore playlist[/red]")
-                    return False
-
-                new_id = r2["subsonic-response"]["playlist"]["id"]
-                conn_usr = get_db_connection_usr()
-                conn_usr.execute(
-                    "UPDATE user SET playlistId = ? WHERE username = ?",
-                    (new_id, user_id),
-                )
-                conn_usr.commit()
-                conn_usr.close()
-                console.log(f"[green]Playlist restored with new ID {new_id}[/green]")
-
-            else:
-                return False
-
-        else:
-            if not stored_playlist_id or stored_playlist_id == "no users/playlist id":
-                new_id = r["subsonic-response"]["playlist"]["id"]
-                conn_usr = get_db_connection_usr()
-                conn_usr.execute(
-                    "UPDATE user SET playlistId = ? WHERE username = ?",
-                    (new_id, user_id),
-                )
-                conn_usr.commit()
-                conn_usr.close()
-                console.log(
-                    f"[green]New playlist ID {new_id} saved for {user_id}[/green]"
-                )
-
+        if not stored_playlist_id or stored_playlist_id == "no users/playlist id":
+            new_id = r["subsonic-response"]["playlist"]["id"]
+            conn_usr = get_db_connection_usr()
+            conn_usr.execute("UPDATE user SET playlistId = ? WHERE username = ?", (new_id, user_id))
+            conn_usr.commit()
+            conn_usr.close()
     except Exception as e:
-        console.log(f"[red]Navidrome communication failed:[/red] {e}")
+        log("error", f"Navidrome communication failed: {e}", source="playlist", user_id=user_id, event="error")
         return False
 
     conn_lib = get_db_connection_lib()
     placeholders = ",".join("?" * len(playlist))
     rows = conn_lib.execute(
-        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
-        playlist,
+        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})", playlist
     ).fetchall()
     conn_lib.close()
 
@@ -716,37 +611,18 @@ def appendPlaylist(user_id, password, explicit_filter, size, injection=True):
     for sid in playlist:
         row = lib_data.get(sid)
         if row:
-            insert_data.append(
-                (
-                    user_id,
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    song_signals.get(sid, "unheard"),
-                    row[4],
-                )
-            )
+            insert_data.append((user_id, row[0], row[1], row[2], row[3], song_signals.get(sid, "unheard"), row[4]))
 
-    conn.executemany(
-        "INSERT OR IGNORE INTO playlist (username, song_id, title, artist, genre, signal, explicit) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        insert_data,
-    )
+    conn.executemany("INSERT OR IGNORE INTO playlist (username, song_id, title, artist, genre, signal, explicit) VALUES (?, ?, ?, ?, ?, ?, ?)", insert_data)
     conn.commit()
     conn.close()
-    console.log(
-        f"[green]Append successful:[/green] {len(playlist)} songs synced for {user_id}"
-    )
     return True
 
 
 def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=False):
     USER_CREDENTIALS = getAllUser()
     password = USER_CREDENTIALS.get(user_id)
-    final_playlist_id = None
-
     if not password:
-        console.log(f"[red]No credentials found for {user_id}, skipping[/red]")
         return
 
     stored_playlist_id = None if newPlaylist else getPlaylistId(user_id)
@@ -755,64 +631,33 @@ def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=Fa
 
     if stored_playlist_id and stored_playlist_id != "no users/playlist id":
         url = f"{base_url}&playlistId={stored_playlist_id}"
-        console.log(
-            f"[cyan]Updating playlist {stored_playlist_id} for {user_id}[/cyan]"
-        )
     else:
         url = f"{base_url}&name={name}"
-        console.log(f"[cyan]Creating new playlist for {user_id}[/cyan]")
 
     data = [("songId", sid) for sid in song_ids]
     try:
         r = requests.post(url, data=data).json()
-
         if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
-            error = (
-                r.get("subsonic-response", {})
-                .get("error", {})
-                .get("message", "Unknown error")
-            )
-            console.log(f"[red]Navidrome API failed:[/red] {error}")
-
-            if stored_playlist_id:
-                console.log(
-                    f"[yellow]Playlist {stored_playlist_id} missing, recreating...[/yellow]"
-                )
-                new_id = createPlaylistIfDeleteByNavidrome(
-                    base_url, name, data, user_id
-                )
-                if not new_id:
-                    return
-                final_playlist_id = new_id
-            else:
-                return
-        else:
-            final_playlist_id = r["subsonic-response"]["playlist"]["id"]
-
+            error = r.get("subsonic-response", {}).get("error", {}).get("message", "Unknown error")
+            log("error", f"Navidrome API failed: {error}", source="playlist", user_id=user_id, event="error")
+            return
+        
+        final_playlist_id = r["subsonic-response"]["playlist"]["id"]
         if not newPlaylist and final_playlist_id != stored_playlist_id:
             conn_usr = get_db_connection_usr()
-            conn_usr.execute(
-                "UPDATE user SET playlistId = ? WHERE username = ?",
-                (final_playlist_id, user_id),
-            )
+            conn_usr.execute("UPDATE user SET playlistId = ? WHERE username = ?", (final_playlist_id, user_id))
             conn_usr.commit()
             conn_usr.close()
 
-        requests.get(
-            build_url_for_user("updatePlaylist", user_id, password)
-            + f"&playlistId={final_playlist_id}&public=false"
-        )
+        requests.get(build_url_for_user("updatePlaylist", user_id, password) + f"&playlistId={final_playlist_id}&public=false")
 
     except Exception as e:
-        console.log(f"[red]Failed to push playlist:[/red] {e}")
+        log("error", f"Failed to push playlist: {e}", source="playlist", user_id=user_id, event="error")
         return
 
     conn_lib = get_db_connection_lib()
     placeholders = ",".join("?" * len(song_ids))
-    rows = conn_lib.execute(
-        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
-        song_ids,
-    ).fetchall()
+    rows = conn_lib.execute(f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})", song_ids).fetchall()
     conn_lib.close()
 
     lib_data = {row[0]: row for row in rows}
@@ -824,87 +669,41 @@ def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=Fa
     for sid in song_ids:
         row = lib_data.get(sid)
         if row:
-            insert_data.append(
-                (
-                    user_id,
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    song_signals.get(sid, "unheard"),
-                    row[4],
-                )
-            )
+            insert_data.append((user_id, row[0], row[1], row[2], row[3], song_signals.get(sid, "unheard"), row[4]))
 
-    cursor.executemany(
-        "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        insert_data,
-    )
+    cursor.executemany("INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit) VALUES (?, ?, ?, ?, ?, ?, ?)", insert_data)
     conn.commit()
     conn.close()
-    console.log(f"[green]Playlist synced:[/green] {len(song_ids)} songs for {user_id}")
 
 
 def get_all_users():
     listens_conn = get_db_connection()
     users_conn = get_db_connection_usr()
 
-    listening_users = set(
-        row[0]
-        for row in listens_conn.execute(
-            "SELECT DISTINCT user_id FROM listens"
-        ).fetchall()
-    )
-    registered_users = set(
-        row[0] for row in users_conn.execute("SELECT username FROM user").fetchall()
-    )
+    listening_users = set(row[0] for row in listens_conn.execute("SELECT DISTINCT user_id FROM listens").fetchall())
+    registered_users = set(row[0] for row in users_conn.execute("SELECT username FROM user").fetchall())
 
     listens_conn.close()
     users_conn.close()
-
-    for u in listening_users - registered_users:
-        console.log(f"[yellow]Unregistered user with listens:[/yellow] {u}")
-
-    valid_users = registered_users & listening_users
-    return list(valid_users)
-
+    return list(registered_users & listening_users)
 
 def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
     USER_CREDENTIALS = getAllUser()
     password = USER_CREDENTIALS.get(user_id)
     if not password:
-        print(f"[TuneLog] No credentials found for {user_id}")
         return False
     base_url = build_url_for_user("createPlaylist", user_id, password)
     url = f"{base_url}&name={playname}"
     payload = [("songId", sid) for sid in song_ids]
 
     try:
-        print(f"[TuneLog] Sending request to Navidrome for user: {user_id}")
         response = requests.post(url, data=payload)
         r_json = response.json()
-
-        if (
-            "subsonic-response" in r_json
-            and r_json["subsonic-response"]["status"] == "ok"
-        ):
+        if "subsonic-response" in r_json and r_json["subsonic-response"]["status"] == "ok":
             new_id = r_json["subsonic-response"]["playlist"]["id"]
-            print(
-                f"[TuneLog] Success! Created playlist '{playname}' (ID: {new_id}) for {user_id}"
-            )
             update_url = build_url_for_user("updatePlaylist", user_id, password)
             requests.get(f"{update_url}&playlistId={new_id}&public=false")
-
             return True
-        else:
-            error_msg = (
-                r_json.get("subsonic-response", {})
-                .get("error", {})
-                .get("message", "Unknown API Error")
-            )
-            print(f"[ERROR] Navidrome rejected request: {error_msg}")
-            return False
-
-    except Exception as e:
-        print(f"[ERROR] Connection failed: {e}")
+        return False
+    except Exception:
         return False

@@ -1,9 +1,10 @@
+
 import time
 import sys
 import threading
 from rich.console import Console
 
-# Assuming you moved GlobalStatus to state.py to prevent circular imports
+from misc import log, setup_logger
 from state import status_registry
 from main import main
 
@@ -24,7 +25,9 @@ banner = r"""
 def global_thread_handler(args):
     err_msg = str(args.exc_value)
     status_registry.update("main", status="crashed", error=err_msg)
+    
     console.print(f"[bold red]CRITICAL THREAD EXCEPTION:[/bold red] {err_msg}")
+    log("critical", f"Thread exception: {err_msg}", source="main")
 
     sys.exit(1)
 
@@ -40,6 +43,7 @@ def supervisor_loop():
     }
 
     console.print("[bold cyan]Supervisor Watchdog Active[/bold cyan]")
+    log("info", "Supervisor Watchdog Active", source="main")
 
     while True:
         time.sleep(15)
@@ -56,40 +60,42 @@ def supervisor_loop():
             timeout_limit = timeouts.get(name, 60)  
 
             if current_time - info["heartbeat"] > timeout_limit:
-                console.print(
-                    f"[bold red]ALERT:[/bold red] {name} thread is unresponsive (Timeout: {timeout_limit}s)"
-                )
+                console.print(f"[bold red]ALERT:[/bold red] {name} thread is unresponsive (Timeout: {timeout_limit}s)")
+                log("warning", f"{name} thread is unresponsive (Timeout: {timeout_limit}s)", source="main")
 
                 if name in ["uvicorn", "SSE", "main"]:
                     critical_failure = True
 
             if info["status"] == "crashed":
-                console.print(
-                    f"[bold red]CRASH DETECTED in {name}:[/bold red] {info['error']}"
-                )
+                console.print(f"[bold red]CRASH DETECTED in {name}:[/bold red] {info['error']}")
+                log("error", f"CRASH DETECTED in {name}: {info['error']}", source="main")
+                
                 if name in ["uvicorn", "main"]:
                     critical_failure = True
 
         if critical_failure:
-            console.print(
-                "[bold red]Initiating emergency container restart...[/bold red]"
-            )
+            console.print("[bold red]Initiating emergency container restart...[/bold red]")
+            log("critical", "Initiating emergency container restart due to critical thread failure.", source="main")
             sys.exit(1) 
 
 def onStart():
+    setup_logger()
+    
     print(banner)
     console.print("[bold blue]Starting TuneLog Services...[/bold blue]")
+    log("info", "Starting TuneLog Services...", source="main")
 
     try:
         main()  
-
         supervisor_loop()
 
     except KeyboardInterrupt:
         console.print("[bold yellow]TuneLog gracefully shutting down...[/bold yellow]")
+        log("info", "TuneLog gracefully shutting down via KeyboardInterrupt.", source="main")
         sys.exit(0)
     except Exception as e:
         console.print(f"[bold red]Main Startup Failed:[/bold red] {e}")
+        log("critical", f"Main Startup Failed: {e}", source="main")
         sys.exit(1)
 
 

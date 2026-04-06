@@ -7,3 +7,4 @@ Requests==2.33.1
 uvicorn==0.42.0
 python-multipart
 rich
+loguru

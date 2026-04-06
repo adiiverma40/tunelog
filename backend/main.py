@@ -45,6 +45,8 @@
 #           - this issue causes to run watcher multiple times,
 
 
+# print("main")
+
 import sys
 import requests
 import threading
@@ -61,6 +63,8 @@ from library import normalise_genre
 from watcher import start_sse
 from misc import push_star
 import uvicorn
+
+from misc import setup_logger
 
 console = Console()
 active = {}
@@ -235,6 +239,8 @@ def autoSyncWithFallback():
         console.print("[bold green]Auto sync done. No notInItunes songs — skipping fallback")
 
 def main():
+    # print("trying to use logger")
+    # setup_logger()
     # Database
     with console.status("[bold green]Initializing Database ..." ):
         try:

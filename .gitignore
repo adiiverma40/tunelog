@@ -89,3 +89,9 @@ genre.json
 
 
 *.csv
+
+
+# log file 
+
+*.log
+*.jsonl

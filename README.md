@@ -92,7 +92,8 @@ LOG_LEVEL=DEBUG
 
 
 ### Additionally 
-TO improve efficieny and better artist mapping you can add a `custom tag` for navidrome
+`issue 5`
+To improve efficieny and better artist mapping you can add a `custom tag` for navidrome
 
 Steps : 
 1. locate your `navidrome` folder.

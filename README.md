@@ -103,6 +103,7 @@ Steps :
 ```bash
 Tags.Artist.Aliases = ["artist", "artists"]
 ```
+5. Do a full library scan inside navidrome 
 
 > Note: if you have diffrent tag for your own need, i m currently trying to add that to this, i planned to give a option to add your custom tag
 

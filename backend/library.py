@@ -57,6 +57,7 @@ from rich.progress import (
 )
 from rich.panel import Panel
 from rich.live import Live
+from misc import crossCheckDatabase
 
 console = Console()
 
@@ -244,13 +245,32 @@ def sync_library():
     insert_batch: list[tuple] = []
     update_batch: list[tuple] = []
 
+        # cursor.executemany("""
+        #     UPDATE listens
+        #     SET title = ?, 
+        #         artist = ?, 
+        #         album = ?
+                    # genre = ? 
+        #     WHERE song_id = ?
+        # """, data)
+
     def flush_batches():
+        formattedInsertdata = [
+            (item[1], item[2], item[3], item[4], item[0]) 
+            for item in insert_batch
+        ]
+        formattedUpdateData = [
+            (item[0], item[1], item[2], item[3], item[6]) 
+            for item in update_batch
+        ]
         if insert_batch:
             cursor.executemany(
                 """INSERT INTO library (song_id, title, artist, album, genre, duration, explicit)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 insert_batch,
             )
+            crossCheckDatabase(formattedInsertdata)
+            formattedInsertdata.clear()
             insert_batch.clear()
         if update_batch:
             cursor.executemany(
@@ -260,8 +280,12 @@ def sync_library():
                    WHERE song_id=?""",
                 update_batch,
             )
+            crossCheckDatabase(formattedUpdateData)
+            formattedUpdateData.clear()
             update_batch.clear()
+            
         conn.commit()
+        
 
     progress_bar = Progress(
         SpinnerColumn(),

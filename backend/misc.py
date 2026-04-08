@@ -469,8 +469,23 @@ def log_summary(user_id, size, counts):
     
     
     
-    
-    
-    
-def crossCheckDatabase ():
-    console.print("[bold blue]Crosschecking database for correction")
+def crossCheckDatabase(data):
+    console.print("[bold blue]Updating song metadata in batch...")    
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.executemany("""
+            UPDATE listens
+            SET title = ?, 
+                artist = ?, 
+                album = ?,
+                genre = ? 
+            WHERE song_id = ?
+        """, data)
+        conn.commit()
+        console.print(f"[bold green]Successfully updated {cursor.rowcount} rows.")
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[bold red]Update failed: {e}")
+    finally:
+        conn.close()

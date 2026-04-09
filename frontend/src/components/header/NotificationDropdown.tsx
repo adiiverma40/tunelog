@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
@@ -8,9 +7,7 @@ import {
   markAsRead,
   hasUnread,
   type StoredSongState,
-} from "../../hooks/Usenotificationstream"
-
-
+} from "../../hooks/Usenotificationstream";
 // import { readNotifications } from "../../hooks/Usenotificationstream";
 const formatTime = (iso: string) => {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -98,7 +95,12 @@ export default function NotificationDropdown() {
             onClick={closeDropdown}
             className="text-gray-500 transition dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
-            <svg className="fill-current" width="24" height="24" viewBox="0 0 24 24">
+            <svg
+              className="fill-current"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+            >
               <path
                 fillRule="evenodd"
                 clipRule="evenodd"
@@ -135,7 +137,11 @@ export default function NotificationDropdown() {
                       <span className="font-medium text-gray-800 dark:text-white/90">
                         {item.username}
                       </span>
-                      <span>{item.state === "started" ? "stopped playing" : "started playing"}</span>
+                      <span>
+                        {item.state === "started"
+                          ? "started playing"
+                          : "stopped playing"}
+                      </span>
                       <span className="font-medium text-gray-800 dark:text-white/90 truncate">
                         {item.song}
                       </span>
@@ -144,11 +150,11 @@ export default function NotificationDropdown() {
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                           item.state === "started"
-                            ? "bg-gray-100 text-gray-500 dark:bg-gray-800": "bg-brand-500/10 text-brand-500"
+                            ? "bg-brand-500/10 text-brand-500":"bg-gray-100 text-gray-500 dark:bg-gray-800"
                             
                         }`}
                       >
-                        {item.state === "started" ? "Stopped":"Playing" }
+                        {item.state === "started" ? "Playing" : "Stopped"}
                       </span>
                       <span className="w-1 h-1 bg-gray-400 rounded-full" />
                       <span>{formatTime(item.receivedAt)}</span>

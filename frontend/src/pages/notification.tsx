@@ -50,7 +50,7 @@ function NowPlayingCard({ item }: { item: StoredSongState }) {
             <span className="font-semibold text-gray-900 dark:text-white/90">
               {item.username}
             </span>{" "}
-            {item.state === "started" ? "stopped playing" : "started playing"}{" "}
+            {item.state === "started" ? "started playing":"stopped playing" }{" "}
             <span className="font-semibold text-gray-900 dark:text-white/90">
               {item.song}
             </span>
@@ -63,11 +63,11 @@ function NowPlayingCard({ item }: { item: StoredSongState }) {
           <span
             className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium ${
               item.state === "stopped"
-                ? "bg-brand-500/10 text-brand-500"
-                : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                ? 
+                 "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400":"bg-brand-500/10 text-brand-500"
             }`}
           >
-            {item.state === "started" ? "Stopped" : "Now Playing"}
+            {item.state === "started" ? "Now Playing":"Stopped"}
           </span>
         </div>
       </div>

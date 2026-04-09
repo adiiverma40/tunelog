@@ -148,7 +148,7 @@ def Watcher():
             }
             console.print(f"[bold blue][NEW] {user_id} started: {entry['title']}")
             notification_status.songState.append(
-                {"username": user_id, "song": entry["title"], "state": "start"}
+                {"username": user_id, "song": entry["title"], "state": "started"}
             )
             # print(notification_status.songState)
 
@@ -157,6 +157,9 @@ def Watcher():
         if user_id not in current_users:
             active[user_id]["actual_played"] += now - active[user_id]["last_seen"]
             log_history(active.pop(user_id))
+            notification_status.songState.append(
+                {"username": user_id, "song": entry["title"], "state": "stopped"}
+            )
             console.print(f"[bold red][STOP] {user_id} stopped")
 
 

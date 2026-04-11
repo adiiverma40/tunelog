@@ -110,7 +110,7 @@ from rich.console import Console
 from rich.table import Table
 
 
-from genre import readJSON
+from genre import readJson as readJSON
 
 from misc import (
     log,

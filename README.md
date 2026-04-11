@@ -105,6 +105,11 @@ Tags.Artist.Aliases = ["artist", "artists"]
 > Note: if you have diffrent tag for your own need, i m currently trying to add that to this, i planned to give a option to add your custom tag
 
 ## TODO:
+- Add Auto playlist reload
+- Add config for all the settings
+- Add music sessions
+- Add Mood detector - 5 skips in a row means bad mood
+  
 
 
 ## How It Works

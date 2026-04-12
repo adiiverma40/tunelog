@@ -200,6 +200,7 @@ def getDataFromDb():
             history[sid] = []
         
         history[sid].append({
+                "id" : row[0],
                  'title' : row[2],
                  'artist' : row[3],
                  'album' : row[4],
@@ -241,23 +242,29 @@ def score_batch(user_id, song_ids, history_dict):
 
 
 def score_song(user_id, library_dict, history_dict):
-    user_song_ids = [
-        sid for sid, listens in history_dict.items() 
-        if any(l['user_id'] == user_id for l in listens)
-    ]
+    user_songs_latest = []
+    for sid, listens in history_dict.items():
+        user_listens = [l for l in listens if l['user_id'] == user_id]
+        if user_listens:
+            latest_id = max(l['id'] for l in user_listens)
+            user_songs_latest.append((sid, latest_id))
 
-    if not user_song_ids:
+    if not user_songs_latest:
         return {}
 
-    user_song_ids = user_song_ids[:PLAYLIST_SIZE * 3]
+    user_songs_latest.sort(key=lambda x: x[1], reverse=True)
+
+    user_song_ids = [sid for sid, max_id in user_songs_latest[:PLAYLIST_SIZE * 3]]
 
     scores = {}
     signal_contributions = {}
 
     for sid in user_song_ids:
         listens = [l for l in history_dict.get(sid, []) if l['user_id'] == user_id]
-        listens.sort(key=lambda x: x['timestamp']) 
-        listens = listens[:20]
+        
+        listens.sort(key=lambda x: x['id'], reverse=True) 
+        listens = listens[:20]                            
+        listens.sort(key=lambda x: x['id'])               
 
         if not listens:
             continue
@@ -295,7 +302,6 @@ def score_song(user_id, library_dict, history_dict):
     log_scores(user_id, scores, signal_contributions, titles)
     
     return scores
-
 
 def fill_slots(scores, slots, slot_sizes, allowed_songs=None, user_id="unknown"):
     for song_id, data in scores.items():

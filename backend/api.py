@@ -54,6 +54,7 @@ import asyncio
 from fastapi.responses import StreamingResponse
 from state import _subscribers, notification_status  
 import json
+import re 
 
 
 load_dotenv()
@@ -140,7 +141,7 @@ def GetGenre():
     db_genres = set()
     for row in rows:
         if row[0]: 
-            parts = [part.strip() for part in row[0].split(',')]
+            parts = [part.strip() for part in re.split(r'[,/]', row[0])]
             db_genres.update(parts)
 
     data = readJson()

@@ -85,8 +85,6 @@ dist-ssr
 .directory
 
 
-genre.json
-
 
 *.csv
 

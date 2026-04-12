@@ -38,7 +38,7 @@ from playlist import (
     getDataFromDb
 )
 
-from state import app_state
+from state import app_state , tune_config , save_config
 import library
 from itunesFuzzy import useFallBackMethods
 from genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
@@ -126,6 +126,12 @@ class csvPlaylist(BaseModel):
     username: list[str]
     song_ids: list[str]
     playlist_name: str
+    
+class configData(BaseModel):
+    playlist_generation: dict
+    behavioral_scoring: dict
+    sync_and_automation: dict
+    api_and_performance: dict
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
@@ -1074,7 +1080,24 @@ async def sse_stream():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )    
+
+@app.get("/api/config")
+def SendConfig():
+    # print("Sending config")
+    return tune_config
+
+@app.post("/api/config/update")
+def update_config(payload: configData):
+    # print(payload)
+    console.print("[bold blue]Received config update request...")
     
+    success, message = save_config(payload.dict())
+    
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
+        
+    return {"status": "success", "message": "config.json updated"}
+
 if __name__ == "__main__":
     init_db()
     init_db_lib()

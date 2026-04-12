@@ -132,25 +132,32 @@ from config import build_url, build_url_for_user, getAllUser
 from state import notification_status
 
 console = Console(log_path=False, log_time=False)
+from state import tune_config
+
+PLAYLIST_SIZE = tune_config["playlist_generation"]["playlist_size"]
+WILDCARD_DAY = tune_config["playlist_generation"]["wildcard_day"]
+
+SIGNAL_WEIGHTS = tune_config["playlist_generation"]["signal_weights"]
+slotsValue = tune_config["playlist_generation"]["slot_ratios"]
 
 
 PLAYLIST_NAME = "Tunelog - {}"
-PLAYLIST_SIZE = 40
-WILDCARD_DAY = 60
+# PLAYLIST_SIZE = 40
+# WILDCARD_DAY = 60
 
-SIGNAL_WEIGHTS = {
-    "repeat": 3,
-    "positive": 2,
-    "partial": 0,
-    "skip": -2,
-}
+# SIGNAL_WEIGHTS = {
+#     "repeat": 3,
+#     "positive": 2,
+#     "partial": 0,
+#     "skip": -2,
+# }
 
-slotsValue = {
-    "positive": 0.35,
-    "repeat": 0.35,
-    "partial": 0.25,
-    "skip": 0.05,
-}
+# slotsValue = {
+#     "positive": 0.35,
+#     "repeat": 0.35,
+#     "partial": 0.25,
+#     "skip": 0.05,
+# }
 
 
 def signalWeights(weights: dict):
@@ -538,6 +545,7 @@ def createPlaylistIfDeleteByNavidrome(base_url, name, data, user_id):
         return
 
 
+
 def build_playlist(
     library,
     history,
@@ -552,11 +560,12 @@ def build_playlist(
 ):
     allowed_songs = get_allowed_songs(explicit_filter)
     song_signals = {}
+    breakdown = tune_config["playlist_generation"]["injection_breakdown"]
 
     if injection:
-        signal_size = round(size * 0.57)
-        unheard_size = round(size * 0.35)
-        wildcard_size = round(size * 0.08)
+        signal_size = round(size * breakdown["signal"])
+        unheard_size = round(size * breakdown["unheard"])
+        wildcard_size = round(size * breakdown["wildcard"])
     else:
         signal_size = size
         unheard_size = 0

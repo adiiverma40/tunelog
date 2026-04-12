@@ -70,7 +70,7 @@ from library import normalise_genre, normalise_artist
 from watcher import start_sse
 from misc import push_star
 import uvicorn
-from state import notification_status
+from state import notification_status , tune_config
 
 # from misc import setup_logger
 
@@ -89,9 +89,9 @@ def Watcher():
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
 
     now = time.time()
-
+    timeout = tune_config["behavioral_scoring"]["stale_session_timeout_sec"]
     for user_id in list(active.keys()):
-        if now - active[user_id]["last_seen"] > 600:
+        if now - active[user_id]["last_seen"] > timeout:
             console.print(
                 f"[blue][STALE] {user_id} flushed: {active[user_id]['title']}"
             )
@@ -164,9 +164,10 @@ def Watcher():
 
 
 def signal_system(percent_played, song_id, user_id):
-    if percent_played <= 30:
+    scoring = tune_config['behavioral_scoring']
+    if percent_played <= scoring["skip_threshold_pct"]:
         base = "skip"
-    elif percent_played < 80:
+    elif percent_played < scoring["positive_threshold_pct"]:
         base = "partial"
     else:
         base = "positive"
@@ -174,15 +175,16 @@ def signal_system(percent_played, song_id, user_id):
     if base == "positive":
         conn = get_db_connection()
         cursor = conn.cursor()
+        window = scoring["repeat_time_window_min"]
 
         cursor.execute(
             """
             SELECT COUNT(*) FROM listens 
             WHERE song_id = ? AND user_id = ? 
             AND signal IN ('positive', 'repeat')
-            AND timestamp > datetime('now', '-30 minutes')
+            AND timestamp > datetime('now', '-? minutes')
         """,
-            (song_id, user_id),
+            (song_id, user_id , window ),
         )
 
         valid_prior_positives = cursor.fetchone()[0]

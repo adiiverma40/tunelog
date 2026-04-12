@@ -261,6 +261,68 @@ export interface PlaylistCreateRequest {
   playlist_name: string;
 }
 
+export interface PlaylistGenerationConfig {
+  playlist_size: number;
+  wildcard_day: number;
+  signal_weights: {
+    repeat: number;
+    positive: number;
+    partial: number;
+    skip: number;
+  };
+  slot_ratios: {
+    positive: number;
+    repeat: number;
+    partial: number;
+    skip: number;
+  };
+  injection_breakdown: {
+    signal: number;
+    unheard: number;
+    wildcard: number;
+  };
+}
+
+export interface BehavioralScoringConfig {
+  skip_threshold_pct: number;
+  positive_threshold_pct: number;
+  repeat_time_window_min: number;
+  stale_session_timeout_sec: number;
+  min_listens_for_star: number;
+  historical_decay_factor: number;
+}
+
+export interface SyncAndAutomationConfig {
+  auto_sync_hour: number;
+  timezone: string;
+  use_itunes_fallback: boolean;
+}
+
+export interface ApiAndPerformanceConfig {
+  max_fuzzy_iterations: number;
+  api_max_retries: number;
+  api_retry_delay_sec: number;
+  itunes_search_depth: number;
+  sync_confidence: {
+    min_match_score: number;
+    metadata_overwrite_score: number;
+    genre_map_strictness: number;
+    duration_tolerance_pct: number;
+  };
+}
+
+export interface TuneConfig {
+  playlist_generation: PlaylistGenerationConfig;
+  behavioral_scoring: BehavioralScoringConfig;
+  sync_and_automation: SyncAndAutomationConfig;
+  api_and_performance: ApiAndPerformanceConfig;
+}
+
+export interface UpdateConfigResponse {
+  status: string;
+  message: string;
+}
+
 export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
 
 export async function fetchPing(): Promise<{ status: string }> {
@@ -591,4 +653,21 @@ console.log("api called notification/stream")
   if (onError) es.onerror = onError;
 
   return es;
+}
+
+
+export async function fetchGetConfig(): Promise<TuneConfig> {
+  const res = await fetch(`${BASE_URL}/api/config`);
+  if (!res.ok) throw new Error("Failed to fetch configuration");
+  return res.json();
+}
+
+export async function fetchUpdateConfig(data: TuneConfig): Promise<UpdateConfigResponse> {
+  const res = await fetch(`${BASE_URL}/api/config/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update configuration");
+  return res.json();
 }

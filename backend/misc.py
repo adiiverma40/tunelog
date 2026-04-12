@@ -62,7 +62,7 @@ import os
 import sys
 import json
 from loguru import logger
-from state import notification_status
+from state import notification_status , tune_config
 
 console = Console()
 
@@ -133,9 +133,10 @@ def push_star(song, signal):
         return
 
     totalListens = len(rows)
-    if totalListens < 3:
+    minListen = tune_config['behavioral_scoring']["min_listens_for_star"]
+    if totalListens < minListen:
         console.print(
-            f"[dim]push star: {song['title']} needs at least 3 listens (has {totalListens})[/dim]"
+            f"[dim]push star: {song['title']} needs at least {minListen} listens (has {totalListens})[/dim]"
         )
         notification_status.starredSong.append(
             {
@@ -149,9 +150,10 @@ def push_star(song, signal):
 
     totalWeight = 0
     rowSongScore = 0
-
+    decay = tune_config['behavioral_scoring']['historical_decay_factor']
     for i, row in enumerate(rows):
-        weightage = 0.9**i
+        
+        weightage = decay**i
         rowSignal = row["signal"]
         rating = star_map.get(rowSignal, 0)
 
@@ -326,7 +328,6 @@ def UpdateDBgenre(data, connLib=None):
     }
 
 
-# setup logger
 
 _initialized = False
 
@@ -389,14 +390,12 @@ _playlist_logger = logger.bind(source="playlist")
 
 
 def log(level: str, message: str, source: str = "main", **kwargs):
-    """Base logging function."""
+
     target = _playlist_logger if source == "playlist" else _main_logger
     if kwargs:
         target = target.bind(**kwargs)
     getattr(target, level.lower())(message)
 
-
-# playlist logging helpers
 
 
 def log_scores(user_id, scores, signal_contributions, titles):

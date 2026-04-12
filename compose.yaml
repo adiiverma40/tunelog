@@ -9,6 +9,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./backend/logs:/app/logs
+      - ./config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
       - FORCE_COLOR=1

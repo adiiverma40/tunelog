@@ -56,18 +56,20 @@ from rich.progress import (
 from rich.panel import Panel
 from rich.live import Live
 from misc import crossCheckDatabase
+from state import tune_config
 
 console = Console()
 
-_auto_sync = 2
-_toggle_itune = False
+sync_config = tune_config["sync_and_automation"]
+_auto_sync = sync_config["auto_sync_hour"]
+_toggle_itune = sync_config["use_itunes_fallback"]
+_timezone = sync_config["timezone"]
+
 _startSyncSong = False
 _isSyncing = False
 _progress = 0
 _stopSync = False
 _fallbackStop = False
-_timezone = "Asia/Kolkata"
-
 
 def setSyncSettings(auto_sync=2, itunes=False, timezone="Asia/Kolkata"):
     global _auto_sync, _toggle_itune, _timezone

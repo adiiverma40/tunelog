@@ -62,6 +62,7 @@ from db import (
     init_db_lib,
     init_db_usr,
     init_db_playlist,
+    init_search_db,
     get_db_connection_lib,
 )
 from itunesFuzzy import useFallBackMethods
@@ -71,9 +72,11 @@ from watcher import start_sse
 from misc import push_star
 import uvicorn
 from state import notification_status , tune_config
-
+from dotenv import load_dotenv
+import os
 # from misc import setup_logger
 
+load_dotenv()
 console = Console()
 active = {}
 
@@ -270,6 +273,7 @@ def main():
     # print("trying to use logger")
     # setup_logger()
     # Database
+    proxyPort = int(os.getenv("PROXY_PORT", 4534))
     with console.status("[bold green]Initializing Database ..."):
         try:
             # print("Initializing databse")
@@ -277,22 +281,43 @@ def main():
             init_db_lib()
             init_db_usr()
             init_db_playlist()
+            init_search_db()
             status_registry.update("Db", status="initialized")
         except Exception as e:
             status_registry.update("Db", status="crashed", error=e)
             console.print("[bold red]Failed TO Initialize Database")
     console.print("[bold green]Database Initialized Successfully")
 
-    with console.status("[bold green]Starting API & Verifying Port 8000..."):
+    with console.status("[bold green]Starting API/Proxy & Verifying Port 8000..."):
         try:
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
                 args=("api:app",),
-                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "warning"},
+                kwargs={"host": "0.0.0.0", "port": 8001, "log_level": "warning"},
+                daemon=True,
+            )
+            ProxyThread = threading.Thread(
+                target=uvicorn.run,
+                args=("proxy.proxy:app",),
+                kwargs={"host": "0.0.0.0", "port": proxyPort, "log_level": "debug"},
                 daemon=True,
             )
             uvicornThread.start()
+            ProxyThread.start()
             time.sleep(2.0)
+            if not ProxyThread.is_alive():
+                status_registry.update(
+                    "uvicorn", status="crashed", error="Port Conflict"
+                )
+                console.print(
+                    f"[bold red]API Failed to Bind:[/bold red] Port {proxyPort} is likely already in use."
+                )
+                sys.exit(1)
+            else:
+                status_registry.update("uvicorn", status="running")
+                console.print(
+                    f"[bold green]API Started & Verified on Port {proxyPort}[/bold green]"
+                )
             if not uvicornThread.is_alive():
                 status_registry.update(
                     "uvicorn", status="crashed", error="Port Conflict"

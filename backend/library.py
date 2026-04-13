@@ -57,6 +57,12 @@ from rich.panel import Panel
 from rich.live import Live
 from misc import crossCheckDatabase
 from state import tune_config
+import asyncio
+import httpx
+from db import get_db_connection_lib
+
+# Limit concurrency so we don't crash the Navidrome server
+SEMAPHORE_LIMIT = 10
 
 console = Console()
 
@@ -169,20 +175,26 @@ def fetch_all_song():
 
     return all_song
 
-
 def fetchSongFromDB():
     db_songs = {}
 
-    with console.status("[bold blue]Fetching pre existing song from db"):
+    with console.status("[bold blue]Fetching library and lyrics from db..."):
         conn = get_db_connection_lib()
         cursor = conn.cursor()
-        # added duration to the select for metadata diff
-        rows = cursor.execute(
-            "SELECT song_id, title, artist, album, genre, explicit, duration FROM library"
-        ).fetchall()
+        query = """
+            SELECT 
+                l.song_id, l.title, l.artist, l.album, l.genre, l.explicit, l.duration,
+                m.lyrics
+            FROM library l
+            LEFT JOIN search_metadata m ON l.song_id = m.song_id
+        """
+        
+        rows = cursor.execute(query).fetchall()
         conn.close()
+
         if not rows:
             return {}
+
         db_songs = {
             row[0]: {
                 "song_id": row[0],
@@ -192,11 +204,12 @@ def fetchSongFromDB():
                 "genre": row[4],
                 "explicit": row[5],
                 "duration": row[6],
+                "lyrics": row[7]  
             }
             for row in rows
         }
 
-        console.log(f"[bold green]Loaded {len(db_songs)} songs from local database.")
+        console.log(f"[bold green]Loaded {len(db_songs)} songs with metadata & lyrics.")
         return db_songs
 
 
@@ -221,7 +234,111 @@ def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
         conn.rollback()
     finally:
         conn.close()
+        
 
+def populate_search_index(dbSongs):
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+    
+    try:
+    
+        song_ids = []
+        fts_data = []
+        metadata_data = []
+
+        for sid, song in dbSongs.items():
+            current_lyrics = song.get('lyrics') or ''
+            
+            song_ids.append((sid,))
+            fts_data.append((sid, song['title'], song['artist'], current_lyrics))
+            
+            metadata_data.append((sid, song.get('lyrics')))
+
+        if not song_ids:
+            return
+        cursor.executemany("DELETE FROM song_search_index WHERE song_id = ?", song_ids)
+        cursor.executemany(
+            "INSERT INTO song_search_index (song_id, title, artist, lyrics) VALUES (?, ?, ?, ?)",
+            fts_data
+        )
+        cursor.executemany(
+            "INSERT OR REPLACE INTO search_metadata (song_id, lyrics) VALUES (?, ?)",
+            metadata_data
+        )
+
+        conn.commit()
+        console.log(f"[bold green]Search Index & Metadata Refreshed:[/bold green] {len(fts_data)} tracks synced.")
+        
+    except Exception as e:
+        console.log(f"[bold red]Indexing Error:[/bold red] {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+async def fetch_lyrics_task(client, song_id, semaphore):
+    async with semaphore:
+        url = build_url("getLyricsBySongId") + f"&id={song_id}&f=json"
+        try:
+            resp = await client.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                lyrics_list = data.get("subsonic-response", {}).get("lyricsList", {})
+                structured = lyrics_list.get("structuredLyrics", [])
+
+                if structured:
+                    lines_data = structured[0].get("line", [])
+                    just_text = [line.get("value", "").strip() for line in lines_data]
+                    clean_lyrics = "\n".join([text for text in just_text if text])
+                    return song_id, clean_lyrics if clean_lyrics else "noLyricsInSong"
+            
+            return song_id, "noLyricsInSong"
+        except Exception:
+            return song_id, None
+        
+async def enrich_search_engine_async():
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR IGNORE INTO song_search_index (song_id, title, artist)
+        SELECT song_id, title, artist FROM library
+    """)
+    missing = cursor.execute("""
+        SELECT song_id FROM library 
+        WHERE song_id NOT IN (SELECT song_id FROM search_metadata WHERE lyrics IS NOT NULL)
+    """).fetchall()
+    
+    conn.commit()
+    if not missing:
+        console.log("[bold green]All lyrics are already up to date.")
+        return
+    ids_to_fetch = [row[0] for row in missing]
+    console.log(f"[bold yellow]Async Enrichment:[/bold yellow] Fetching lyrics for {len(ids_to_fetch)} songs...")
+
+    semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_lyrics_task(client, sid, semaphore) for sid in ids_to_fetch]
+        results = []
+        with Progress() as progress:
+            task_id = progress.add_task("[cyan]Fetching Lyrics...", total=len(tasks))
+            for f in asyncio.as_completed(tasks):
+                res = await f
+                results.append(res)
+                progress.update(task_id, advance=1)
+
+    valid_results = [(sid, lyr) for sid, lyr in results if lyr is not None]
+
+    if valid_results:
+        cursor.executemany(
+            "INSERT OR REPLACE INTO search_metadata (song_id, lyrics) VALUES (?, ?)", 
+            valid_results
+        )
+        for sid, lyr in valid_results:
+            searchable_text = "" if lyr == "noLyricsInSong" else lyr
+            cursor.execute(
+                "UPDATE song_search_index SET lyrics = ? WHERE song_id = ?", 
+                (searchable_text, sid)
+            )
+        conn.commit()
+        console.log(f"[bold green]Enrichment Done:[/bold green] Processed {len(valid_results)} songs.")
 
 def sync_library():
     global _isSyncing, _progress, _startSyncSong, _stopSync
@@ -232,6 +349,8 @@ def sync_library():
 
     songs = fetch_all_song()
     dbSongs = fetchSongFromDB()
+    console.print("[bold blue] Trying to update fts and search database")
+    populate_search_index(dbSongs)
     total = len(songs)
 
     fast_sync = not _toggle_itune
@@ -269,6 +388,7 @@ def sync_library():
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 insert_batch,
             )
+            
             crossCheckDatabase(formattedInsertdata)
             formattedInsertdata.clear()
             insert_batch.clear()
@@ -437,6 +557,20 @@ def sync_library():
 
     flush_batches()
     conn.close()
+
+    with console.status("[bold cyan]Updating Search Index and Cleanup...", spinner="bouncingBar"):
+        latest_db_songs = fetchSongFromDB() 
+        populate_search_index(latest_db_songs)
+        navidrome_ids = {song["id"] for song in songs}
+        remove_deleted_songs(navidrome_ids, set(latest_db_songs.keys()))
+
+    try:
+        console.log("[bold yellow]Starting Deep Enrichment (Lyrics)...")
+        asyncio.run(enrich_search_engine_async())
+    except Exception as e:
+        console.log(f"[bold red]Lyrics Sync Failed:[/bold red] {e}")
+
+    _isSyncing = False
 
     with console.status(
         "[bold cyan]Performing cleanup and genre sync...", spinner="bouncingBar"

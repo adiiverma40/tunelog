@@ -192,6 +192,46 @@ def db_supervisor(func):
 
     return wrapper
 
+import sqlite3
+
+def init_search_db():
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+
+    # 1. Enable Foreign Key support (disabled by default in SQLite)
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # 2. Create a standard table for Lyrics and extra metadata
+    # This table acts as the "Bridge" to your library
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS search_metadata (
+            song_id       TEXT PRIMARY KEY,
+            lyrics        TEXT,
+            last_updated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (song_id) REFERENCES library (song_id) ON DELETE CASCADE
+        )
+    """
+    )
+
+    # 3. Create the FTS5 Virtual Table
+    # We include title and artist here even if they are in 'library' 
+    # so FTS5 can search them all in one pass.
+    cursor.execute(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS song_search_index USING fts5(
+            song_id UNINDEXED, 
+            title, 
+            artist, 
+            lyrics,
+            tokenize = 'porter unicode61'
+        )
+    """
+    )
+
+    conn.commit()
+    conn.close()
+
 
 if __name__ == "__main__":
     init_db()

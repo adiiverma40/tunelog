@@ -108,6 +108,7 @@ Tags.Artist.Aliases = ["artist", "artists"]
 - I think i implemented musicbrainz api as it was written in the docs but i got ip blocked, if you are dev, can you review it? if you are user, try using vpn before doing fuzzy matching 
 
 ## TODO:
+- ISSUE : after reviewing playlist.jsonl, if a song has plays, and was choosen because of unheard pool or genre injection, meaning its faling 
 - Cold start: in ui. ask user to give location of navidrome.db, using db as a reference map out the past listen history, using the tunelog.db and navidrome.db check if the navidrome last listen song is in tunelog.db if not then add it in tunelog.db with score of 1 for every plays, song a with 5 plays will get score of 5 to counter the cold start probelm
 - Add A proxy btw client and navidrome backend, when client search for any music, intercept the request, use lyrics and tunelog db to suggest the best songs 'the weekend' look for most heard song of artist in tunelog db as well as song that contain it in lyrics
 

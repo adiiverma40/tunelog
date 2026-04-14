@@ -7,6 +7,7 @@ import os
 import time
 import functools
 
+
 # import sqlite3
 from state import status_registry
 
@@ -120,7 +121,10 @@ def init_db_lib():
             song_id     TEXT PRIMARY KEY,
             title       TEXT,
             artist      TEXT,
+            artistId    TEXT,
+            artistJSON  TEXT,
             album       TEXT,
+            albumId     TEXT, 
             genre       TEXT,
             duration    INTEGER,
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -214,7 +218,10 @@ def init_search_db():
             song_id UNINDEXED, 
             title, 
             artist, 
+            artistId UNINDEXED,
+            artistJSON UNINDEXED, 
             album,
+            albumId UNINDEXED, 
             lyrics,
             tokenize = 'porter unicode61'
         )

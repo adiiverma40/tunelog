@@ -1,5 +1,5 @@
-# search engine for the navidrome proxy 
 
+# search engine for the navidrome proxy 
 
 from db import get_db_connection_lib, get_db_connection
 import httpx
@@ -9,108 +9,215 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+NAVIDROME_URL = os.getenv("BASE_URL", "http://localhost:4533")
 
 
-
-NAVIDROME_URL = os.getenv("BASE_URL" , "http://localhost:4533")
-
-def fetchAllFromListes():
+def fetchAllFromListens():
     conn = get_db_connection()
     cursor = conn.cursor()
-    songs = cursor.execute("select song_id, count(*) as listen from listens group by song_id order by listen desc").fetchall()
+    songs = cursor.execute(
+        "SELECT song_id, count(*) as listen FROM listens GROUP BY song_id ORDER BY listen DESC"
+    ).fetchall()
     song_counts = {row[0]: row[1] for row in songs}
     conn.close()
     return song_counts
 
-
-async def fetchAll(request, song_ids, is_subsonic=False , type = "global"):
+async def fetchAll(request, song_ids, is_subsonic=False, type="global"):
     async with httpx.AsyncClient() as client:
         tasks = []
         for sid in song_ids:
             if is_subsonic:
                 url = f"{NAVIDROME_URL}/rest/getSong"
-                
-                req_params = dict(request.query_params)
-                req_params["id"] = sid 
-                
+                req_params = dict(request.state.mergedParams)
+                req_params["id"] = sid
                 tasks.append(client.get(url, params=req_params))
             else:
                 url = f"{NAVIDROME_URL}/api/song/{sid}"
-                tasks.append(client.get(url, headers=request.headers))
+                tasks.append(client.get(url, headers=dict(request.headers)))
+
         responses = await asyncio.gather(*tasks)
         results = []
         for res in responses:
             if res.status_code == 200:
                 data = res.json()
                 if is_subsonic:
-                    target_song_dict = data.get("subsonic-response", {}).get("song")
+                    target = data.get("subsonic-response", {}).get("song")
                 else:
-                    target_song_dict = data
-                    
-                if target_song_dict:
-                    # old_comment = target_song_dict.get("comment", "").strip()
-                    
+                    target = data
+
+                if target:
                     if type == "global":
-                        target_song_dict["comment"] = f"BY TUNELOG PROXY - GLOBAL SEARCH RESULTS"
+                        target["comment"] = "BY TUNELOG PROXY - GLOBAL SEARCH RESULTS"
                     elif type == "song":
-                        target_song_dict["comment"] = f"BY TUNELOG PROXY - Song TITLE and LYRICS RESULTS"
-                    
+                        target["comment"] = "BY TUNELOG PROXY - Song TITLE and LYRICS RESULTS"
                     else:
-                        target_song_dict["comment"] = f"BY TUNELOG PROXY - {type} RESULTS"
-                        
-                    results.append(target_song_dict)
+                        target["comment"] = f"BY TUNELOG PROXY - {type} RESULTS"
+                    results.append(target)
+
         return results
 
-async def searchTable(request , query, end= 15, start = 0 , type :str = "global" ):
-    history = fetchAllFromListes()
+async def fetch_single_artist(client, request, artist_id):
     
-    conn = get_db_connection_lib()
-    cursor = conn.cursor()
-    safe_query = f'"{query.replace('"', '""')}"'
-    if type == "global":
-        results = cursor.execute(
-            "SELECT song_id , rank FROM song_search_index WHERE song_search_index MATCH ?", 
-            (safe_query,)
-        ).fetchall()
-    
-    elif type == "song":
-        results = cursor.execute(
-            "SELECT song_id, rank FROM song_search_index WHERE song_search_index MATCH ?", 
-            (f' {{lyrics title}} : {safe_query}',)
-        ).fetchall()
-    
-    else :
-        results = cursor.execute(
-            "SELECT song_id, rank FROM song_search_index WHERE song_search_index MATCH ?", 
-            (f'{type} : {safe_query}',)
-        ).fetchall()
-    
-    processed_songs = []
-    LISTEN_WEIGHT = 2.0 
+    url = f"{NAVIDROME_URL}/api/artist/{artist_id}"
+    try:
+        resp = await client.get(url, headers=dict(request.headers))
+        if resp.status_code == 200:
+            data = resp.json()
+            data["comment"] = "BY TUNELOG PROXY - ARTIST SEARCH RESULTS"
+            return data
+    except Exception:
+        pass
+    return None
 
-    for result in results:
-        song_id, rank = result
+
+async def fetchAllArtists(request, artist_ids):
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_single_artist(client, request, aid) for aid in artist_ids]
+        responses = await asyncio.gather(*tasks)
+        return [r for r in responses if r is not None]
+
+async def fetch_single_album(client, request, album_id):
+    url = f"{NAVIDROME_URL}/api/album/{album_id}"
+    try:
+        resp = await client.get(url, headers=dict(request.headers))
+        if resp.status_code == 200:
+            data = resp.json()
+            data["comment"] = "BY TUNELOG PROXY - ALBUM SEARCH RESULTS"
+            return data
+    except Exception:
+        pass
+    return None
+
+
+async def fetchAllAlbums(request, album_ids):
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_single_album(client, request, aid) for aid in album_ids]
+        responses = await asyncio.gather(*tasks)
+        return [r for r in responses if r is not None]
+
+
+def fts_song_search(cursor, safe_query):
+    return cursor.execute(
+        "SELECT song_id, rank FROM song_search_index WHERE song_search_index MATCH ?",
+        (safe_query,)
+    ).fetchall()
+
+
+def fts_song_title_lyrics(cursor, safe_query):
+    return cursor.execute(
+        "SELECT song_id, rank FROM song_search_index WHERE song_search_index MATCH ?",
+        (f'{{lyrics title}} : {safe_query}',)
+    ).fetchall()
+
+
+def fts_artist_search(cursor, safe_query):
+  
+    return cursor.execute(
+        """SELECT song_id, artistId, rank 
+           FROM song_search_index 
+           WHERE song_search_index MATCH ?""",
+        (f'artist : {safe_query}',)
+    ).fetchall()
+
+
+def fts_album_search(cursor, safe_query):
+    return cursor.execute(
+        """SELECT song_id, albumId, rank 
+           FROM song_search_index 
+           WHERE song_search_index MATCH ?""",
+        (f'album : {safe_query}',)
+    ).fetchall()
+
+LISTEN_WEIGHT = 2.0
+
+
+def _rank_songs(fts_results, history):
+    processed = []
+    for song_id, rank in fts_results:
         listens = history.get(song_id, 0)
         blended_score = rank - (listens * LISTEN_WEIGHT)
-        
-        processed_songs.append({
-            "id": song_id,
-            "rank": rank,
-            "score": blended_score 
-        })
-        
-    processed_songs.sort(key=lambda x: x["score"])
-    conn.close()
-    paginated_songs =[song["id"] for song in processed_songs[start:end]]
-    if not paginated_songs:
-        return []
-    urls = []
-    if type == "global":
-        enriched_songs = await fetchAll(request, paginated_songs, is_subsonic=True , type=type)
-        print(enriched_songs)
-        return enriched_songs
-    else :
-        print("else")
-        enriched_songs = await fetchAll(request , paginated_songs , is_subsonic=False , type=type)
-        print(enriched_songs)
-        return enriched_songs
+        processed.append({"id": song_id, "rank": rank, "score": blended_score})
+    processed.sort(key=lambda x: x["score"])
+    return processed
+
+
+def _rank_entities(fts_results, history, id_key_index):
+    
+    entity_scores: dict[str, dict] = {}
+
+    for row in fts_results:
+        song_id   = row[0]
+        entity_id = row[id_key_index]
+        rank      = row[2]
+
+        if not entity_id:
+            continue
+
+        listens = history.get(song_id, 0)
+        blended = rank - (listens * LISTEN_WEIGHT)
+
+        if entity_id not in entity_scores:
+            entity_scores[entity_id] = {"id": entity_id, "score": blended, "hits": 1}
+        else:
+            entity_scores[entity_id]["score"] = min(entity_scores[entity_id]["score"], blended)
+            entity_scores[entity_id]["hits"] += 1
+
+    ranked = list(entity_scores.values())
+    ranked.sort(key=lambda x: (x["score"], -x["hits"]))
+    return ranked
+
+
+async def searchTable(request, query, end=15, start=0, type: str = "global"):
+    history = fetchAllFromListens()
+
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+
+    safe_query = f'"{query.replace(chr(34), chr(34)+chr(34))}"'
+
+    try:
+        if type == "global":
+            raw = fts_song_search(cursor, safe_query)
+            ranked = _rank_songs(raw, history)
+            paginated_ids = [s["id"] for s in ranked[start:end]]
+            if not paginated_ids:
+                return []
+            return await fetchAll(request, paginated_ids, is_subsonic=True, type=type)
+
+        elif type == "song":
+            raw = fts_song_title_lyrics(cursor, safe_query)
+            ranked = _rank_songs(raw, history)
+            paginated_ids = [s["id"] for s in ranked[start:end]]
+            if not paginated_ids:
+                return []
+            return await fetchAll(request, paginated_ids, is_subsonic=False, type=type)
+
+        elif type == "artist":
+            raw = fts_artist_search(cursor, safe_query)
+            ranked = _rank_entities(raw, history, id_key_index=1)
+            paginated_ids = [e["id"] for e in ranked[start:end]]
+            if not paginated_ids:
+                return []
+            return await fetchAllArtists(request, paginated_ids)
+
+        elif type == "album":
+            raw = fts_album_search(cursor, safe_query)
+            ranked = _rank_entities(raw, history, id_key_index=1)
+            paginated_ids = [e["id"] for e in ranked[start:end]]
+            if not paginated_ids:
+                return []
+            return await fetchAllAlbums(request, paginated_ids)
+
+        else:
+            raw = cursor.execute(
+                "SELECT song_id, rank FROM song_search_index WHERE song_search_index MATCH ?",
+                (f'{type} : {safe_query}',)
+            ).fetchall()
+            ranked = _rank_songs(raw, history)
+            paginated_ids = [s["id"] for s in ranked[start:end]]
+            if not paginated_ids:
+                return []
+            return await fetchAll(request, paginated_ids, is_subsonic=False, type=type)
+
+    finally:
+        conn.close()

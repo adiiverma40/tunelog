@@ -2,8 +2,8 @@
 
 # iissue : /event endpoint is a sse 
 # fix : create a sepeate sse for /event
-
-
+# IISuee : some client uses post method with search3.view endpoint 
+# fix wrap post method as a get and pass as usual 
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,14 +30,32 @@ app.add_middleware(
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_all(request: Request, path: str):
+    raw_body = await request.body()
+    request.state.raw_body = raw_body
+    
+    mergedParams = dict(request.query_params)
+    
+    if request.method == "POST":
+        conntentType = request.headers.get("content-type" , "")
+        if "application/x-www-form-urlencoded" in conntentType:
+            form_data = await request.form()
+            mergedParams.update(form_data)
+            # print(mergedParams)
+    request.state.mergedParams = mergedParams
+    
+    
+    
     url = f"{NAVIDROME_URL}/{path}"
+    
     headers = dict(request.headers)
     headers.pop("host", None)
-    params = dict(request.query_params)
-    searchResponse , searchEndpoint  = await handle_search_logic(path, params , request)
+    
+    
+    searchResponse , searchEndpoint  = await handle_search_logic(path, mergedParams , request)
 
         
-    if searchEndpoint and searchResponse:
+    if searchEndpoint and searchResponse is not None:
+       
         count = len(searchResponse)
         if searchEndpoint == "rest/search3":
             payload = {
@@ -129,6 +147,9 @@ async def handle_search_logic(path: str, params: dict , request):
         "api/album": "name",   
         "api/artist": "name"
     }
+    if "id" in params:
+        return None, None
+    
     start = int(params.get("_start" , 0 ))
     end = int(params.get("_end" , 15))
     for target_path, param_key in category_map.items():
@@ -137,6 +158,20 @@ async def handle_search_logic(path: str, params: dict , request):
             print("searched using ", target_path , "for " , search_term)
             
             if search_term:
+                is_subsonic = (target_path == "rest/search3")
+                if is_subsonic:
+                    song_offset = int(params.get("songOffset", 0))
+                    song_count = int(params.get("songCount", 20))
+                
+                    start = song_offset
+                    end = song_offset + song_count
+                    
+                else:
+                    start = int(params.get("_start", 0))
+                    end = int(params.get("_end", 15))
+        
+                print(f"Searching {target_path} for '{search_term}' (Items {start} to {end})")
+                
                 if target_path == "rest/search3":
                     results =  await searchTable(request , search_term , end , start) 
                 elif target_path == "api/song":

@@ -1,3 +1,10 @@
+
+
+# TODO
+
+- BYPASS SEARCH : only hijack the search query if it has something other then songid, or an empty parameter, if empty means user is scrolling library, if sond is, then client wants specific song's details like cover and album art
+
+
 #  TuneLog
 **A self-hosted music recommendation system for Navidrome.** TuneLog learns your taste by watching how you actually interact with your music tracking skips, finishes, and replays to build evolving, personalized playlists without you ever touching a "Like" button.
 

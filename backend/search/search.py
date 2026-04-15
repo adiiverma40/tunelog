@@ -169,15 +169,16 @@ def _rank_entities(fts_results, history, id_key_index):
     ranked.sort(key=lambda x: (x["score"], -x["hits"]))
     return ranked
 
-
 def normalize_text(text: str) -> str:
     if not text:
         return ""
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"([a-z])\1+", r"\1", text)
+    text = re.sub(r"[^\w\s]", " ", text) 
+    text = re.sub(r"([a-z])\1{1,}", r"\1", text)
     text = re.sub(r"\s+", " ", text).strip()
+   
     return text
+
 
 
 

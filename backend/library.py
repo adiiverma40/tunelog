@@ -243,14 +243,14 @@ def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
 
         import re
 
-
 def normalize_text(text: str) -> str:
     if not text:
         return ""
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"([a-z])\1+", r"\1", text)
+    text = re.sub(r"[^\w\s]", " ", text) 
+    text = re.sub(r"([a-z])\1{1,}", r"\1", text)
     text = re.sub(r"\s+", " ", text).strip()
+   
     return text
 
 def normalize_dbSongs(dbSongs: dict) -> dict:

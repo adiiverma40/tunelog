@@ -133,7 +133,10 @@ Tags.Artist.Aliases = ["artist", "artists"]
 > Note: if you have diffrent tag for your own need, i m currently trying to add that to this, i planned to give a option to add your custom tag
 
 ## Warning
-- I think i implemented musicbrainz api as it was written in the docs but i got ip blocked, if you are dev, can you review it? if you are user, try using vpn before doing fuzzy matching 
+- I think i implemented musicbrainz api as it was written in the docs but i got ip blocked, if you are dev, can you review it? if you are user, try using vpn before doing fuzzy matching
+
+## Notice 
+- My script will almost certainly fail if you listen song in speed up or down (1.5x) as my script will think you partially completed the song when you have completed it already
 
 ## TODO:
 - ISSUE : after reviewing playlist.jsonl, if a song has plays, and was choosen because of unheard pool or genre injection, meaning its faling 

@@ -4,6 +4,9 @@
 
 ---
 
+## Currently:-
+ currently working on Spotify jam for navidrome. 
+
 ## Update :
 It is recommened to delete or alter the existing database to inculde the changes
 Changes : two new tables in songlist.db,  
@@ -137,6 +140,15 @@ Tags.Artist.Aliases = ["artist", "artists"]
 
 ## Notice 
 - My script will almost certainly fail if you listen song in speed up or down (1.5x) as my script will think you partially completed the song when you have completed it already
+
+## Navidrome Jam/Spotify jam
+- use navidrome as backend
+- use my proxy layer as radio broadcaster
+- use my dashboard for adding and deleting queues for the jam
+- use my dashboard for play pause skip
+- basic idea: a host starts navidrome and my tunelog, users joing using the tunelog proxy,host starts a radio , users can add and delete queues , skip play and pause
+
+
 
 ## TODO:
 - ISSUE : after reviewing playlist.jsonl, if a song has plays, and was choosen because of unheard pool or genre injection, meaning its faling 

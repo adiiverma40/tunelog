@@ -5,6 +5,10 @@
 ---
 
 ## Update :
+It is recommened to delete or alter the existing database to inculde the changes
+Changes : two new tables in songlist.db,  
+- in library table, new colmns : `artistId` ,  `albumId` , `artistJSON`
+  
 The new update includes a proxy layer between navidrome and the client,
 - It can improve search results
 - Added a new `lyrics` search option, when you search songs, with the lyrics, if the song has lyrics it will be in the results

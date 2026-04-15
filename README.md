@@ -1,30 +1,26 @@
 
-
-# TODO
-
-- BYPASS SEARCH : only hijack the search query if it has something other then songid, or an empty parameter, if empty means user is scrolling library, if sond is, then client wants specific song's details like cover and album art
-- ADD NORMALISZATIONS FOR LYRICS, no repeat letters, if its AAAHHH! men it will be ah men ,
-- Find a way to do search for this, MERE NISHAN, when user do ME it should suggest song with user typing full MERE for results 
-
-
-
-# Positives : 
-- Proxy is working
-- Song stream is working
-- Search3 endpoint is working
-- /api/getSong is working
-- /api/album is working
-- /api/artist is working
-
-# Bads : 
-- need to figure out /api/getArtist and getAlbum, one way is to , search album, get the song id, use song id to get album id, then get album info and then send it to frontend, or just create a artist id and album id
-- Symphonifm app doesnt work as it uses its own internal search machenism to search for the song 
-
-
 #  TuneLog
 **A self-hosted music recommendation system for Navidrome.** TuneLog learns your taste by watching how you actually interact with your music tracking skips, finishes, and replays to build evolving, personalized playlists without you ever touching a "Like" button.
 
 ---
+
+## Update :
+The new update includes a proxy layer between navidrome and the client,
+- It can improve search results
+- Added a new `lyrics` search option, when you search songs, with the lyrics, if the song has lyrics it will be in the results
+- Using the `tunelog` history of listens, the search results can be ranked.
+- A improved searches for songs like `AAAHHHHA! MEN` now you only need to type `ah Men` for the result
+
+## Proxy :
+Proxy layer is optional, but recommened, I am planning future updates based on the proxy layer
+
+### Setup :
+- TO set up proxy, define `PROXY_PORT` in `.env` or defaults to `4534`
+- In subsonic/navidrome client, change server url to match the `port`
+- Done
+All the url request will be routed through `proxy to navidrome` , when any search request comes it will use `my script` or fallback to the Default `navidrome results`
+It is recommened to run both servers in `same computer` or will might see `latency issue`
+  
 ## New Update will come after new version of navidrome 
 - Navidrome new version will include  `now playing` endpoint which will futher increase the accuracy of my project
 
@@ -55,6 +51,7 @@ cp .env.example .env
 docker compose up --build
 ```
 * **Web UI:** `http://localhost:5173`
+* **Proxy** `http://localhost:4534`
 * **API Server:** `http://localhost:8000`
 
 ---
@@ -106,6 +103,10 @@ LOG_DIR=/app/logs
 LOG_MAX_SIZE=10 MB
 LOG_RETENTION_DAYS=7 days
 LOG_LEVEL=DEBUG
+
+
+# Proxy for search result alteration in clients 
+PROXY_PORT=4534
 
 ```
 - You can get your ip address by doing, `ipconfig` in windows and `ip a` in linux or use `localhost` if its works for you

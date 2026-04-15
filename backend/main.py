@@ -293,7 +293,7 @@ def main():
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
                 args=("api:app",),
-                kwargs={"host": "0.0.0.0", "port": 8001, "log_level": "warning"},
+                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "warning"},
                 daemon=True,
             )
             ProxyThread = threading.Thread(

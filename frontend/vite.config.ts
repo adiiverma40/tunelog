@@ -1,23 +1,4 @@
-// import { defineConfig } from "vite";
-// import react from "@vitejs/plugin-react";
-// import svgr from "vite-plugin-svgr";
 
-// // https://vite.dev/config/
-// export default defineConfig({
-//   // Tell Vite to look for the .env file in the root folder (TuneLog/)
-//   envDir: "../", 
-  
-//   plugins: [
-//     react(),
-//     svgr({
-//       svgrOptions: {
-//         icon: true,
-//         exportType: "named",
-//         namedExport: "ReactComponent",
-//       },
-//     }),
-//   ],
-// });
 
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";

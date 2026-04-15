@@ -6,11 +6,14 @@ import httpx
 import asyncio
 import os
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
 NAVIDROME_URL = os.getenv("BASE_URL", "http://localhost:4533")
 
+# you might be thinking why i am doing global instead of per user? where user_id = adii ? its not like i forgot, its not a bug its a feature
+# if there is multiple user then it would improve search results, ("i just dont want to deal with managing user")
 
 def fetchAllFromListens():
     conn = get_db_connection()
@@ -128,7 +131,7 @@ def fts_album_search(cursor, safe_query):
         (f'album : {safe_query}',)
     ).fetchall()
 
-LISTEN_WEIGHT = 2.0
+LISTEN_WEIGHT = 5.0
 
 
 def _rank_songs(fts_results, history):
@@ -167,13 +170,28 @@ def _rank_entities(fts_results, history, id_key_index):
     return ranked
 
 
+def normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = re.sub(r"([a-z])\1+", r"\1", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+
 async def searchTable(request, query, end=15, start=0, type: str = "global"):
     history = fetchAllFromListens()
 
     conn = get_db_connection_lib()
     cursor = conn.cursor()
 
-    safe_query = f'"{query.replace(chr(34), chr(34)+chr(34))}"'
+    cleaned_query = normalize_text(query)
+    if not cleaned_query:
+        return []
+    safe_query = f"{cleaned_query}*"
+    print ("query = ", safe_query)
 
     try:
         if type == "global":
@@ -193,9 +211,11 @@ async def searchTable(request, query, end=15, start=0, type: str = "global"):
             return await fetchAll(request, paginated_ids, is_subsonic=False, type=type)
 
         elif type == "artist":
+            print("type = artist")
             raw = fts_artist_search(cursor, safe_query)
             ranked = _rank_entities(raw, history, id_key_index=1)
             paginated_ids = [e["id"] for e in ranked[start:end]]
+            print(paginated_ids)
             if not paginated_ids:
                 return []
             return await fetchAllArtists(request, paginated_ids)

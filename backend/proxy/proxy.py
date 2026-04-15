@@ -157,7 +157,11 @@ async def handle_search_logic(path: str, params: dict , request):
             search_term = params.get(param_key)
             print("searched using ", target_path , "for " , search_term)
             
-            if search_term:
+            if search_term is not None:
+                clean_term = search_term.strip('"\' ')
+                
+                if not clean_term:
+                    return None, None
                 is_subsonic = (target_path == "rest/search3")
                 if is_subsonic:
                     song_offset = int(params.get("songOffset", 0))
@@ -173,6 +177,9 @@ async def handle_search_logic(path: str, params: dict , request):
                 print(f"Searching {target_path} for '{search_term}' (Items {start} to {end})")
                 
                 if target_path == "rest/search3":
+                    # if search_term == "":
+                    #     return None , None  #symphonifum usses "" in search term for library caching
+                    
                     results =  await searchTable(request , search_term , end , start) 
                 elif target_path == "api/song":
                     results =  await searchTable(request, search_term , end , start , "song")

@@ -17,7 +17,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8001:8001"
+      - "8000:8000"
       - "4534:4534"
 
   frontend:
@@ -29,7 +29,7 @@ services:
     environment:
       VITE_ALLOWED_HOSTS: tunelog.${MY_DOMAIN}
     ports:
-      - "5174:5174"
+      - "5173:5173"
     env_file:
       - .env
     depends_on:

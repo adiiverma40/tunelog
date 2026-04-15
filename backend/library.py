@@ -1,4 +1,3 @@
-
 # to fetch and create library database from navidrome
 # uses SEARCH3 api endpoint to build library database
 # works by runing a loop thourgh the api
@@ -77,6 +76,7 @@ _isSyncing = False
 _progress = 0
 _stopSync = False
 _fallbackStop = False
+
 
 def setSyncSettings(auto_sync=2, itunes=False, timezone="Asia/Kolkata"):
     global _auto_sync, _toggle_itune, _timezone
@@ -191,7 +191,7 @@ def fetchSongFromDB():
             FROM library l
             LEFT JOIN search_metadata m ON l.song_id = m.song_id
         """
-        
+
         rows = cursor.execute(query).fetchall()
         conn.close()
 
@@ -200,17 +200,17 @@ def fetchSongFromDB():
 
         db_songs = {
             row[0]: {
-                "song_id":    row[0],
-                "title":      row[1],
-                "artist":     row[2],
-                "album":      row[3],
-                "genre":      row[4],
-                "explicit":   row[5],
-                "duration":   row[6],
-                "artistId":   row[7],   
-                "artistJSON": row[8],   
-                "albumId":    row[9],   
-                "lyrics":     row[10],  
+                "song_id": row[0],
+                "title": row[1],
+                "artist": row[2],
+                "album": row[3],
+                "genre": row[4],
+                "explicit": row[5],
+                "duration": row[6],
+                "artistId": row[7],
+                "artistJSON": row[8],
+                "albumId": row[9],
+                "lyrics": row[10],
             }
             for row in rows
         }
@@ -240,58 +240,89 @@ def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
         conn.rollback()
     finally:
         conn.close()
+
+        import re
+
+
+def normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = re.sub(r"([a-z])\1+", r"\1", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def normalize_dbSongs(dbSongs: dict) -> dict:
+    normalized = {}
+    SKIP_KEYS = {"song_id", "artistId", "albumId", "artistJSON"}
+    
+    console.print("[bold purple]Normalizing DB list")
+    for sid, song in dbSongs.items():
+        new_song = {}
+        for key, value in song.items():
+            if key in SKIP_KEYS:
+                new_song[key] = value
+            elif isinstance(value, str):
+                new_song[key] = normalize_text(value)
+            else:
+                new_song[key] = value
+                
+        normalized[sid] = new_song
         
+    return normalized
+
 
 def populate_search_index(dbSongs):
     conn = get_db_connection_lib()
     cursor = conn.cursor()
-    
+
+    normlisedDb = normalize_dbSongs(dbSongs)
     try:
         fts_data = []
         metadata_data = []
 
-        for sid, song in dbSongs.items():
-            current_lyrics = song.get('lyrics') or ''
-            
-            fts_data.append((
-                sid,
-                song['title'],
-                song['artist'],
-                song.get('artistId') or '',
-                song.get('artistJSON') or '',
-                song.get('album') or '',
-                song.get('albumId') or '',
-                current_lyrics,
-            ))
-            metadata_data.append((sid, song.get('lyrics')))
+        for sid, song in normlisedDb.items():
+            current_lyrics = song.get("lyrics") or ""
+
+            fts_data.append(
+                (
+                    sid,
+                    song["title"],
+                    song["artist"],
+                    song.get("artistId") or "",
+                    song.get("artistJSON") or "",
+                    song.get("album") or "",
+                    song.get("albumId") or "",
+                    current_lyrics,
+                )
+            )
+            metadata_data.append((sid, song.get("lyrics")))
 
         if not fts_data:
             return
 
         cursor.execute("DELETE FROM song_search_index")
-        
         cursor.executemany(
             """INSERT INTO song_search_index 
                (song_id, title, artist, artistId, artistJSON, album, albumId, lyrics) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            fts_data
+            fts_data,
         )
-        
         cursor.executemany(
             "INSERT OR REPLACE INTO search_metadata (song_id, lyrics) VALUES (?, ?)",
-            metadata_data
+            metadata_data,
         )
-
         conn.commit()
-        console.log(f"[bold green]Search Index & Metadata Refreshed:[/bold green] {len(fts_data)} tracks synced.")
-        
-        
+        console.log(
+            f"[bold green]Search Index & Metadata Refreshed:[/bold green] {len(fts_data)} tracks synced."
+        )
     except Exception as e:
         console.log(f"[bold red]Indexing Error:[/bold red] {e}")
         conn.rollback()
     finally:
         conn.close()
-        
+
 
 async def fetch_lyrics_task(client, song_id, semaphore):
     async with semaphore:
@@ -308,26 +339,31 @@ async def fetch_lyrics_task(client, song_id, semaphore):
                     just_text = [line.get("value", "").strip() for line in lines_data]
                     clean_lyrics = "\n".join([text for text in just_text if text])
                     return song_id, clean_lyrics if clean_lyrics else "noLyricsInSong"
-            
+
             return song_id, "noLyricsInSong"
         except Exception:
             return song_id, None
-        
+
+
 async def enrich_search_engine_async():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
 
-    missing = cursor.execute("""
+    missing = cursor.execute(
+        """
         SELECT song_id FROM library 
         WHERE song_id NOT IN (SELECT song_id FROM search_metadata WHERE lyrics IS NOT NULL)
-    """).fetchall()
-    
+    """
+    ).fetchall()
+
     conn.commit()
     if not missing:
         console.log("[bold green]All lyrics are already up to date.")
         return
     ids_to_fetch = [row[0] for row in missing]
-    console.log(f"[bold yellow]Async Enrichment:[/bold yellow] Fetching lyrics for {len(ids_to_fetch)} songs...")
+    console.log(
+        f"[bold yellow]Async Enrichment:[/bold yellow] Fetching lyrics for {len(ids_to_fetch)} songs..."
+    )
 
     semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
     async with httpx.AsyncClient() as client:
@@ -344,17 +380,20 @@ async def enrich_search_engine_async():
 
     if valid_results:
         cursor.executemany(
-            "INSERT OR REPLACE INTO search_metadata (song_id, lyrics) VALUES (?, ?)", 
-            valid_results
+            "INSERT OR REPLACE INTO search_metadata (song_id, lyrics) VALUES (?, ?)",
+            valid_results,
         )
         for sid, lyr in valid_results:
             searchable_text = "" if lyr == "noLyricsInSong" else lyr
             cursor.execute(
-                "UPDATE song_search_index SET lyrics = ? WHERE song_id = ?", 
-                (searchable_text, sid)
+                "UPDATE song_search_index SET lyrics = ? WHERE song_id = ?",
+                (searchable_text, sid),
             )
         conn.commit()
-        console.log(f"[bold green]Enrichment Done:[/bold green] Processed {len(valid_results)} songs.")
+        console.log(
+            f"[bold green]Enrichment Done:[/bold green] Processed {len(valid_results)} songs."
+        )
+
 
 def sync_library():
     global _isSyncing, _progress, _startSyncSong, _stopSync
@@ -389,9 +428,9 @@ def sync_library():
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 insert_batch,
             )
-            crossCheckDatabase([
-                (item[1], item[2], item[3], item[4], item[0]) for item in insert_batch
-            ])
+            crossCheckDatabase(
+                [(item[1], item[2], item[3], item[4], item[0]) for item in insert_batch]
+            )
             insert_batch.clear()
 
         if update_batch:
@@ -403,9 +442,9 @@ def sync_library():
                    WHERE song_id=?""",
                 update_batch,
             )
-            crossCheckDatabase([
-                (item[0], item[1], item[2], item[3], item[9]) for item in update_batch
-            ])
+            crossCheckDatabase(
+                [(item[0], item[1], item[2], item[3], item[9]) for item in update_batch]
+            )
             update_batch.clear()
 
         conn.commit()
@@ -426,36 +465,44 @@ def sync_library():
                 console.log("[bold red]Sync stopped by user.")
                 break
 
-            song_id      = song["id"]
-            song_title   = song.get("title", "Unknown")
-            song_artist  = normalise_artist(song.get("artist", "Unknown"))
-            nav_album    = song.get("album", "")
+            song_id = song["id"]
+            song_title = song.get("title", "Unknown")
+            song_artist = normalise_artist(song.get("artist", "Unknown"))
+            nav_album = song.get("album", "")
             nav_duration = song.get("duration", 0)
-            nav_genre    = normalise_genre(song.get("genre"))
+            nav_genre = normalise_genre(song.get("genre"))
 
-            raw_artists    = song.get("artists", [])
-            nav_artistId   = raw_artists[0]["id"] if raw_artists else ""
-            nav_artistJSON = json.dumps(raw_artists)  
-            nav_albumId    = song.get("albumId", "")
+            raw_artists = song.get("artists", [])
+            nav_artistId = raw_artists[0]["id"] if raw_artists else ""
+            nav_artistJSON = json.dumps(raw_artists)
+            nav_albumId = song.get("albumId", "")
 
             existing = dbSongs.get(song_id)
 
             if existing:
                 metadata_changed = (
-                    existing["title"]    != song_title
-                    or existing["artist"]   != song_artist
-                    or existing["album"]    != nav_album
+                    existing["title"] != song_title
+                    or existing["artist"] != song_artist
+                    or existing["album"] != nav_album
                     or existing["duration"] != nav_duration
                 )
 
                 if fast_sync:
                     if metadata_changed:
-                        update_batch.append((
-                            song_title, song_artist, nav_album, nav_genre,
-                            nav_duration, existing["explicit"],
-                            nav_artistId, nav_artistJSON, nav_albumId, 
-                            song_id,
-                        ))
+                        update_batch.append(
+                            (
+                                song_title,
+                                song_artist,
+                                nav_album,
+                                nav_genre,
+                                nav_duration,
+                                existing["explicit"],
+                                nav_artistId,
+                                nav_artistJSON,
+                                nav_albumId,
+                                song_id,
+                            )
+                        )
                         updated += 1
                     else:
                         skipped += 1
@@ -465,12 +512,20 @@ def sync_library():
 
                     if existing_explicit and existing_explicit != "":
                         if metadata_changed:
-                            update_batch.append((
-                                song_title, song_artist, nav_album, nav_genre,
-                                nav_duration, existing_explicit,
-                                nav_artistId, nav_artistJSON, nav_albumId,  
-                                song_id,
-                            ))
+                            update_batch.append(
+                                (
+                                    song_title,
+                                    song_artist,
+                                    nav_album,
+                                    nav_genre,
+                                    nav_duration,
+                                    existing_explicit,
+                                    nav_artistId,
+                                    nav_artistJSON,
+                                    nav_albumId,
+                                    song_id,
+                                )
+                            )
                             updated += 1
                         else:
                             skipped += 1
@@ -481,21 +536,31 @@ def sync_library():
 
                             if not iTunes:
                                 new_explicit = "notInItunes"
-                                new_genre    = nav_genre
+                                new_genre = nav_genre
                             else:
                                 new_explicit = iTunes.get("explicit", "notInItunes")
-                                new_genre    = normalise_genre(iTunes.get("genre") or song.get("genre"))
-                                song_artist  = iTunes.get("artist") or song_artist
-                                nav_album    = iTunes.get("album") or nav_album
+                                new_genre = normalise_genre(
+                                    iTunes.get("genre") or song.get("genre")
+                                )
+                                song_artist = iTunes.get("artist") or song_artist
+                                nav_album = iTunes.get("album") or nav_album
                                 if iTunes.get("duration"):
                                     nav_duration = iTunes["duration"] // 1000
 
-                            update_batch.append((
-                                song_title, song_artist, nav_album, new_genre,
-                                nav_duration, new_explicit,
-                                nav_artistId, nav_artistJSON, nav_albumId,  
-                                song_id,
-                            ))
+                            update_batch.append(
+                                (
+                                    song_title,
+                                    song_artist,
+                                    nav_album,
+                                    new_genre,
+                                    nav_duration,
+                                    new_explicit,
+                                    nav_artistId,
+                                    nav_artistJSON,
+                                    nav_albumId,
+                                    song_id,
+                                )
+                            )
                             updated += 1
                         except Exception:
                             skipped += 1
@@ -509,10 +574,12 @@ def sync_library():
                         if not iTunes:
                             explicit = "notInItunes"
                         else:
-                            explicit     = iTunes.get("explicit")
-                            nav_genre    = normalise_genre(iTunes.get("genre") or song.get("genre"))
-                            song_artist  = iTunes.get("artist") or song_artist
-                            nav_album    = iTunes.get("album") or nav_album
+                            explicit = iTunes.get("explicit")
+                            nav_genre = normalise_genre(
+                                iTunes.get("genre") or song.get("genre")
+                            )
+                            song_artist = iTunes.get("artist") or song_artist
+                            nav_album = iTunes.get("album") or nav_album
                             if iTunes.get("duration"):
                                 nav_duration = iTunes["duration"] // 1000
                     except Exception:
@@ -520,11 +587,20 @@ def sync_library():
                 else:
                     explicit = None
 
-                insert_batch.append((
-                    song_id, song_title, song_artist, nav_album, nav_genre,
-                    nav_duration, explicit,
-                    nav_artistId, nav_artistJSON, nav_albumId,  
-                ))
+                insert_batch.append(
+                    (
+                        song_id,
+                        song_title,
+                        song_artist,
+                        nav_album,
+                        nav_genre,
+                        nav_duration,
+                        explicit,
+                        nav_artistId,
+                        nav_artistJSON,
+                        nav_albumId,
+                    )
+                )
                 inserted += 1
 
             _progress = round((i + 1) / total * 100, 2)
@@ -545,9 +621,11 @@ def sync_library():
     except Exception as e:
         console.log(f"[bold red]Lyrics Sync Failed:[/bold red] {e}")
 
-    with console.status("[bold cyan]Updating Search Index and Cleanup...", spinner="bouncingBar"):
+    with console.status(
+        "[bold cyan]Updating Search Index and Cleanup...", spinner="bouncingBar"
+    ):
         latest_db_songs = fetchSongFromDB()
-        populate_search_index(latest_db_songs)  
+        populate_search_index(latest_db_songs)
         navidrome_ids = {song["id"] for song in songs}
         remove_deleted_songs(navidrome_ids, set(latest_db_songs.keys()))
 

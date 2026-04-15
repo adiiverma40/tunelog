@@ -223,7 +223,7 @@ def init_search_db():
             album,
             albumId UNINDEXED, 
             lyrics,
-            tokenize = 'porter unicode61'
+            tokenize='unicode61 remove_diacritics 1'
         )
     """
     )

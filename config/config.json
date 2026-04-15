@@ -1,6 +1,6 @@
 {
     "playlist_generation": {
-        "playlist_size": 50,
+        "playlist_size": 40,
         "wildcard_day": 60,
         "signal_weights": {
             "repeat": 3,
@@ -11,8 +11,8 @@
         "slot_ratios": {
             "positive": 0.35,
             "repeat": 0.35,
-            "partial": 0.3,
-            "skip": 0
+            "partial": 0.25,
+            "skip": 0.05
         },
         "injection_breakdown": {
             "signal": 0.57,

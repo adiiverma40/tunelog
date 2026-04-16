@@ -1,4 +1,13 @@
+
 services:
+  icecast:
+    image: moul/icecast
+    container_name: tunelog-icecast
+    restart: always
+    ports:
+    - "${RADIO_PORT}:8000"
+    env_file:
+      - .env
   backend:
     build:
       context: ./backend

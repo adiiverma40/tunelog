@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router";
 import { usePlayer } from "../../context/PlayerContext";
 
@@ -32,11 +31,15 @@ export default function MiniPlayer() {
 
   const CoverArt = () =>
     track.coverArt ? (
-      <button onClick={() => navigate("/nowplaying")} title="Open Now Playing" className="flex-shrink-0">
+      <button
+        onClick={() => navigate("/nowplaying")}
+        title="Open Now Playing"
+        className="flex-shrink-0"
+      >
         <img
           src={track.coverArt}
           alt={track.album ?? "cover"}
-          className="h-10 w-10 rounded-lg object-cover shadow"
+          className="h-10 w-10 rounded-lg object-cover "
         />
       </button>
     ) : (
@@ -49,7 +52,10 @@ export default function MiniPlayer() {
     );
 
   const TrackInfo = () => (
-    <button onClick={() => navigate("/now-playing")} className="min-w-0 flex-1 text-left">
+    <button
+      onClick={() => navigate("/now-playing")}
+      className="min-w-0 flex-1 text-left"
+    >
       <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">
         {track.title}
       </p>
@@ -98,7 +104,7 @@ export default function MiniPlayer() {
     <>
       <div
         className="fixed bottom-5 left-1/2 z-50 hidden -translate-x-1/2 lg:flex"
-        style={{ filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.15))" }}
+        style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}
       >
         <div
           className="flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white/90 px-4 py-3 dark:border-gray-700/60 dark:bg-gray-900/90"

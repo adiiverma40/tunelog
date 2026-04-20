@@ -1,6 +1,3 @@
-
-
-
 import {
   createContext,
   useContext,
@@ -18,6 +15,7 @@ export interface Track {
   artist: string;
   album?: string;
   coverArt?: string;
+  coverArtUrl?: string;
   streamUrl: string;
   duration?: number;
 }
@@ -41,6 +39,7 @@ interface PlayerContextValue {
   toggleMute: () => void;
   setIsOnNowPlayingPage: (val: boolean) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
+  queue: Track[];
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -63,7 +62,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const isHost = localStorage.getItem("isHost") === "true";
   const isJoining = localStorage.getItem("isJoining") === "true";
   const inJam = isHost || isJoining;
-  console.log("in Jam : " , inJam)
+  console.log("in Jam : ", inJam);
+  const [queue, setQueue] = useState<Track[]>([]);
+
+  useEffect(() => {
+    socket.emit("get_queue");
+    const handleQueueUpdate = (newQueue: Track[]) => {
+      setQueue(newQueue);
+    };
+    socket.on("queue_update", handleQueueUpdate);
+    return () => {
+      socket.off("queue_update", handleQueueUpdate);
+    };
+  }, [socket]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -72,7 +83,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const current = audio.currentTime;
       setCurrentTime(current);
       if (localStorage.getItem("isHost") === "true") {
-        if (current - lastSyncTime.current >= 1 || current < lastSyncTime.current) {
+        if (
+          current - lastSyncTime.current >= 1 ||
+          current < lastSyncTime.current
+        ) {
           lastSyncTime.current = current;
           socket.emit("sync_time", { positionMs: Math.floor(current * 1000) });
         }
@@ -80,7 +94,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
 
     const onDurationChange = () => setDuration(audio.duration || 0);
-    const onEnded = () => setIsPlaying(false);
+
+    const onEnded = () => {
+      setIsPlaying(false);
+      console.log("music finished");
+      const amHost = localStorage.getItem("isHost") === "true";
+      const amJoining = localStorage.getItem("isJoining") === "true";
+      if (amJoining && !amHost) return;
+      if (amHost) {
+        socket.emit("jam_next");
+        return;
+      }
+
+      setQueue((currentQueue) => {
+        const currentId = trackRef.current?.id;
+        const idx = currentQueue.findIndex((t) => t.id === currentId);
+        const nextTrack = currentQueue[idx + 1] ?? null;
+
+        const audio = audioRef.current;
+
+        if (nextTrack) {
+          audio.src = nextTrack.streamUrl;
+          audio.load();
+          setTrack(nextTrack);
+          trackRef.current = nextTrack;
+          setCurrentTime(0);
+          setDuration(0);
+          audio.play().catch(console.error);
+        } else {
+          console.log("Queue ended → stopping player");
+
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = "";
+          audio.load();
+
+          setTrack(null);
+          trackRef.current = null;
+          setCurrentTime(0);
+          setDuration(0);
+        }
+
+        return currentQueue;
+      });
+    };
+
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
 
@@ -111,12 +169,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (audioRef.current.paused) {
         audioRef.current
           .play()
-          .catch(() => console.warn("Autoplay blocked — waiting for interaction"));
+          .catch(() =>
+            console.warn("Autoplay blocked — waiting for interaction"),
+          );
       }
     };
 
     socket.on("sync_room_time", handleRoomSync);
-    return () => { socket.off("sync_room_time", handleRoomSync); };
+    return () => {
+      socket.off("sync_room_time", handleRoomSync);
+    };
   }, [socket]);
 
   useEffect(() => {
@@ -232,6 +294,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         toggleMute,
         setIsOnNowPlayingPage,
         audioRef,
+        queue,
       }}
     >
       {children}

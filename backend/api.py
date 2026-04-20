@@ -28,10 +28,10 @@ from playlist import (
     songSlots,
     signalWeights,
     API_push_playlist,
-    getDataFromDb
+    getDataFromDb,
 )
 
-from state import app_state , tune_config , save_config
+from state import app_state, tune_config, save_config
 import library
 from itunesFuzzy import useFallBackMethods
 from genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
@@ -45,9 +45,9 @@ from dotenv import load_dotenv
 
 import asyncio
 from fastapi.responses import StreamingResponse
-from state import _subscribers, notification_status  
+from state import _subscribers, notification_status
 import json
-import re 
+import re
 
 import socketio
 
@@ -58,7 +58,6 @@ sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 app = FastAPI()
 
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
-
 
 
 load_dotenv()
@@ -129,7 +128,8 @@ class csvPlaylist(BaseModel):
     username: list[str]
     song_ids: list[str]
     playlist_name: str
-    
+
+
 class configData(BaseModel):
     playlist_generation: dict
     behavioral_scoring: dict
@@ -138,6 +138,7 @@ class configData(BaseModel):
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
+
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -149,8 +150,8 @@ def GetGenre():
 
     db_genres = set()
     for row in rows:
-        if row[0]: 
-            parts = [part.strip() for part in re.split(r'[,/]', row[0])]
+        if row[0]:
+            parts = [part.strip() for part in re.split(r"[,/]", row[0])]
             db_genres.update(parts)
 
     data = readJson()
@@ -160,16 +161,14 @@ def GetGenre():
         known_terms.add(category.lower())
         for v in values:
             known_terms.add(v.lower())
-            
-    unmapped_genres = [
-        g for g in db_genres 
-        if g and g.lower() not in known_terms
-    ]
+
+    unmapped_genres = [g for g in db_genres if g and g.lower() not in known_terms]
 
     return {
         "status": "success",
         "genres": sorted(unmapped_genres),
     }
+
 
 @app.get("/api/ping")
 def ping():
@@ -659,8 +658,8 @@ def generatePlaylist(data: PlaylistOptions):
         if data.weights:
             signalWeights(data.weights)
             # print("api signal weight " , data.weights)
-        library , history = getDataFromDb()
-        scores = score_song(username , history_dict=history , library_dict= library)
+        library, history = getDataFromDb()
+        scores = score_song(username, history_dict=history, library_dict=library)
         unheard, unheard_ratio = get_unheard_songs(scores)
         wildcards = get_wildcard_songs(scores, username)
         playlist, song_signals = build_playlist(
@@ -674,7 +673,6 @@ def generatePlaylist(data: PlaylistOptions):
             explicit_filter,
             size,
             injection,
-            
         )
         push_playlist(playlist, username, song_signals)
 
@@ -1045,9 +1043,6 @@ def csvPlaylist(data: csvPlaylist):
         return {"status": str(e)}
 
 
-
-
-
 @app.get("/notifications/stream")
 async def sse_stream():
     queue: asyncio.Queue = asyncio.Queue()
@@ -1082,12 +1077,14 @@ async def sse_stream():
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )    
+    )
+
 
 @app.get("/api/config")
 def SendConfig():
     # print("Sending config")
     return tune_config
+
 
 @app.post("/api/config/update")
 def update_config(payload: configData):
@@ -1099,11 +1096,14 @@ def update_config(payload: configData):
     return {"status": "success", "message": "config.json updated"}
 
 
-
-
-from search import searchTable
-
-from jam import sendSongPayload, AddQueue, currentQueue, ClearQueue, songQueue
+from jam import (
+    sendSongPayload,
+    AddQueue,
+    currentQueue,
+    ClearQueue,
+    future_queue_ids,
+    past_queue_ids,
+)
 
 connected_users = {}
 
@@ -1112,29 +1112,7 @@ jam_state = {
     "host_name": None,
     "current_track": None,
     "is_playing": False,
-    "current_index": 0,
 }
-
-
-def get_queue_ids():
-    q = currentQueue()
-    if isinstance(q, list):
-        return [item.get("id") for item in q if item.get("id")]
-    if isinstance(q, dict):
-        return list(q.keys())
-    return []
-
-
-def resolve_current_index():
-    queue_ids = get_queue_ids()
-    if not queue_ids:
-        return 0, queue_ids
-
-    current_track = jam_state.get("current_track")
-    if current_track in queue_ids:
-        return queue_ids.index(current_track), queue_ids
-
-    return 0, queue_ids
 
 
 @sio.event
@@ -1142,16 +1120,20 @@ async def connect(sid, environ, auth):
     print(f"Client connected: {sid}")
     connected_users[sid] = {"username": "Anonymous", "isHost": False}
 
-    payload = sendSongPayload(jam_state["current_track"]) if jam_state["current_track"] else sendSongPayload()
-    await sio.emit("now_playing", payload, to=sid)
+    track_id = jam_state.get("current_track")
+    if track_id:
+        payload = sendSongPayload(track_id)
+        await sio.emit("now_playing", payload, to=sid)
+    else:
+        await sio.emit("now_playing", None, to=sid)
 
-    if jam_state["host_name"]:
+    if jam_state.get("host_name"):
         await sio.emit(
             "jam_announced",
             {
-                "hostName": jam_state["host_name"],
-                "trackId": jam_state["current_track"],
-                "isPlaying": jam_state["is_playing"],
+                "hostName": jam_state.get("host_name"),
+                "trackId": jam_state.get("current_track"),
+                "isPlaying": jam_state.get("is_playing", False),
             },
             to=sid,
         )
@@ -1168,7 +1150,6 @@ async def disconnect(sid):
         jam_state["host_name"] = None
         jam_state["current_track"] = None
         jam_state["is_playing"] = False
-        jam_state["current_index"] = 0
 
         await sio.emit("jam_finished")
         print("Jam ended — host disconnected")
@@ -1180,9 +1161,7 @@ async def disconnect(sid):
 async def start_jam(sid, data):
     jam_state["host_sid"] = sid
     jam_state["host_name"] = data.get("username")
-    jam_state["current_track"] = data.get("trackId")
     jam_state["is_playing"] = True
-
     connected_users[sid]["isHost"] = True
 
     library, history = getDataFromDb()
@@ -1211,12 +1190,16 @@ async def start_jam(sid, data):
     for songId in playlist:
         AddQueue(songId)
 
-    jam_state["current_index"], queue_ids = resolve_current_index()
-    if queue_ids:
-        jam_state["current_track"] = queue_ids[0]
-        jam_state["current_index"] = 0
+    if future_queue_ids:
+        jam_state["current_track"] = future_queue_ids.pop(0)
+    else:
+        jam_state["current_track"] = data.get("trackId")
 
-    payload = sendSongPayload(jam_state["current_track"]) if jam_state["current_track"] else {}
+    payload = (
+        sendSongPayload(jam_state["current_track"])
+        if jam_state["current_track"]
+        else {}
+    )
 
     await sio.emit(
         "jam_announced",
@@ -1240,21 +1223,20 @@ async def get_queue(sid):
 
 @sio.event
 async def add_queue(sid, data):
-    print(data)
     AddQueue(
         data["song_id"],
         data.get("title"),
         data.get("artist", "Unknown"),
     )
-    curennt = currentQueue()
-    print("current : " , curennt)
-    await sio.emit("queue_update", curennt)
-
+    await sio.emit("queue_update", currentQueue())
 
 
 @sio.event
 async def clear_queue(sid):
     ClearQueue()
+    jam_state["current_track"] = None
+    jam_state["is_playing"] = False
+    await sio.emit("now_playing", None)
     await sio.emit("queue_update", currentQueue())
 
 
@@ -1267,7 +1249,6 @@ async def stop_jam(sid):
     jam_state["host_name"] = None
     jam_state["current_track"] = None
     jam_state["is_playing"] = False
-    jam_state["current_index"] = 0
 
     connected_users[sid]["isHost"] = False
 
@@ -1283,8 +1264,6 @@ async def jam_play(sid):
     jam_state["is_playing"] = True
     await sio.emit("jam_playback", {"isPlaying": True})
 
-    print("Broadcast play to all users")
-
 
 @sio.event
 async def jam_pause(sid):
@@ -1294,36 +1273,30 @@ async def jam_pause(sid):
     jam_state["is_playing"] = False
     await sio.emit("jam_playback", {"isPlaying": False})
 
-    print("Broadcast pause to all users")
-
 
 @sio.event
 async def jam_next(sid):
     if sid != jam_state["host_sid"]:
         return
 
-    queue_ids = get_queue_ids()
-    if not queue_ids:
-        return
+    print("request for next song")
 
-    if jam_state["current_track"] in queue_ids:
-        current_index = queue_ids.index(jam_state["current_track"])
-        next_index = (current_index + 1) % len(queue_ids)
+    if jam_state["current_track"]:
+        past_queue_ids.append(jam_state["current_track"])
+
+    if future_queue_ids:
+        next_track_id = future_queue_ids.pop(0)
+        jam_state["current_track"] = next_track_id
+        jam_state["is_playing"] = True
+        payload = sendSongPayload(next_track_id)
     else:
-        next_index = 0
-
-    next_track_id = queue_ids[next_index]
-    jam_state["current_track"] = next_track_id
-    jam_state["current_index"] = next_index
-    jam_state["is_playing"] = True
-
-    payload = sendSongPayload(next_track_id)
+        jam_state["current_track"] = None
+        jam_state["is_playing"] = False
+        payload = None
 
     await sio.emit("now_playing", payload)
-    await sio.emit("jam_playback", {"isPlaying": True})
+    await sio.emit("jam_playback", {"isPlaying": jam_state["is_playing"]})
     await sio.emit("queue_update", currentQueue())
-
-    print(f"Next track broadcasted: {next_track_id}")
 
 
 @sio.event
@@ -1331,25 +1304,19 @@ async def jam_prev(sid):
     if sid != jam_state["host_sid"]:
         return
 
-    queue_ids = get_queue_ids()
-    if not queue_ids:
+    if not past_queue_ids:
+        print("No past songs to return to.")
         return
-
-    if jam_state["current_track"] in queue_ids:
-        current_index = queue_ids.index(jam_state["current_track"])
-        prev_index = (current_index - 1) % len(queue_ids)
-    else:
-        prev_index = 0
-
-    prev_track_id = queue_ids[prev_index]
+    if jam_state["current_track"]:
+        future_queue_ids.insert(0, jam_state["current_track"])
+    prev_track_id = past_queue_ids.pop()
     jam_state["current_track"] = prev_track_id
-    jam_state["current_index"] = prev_index
     jam_state["is_playing"] = True
 
     payload = sendSongPayload(prev_track_id)
 
     await sio.emit("now_playing", payload)
-    await sio.emit("jam_playback", {"isPlaying": True})
+    await sio.emit("jam_playback", {"isPlaying": jam_state["is_playing"]})
     await sio.emit("queue_update", currentQueue())
 
     print(f"Previous track broadcasted: {prev_track_id}")
@@ -1360,9 +1327,12 @@ async def sync_time(sid, data):
     if sid != jam_state["host_sid"]:
         return
 
-    await sio.emit("sync_room_time", {
-        "positionMs": data.get("positionMs"),
-    })
+    await sio.emit(
+        "sync_room_time",
+        {
+            "positionMs": data.get("positionMs"),
+        },
+    )
 
 
 if __name__ == "__main__":

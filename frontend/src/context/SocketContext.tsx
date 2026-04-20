@@ -1,5 +1,3 @@
-
-
 import React, {
   createContext,
   useContext,
@@ -23,7 +21,7 @@ interface SocketContextValue {
   socket: typeof socket;
   activeHost: string | null;
   jamPlayback: { isPlaying: boolean } | null;
-  queue : any[];
+  queue: any[];
 }
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
@@ -36,12 +34,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({
   const [activeHost, setActiveHost] = useState<string | null>(null);
   const [queue, setQueue] = useState<any[]>([]);
   const [jamPlayback, setJamPlayback] = useState<{ isPlaying: boolean } | null>(
-    null
+    null,
   );
   const onQueueUpdate = (data: any) => {
-  console.log("queue_update:", data);
-  setQueue(data);
-};
+    // console.log("queue_update:", data);
+    setQueue(data);
+  };
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -121,7 +119,14 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <SocketContext.Provider
-      value={{ isConnected, nowPlaying, socket, activeHost, jamPlayback , queue }}
+      value={{
+        isConnected,
+        nowPlaying,
+        socket,
+        activeHost,
+        jamPlayback,
+        queue,
+      }}
     >
       {children}
     </SocketContext.Provider>
@@ -130,6 +135,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({
 
 export function useGlobalSocket() {
   const ctx = useContext(SocketContext);
-  if (!ctx) throw new Error("useGlobalSocket must be used within a SocketProvider");
+  if (!ctx)
+    throw new Error("useGlobalSocket must be used within a SocketProvider");
   return ctx;
 }

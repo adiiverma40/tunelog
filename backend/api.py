@@ -1,5 +1,13 @@
 # # This to give frontend api data
 
+
+# Notification apis to implement
+# 1. Who started playling what
+# 2. Last sycned
+# 3. last playlist generated for who
+# 4. last song that got started
+
+
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import requests
@@ -27,10 +35,12 @@ from playlist import (
     songSlots,
     signalWeights,
     API_push_playlist,
+    getDataFromDb
 )
+
+from state import app_state , tune_config , save_config
 import library
 from itunesFuzzy import useFallBackMethods
-
 from genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
 from misc import UpdateDBgenre
 from importPlaylist import fuzzymatching
@@ -38,13 +48,32 @@ from importPlaylist import fuzzymatching
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from rich.console import Console
+from dotenv import load_dotenv
+
+import asyncio
+from fastapi.responses import StreamingResponse
+from state import _subscribers, notification_status  
+import json
+import re 
+
+
+load_dotenv()
 
 app = FastAPI()
 console = Console(log_path=False, log_time=False)
 
+allowedOriginsStr = os.getenv("ALLOWED_ORIGINS", "")
+allowedOrigins = [
+    origin.strip() for origin in allowedOriginsStr.split(",") if origin.strip()
+]
+
+if not allowedOrigins:
+    allowedOrigins = ["http://localhost:5173"]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "*"],
+    allow_origins=allowedOrigins,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -97,10 +126,15 @@ class csvPlaylist(BaseModel):
     username: list[str]
     song_ids: list[str]
     playlist_name: str
+    
+class configData(BaseModel):
+    playlist_generation: dict
+    behavioral_scoring: dict
+    sync_and_automation: dict
+    api_and_performance: dict
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
-
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -110,7 +144,12 @@ def GetGenre():
     ).fetchall()
     conn.close()
 
-    db_genres = [row[0] for row in rows]
+    db_genres = set()
+    for row in rows:
+        if row[0]: 
+            parts = [part.strip() for part in re.split(r'[,/]', row[0])]
+            db_genres.update(parts)
+
     data = readJson()
     known_terms = set()
 
@@ -118,14 +157,16 @@ def GetGenre():
         known_terms.add(category.lower())
         for v in values:
             known_terms.add(v.lower())
-
-    unmapped_genres = [g for g in db_genres if g and g.lower() not in known_terms]
+            
+    unmapped_genres = [
+        g for g in db_genres 
+        if g and g.lower() not in known_terms
+    ]
 
     return {
         "status": "success",
-        "genres": unmapped_genres,
+        "genres": sorted(unmapped_genres),
     }
-
 
 @app.get("/api/ping")
 def ping():
@@ -615,10 +656,13 @@ def generatePlaylist(data: PlaylistOptions):
         if data.weights:
             signalWeights(data.weights)
             # print("api signal weight " , data.weights)
-        scores = score_song(username)
+        library , history = getDataFromDb()
+        scores = score_song(username , history_dict=history , library_dict= library)
         unheard, unheard_ratio = get_unheard_songs(scores)
         wildcards = get_wildcard_songs(scores, username)
         playlist, song_signals = build_playlist(
+            library,
+            history,
             scores,
             unheard,
             wildcards,
@@ -627,6 +671,7 @@ def generatePlaylist(data: PlaylistOptions):
             explicit_filter,
             size,
             injection,
+            
         )
         push_playlist(playlist, username, song_signals)
 
@@ -841,18 +886,11 @@ def getMonthlyListens():
     return [{"month": row[0], "count": row[1]} for row in rows]
 
 
-_fallbackRunning = False
-_fallbackProcessed = 0
-_fallbackTotal = 0
-_fallbackStop = False
-
-
 @app.post("/api/sync/fallback")
 def syncByFallback(tries: int = 500):
-    global _fallbackRunning, _fallbackProcessed, _fallbackTotal, _fallbackStop
     console.log(f"[cyan]Fallback Sync Triggered[/cyan] (Tries: {tries})")
 
-    if _fallbackRunning:
+    if app_state.fallback_running:
         return {"status": "error", "reason": "Fallback sync already running"}
 
     conn = get_db_connection_lib()
@@ -867,22 +905,21 @@ def syncByFallback(tries: int = 500):
     if not songs:
         return {"status": "ok", "reason": "No notInItunes songs found"}
 
-    _fallbackRunning = True
-    _fallbackProcessed = 0
-    _fallbackTotal = len(songs)
-    _fallbackStop = False
+    app_state.fallback_running = True
+    app_state.fallback_processed = 0
+    app_state.fallback_total = len(songs)
+    app_state.fallback_stop = False
 
     def run():
-        global _fallbackRunning, _fallbackProcessed, _fallbackStop
-        library._fallbackStop = False
         for song in songs:
-            if _fallbackStop:
-                console.log("[yellow]Fallback Sync Stopped[/yellow]")
+            if app_state.fallback_stop:
+                console.log("[yellow]Fallback Sync Stopped by User[/yellow]")
                 break
+
             result = useFallBackMethods(song, tries)
-            _fallbackProcessed += 1
-        _fallbackRunning = False
-        _fallbackStop = False
+            app_state.fallback_processed += 1
+
+        app_state.fallback_running = False
 
     Thread(target=run, daemon=True).start()
     return {"status": "ok", "total": len(songs)}
@@ -892,12 +929,12 @@ def syncByFallback(tries: int = 500):
 def fallbackStatus():
     return {
         "status": "ok",
-        "is_running": _fallbackRunning,
-        "processed": _fallbackProcessed,
-        "total": _fallbackTotal,
+        "is_running": app_state.fallback_running,
+        "processed": app_state.fallback_processed,
+        "total": app_state.fallback_total,
         "progress": (
-            round((_fallbackProcessed / _fallbackTotal) * 100)
-            if _fallbackTotal > 0
+            round((app_state.fallback_processed / app_state.fallback_total) * 100)
+            if app_state.fallback_total > 0
             else 0
         ),
     }
@@ -905,8 +942,10 @@ def fallbackStatus():
 
 @app.get("/api/sync/fallback/stop")
 def stopFallback():
-    global _fallbackStop
-    _fallbackStop = True
+    print("fallback stop triggerd")
+    # print(app_state.fallback_stop)
+    app_state.fallback_stop = True
+    # print(app_state.fallback_stop)
     return {"status": "ok"}
 
 
@@ -950,7 +989,7 @@ def GetGenreFromDb():
 def autoMatchGenre():
     data = readJson()
     update = autoGenre(data)
-    sync_database_to_json()
+    # sync_database_to_json()
     remaining_data = GetGenre()
     return {"unmapped": remaining_data, "genre_updated": update}
 
@@ -1002,6 +1041,62 @@ def csvPlaylist(data: csvPlaylist):
         console.log(f"[red]Error pushing CSV playlist:[/red] {e}")
         return {"status": str(e)}
 
+
+
+
+
+@app.get("/notifications/stream")
+async def sse_stream():
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    subscriber_entry = (queue, loop)
+    _subscribers.append(subscriber_entry)
+
+    async def event_generator():
+        try:
+            for field in ("songState", "playlist", "starredSong"):
+                existing = list(getattr(notification_status, field))
+                if existing:
+                    payload = json.dumps({field: existing})
+                    yield f"data: {payload}\n\n"
+
+            while True:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=20)
+                    yield f"data: {data}\n\n"
+
+                    field = list(json.loads(data).keys())[0]
+                    getattr(notification_status, field).clear()
+
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _subscribers.remove(subscriber_entry)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )    
+
+@app.get("/api/config")
+def SendConfig():
+    # print("Sending config")
+    return tune_config
+
+@app.post("/api/config/update")
+def update_config(payload: configData):
+    # print(payload)
+    console.print("[bold blue]Received config update request...")
+    
+    success, message = save_config(payload.dict())
+    
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
+        
+    return {"status": "success", "message": "config.json updated"}
 
 if __name__ == "__main__":
     init_db()

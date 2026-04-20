@@ -13,15 +13,19 @@
 
 from rapidfuzz import fuzz
 from time import sleep
-from random import shuffle
+
+# from random import shuffle
 import requests
 import re
 import time
 import urllib.parse
-import library
+
+# import library
 
 from db import get_db_connection_lib
+from state import app_state
 from rich.console import Console
+from state import tune_config
 
 console = Console(log_time=False, log_path=False)
 totalTries = 0
@@ -117,15 +121,15 @@ def clean_text(text: str) -> str:
 
 
 def generalItunesSearch(
-    title,
+  title,
     artist="",
     limit=5,
     entity="song",
     type="search",
     termApi="term",
     trimText=True,
-    maxRetries=3,
-    retryDelay=3,
+    maxRetries=tune_config["api_and_performance"]["api_max_retries"],
+    retryDelay=tune_config["api_and_performance"]["api_retry_delay_sec"],
 ):
     if trimText:
         title = re.sub(r"\(.*?\)", "", str(title)).strip()
@@ -179,7 +183,7 @@ def mb_to_itunes_format(mb_response):
 
 
 def musicbrainz_search(
-    query: str, entity: str = "recording", limit: int = 10, max_retries: int = 3
+    query: str, entity: str = "recording", limit: int = 10, max_retries: int = tune_config["api_and_performance"]["api_max_retries"]
 ):
     base_url = f"https://musicbrainz.org/ws/2/{entity}"
     headers = {"User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog/)"}
@@ -253,8 +257,8 @@ def fuzzyScoreMatch(response, song, isAlbum=False, tryLimit: int = 500):
     results.sort(key=lambda x: x[0], reverse=True)
     bestScore, bestMatch = results[0]
 
-    return (bestMatch, bestScore) if bestScore >= 70 else (None, bestScore)
-
+    min_score = tune_config["api_and_performance"]["sync_confidence"]["min_match_score"]
+    return (bestMatch, bestScore) if bestScore >= min_score else (None, bestScore)
 
 def fallback1(song):
     title = clean_text(song["title"])
@@ -329,9 +333,8 @@ def itunes_to_song_format(res):
 def useFallBackMethods(song, tries):
     global totalTries
     totalTries = 0
-
-    if library._fallbackStop:
-        console.log("[bold red]Sync Stopping Command Received[/bold red]")
+    if app_state.fallback_stop:
+        console.log("[bold red]Sync Stopping Command Received (in Fuzzy)[/bold red]")
         return
 
     song_id = song["song_id"]
@@ -376,8 +379,11 @@ def useFallBackMethods(song, tries):
         explicit = match.get("trackExplicitness", "notInItunes") or "notInItunes"
         itunes_artist = match.get("artistName")
         itunes_genre = match.get("primaryGenreName")
-
-        if sc >= 80:
+        
+        overwrite_score = tune_config["api_and_performance"]["sync_confidence"]["metadata_overwrite_score"]
+        
+        if sc >= overwrite_score:
+            
             updateSong(
                 song_id=song_id,
                 explicit=explicit,

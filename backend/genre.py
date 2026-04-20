@@ -42,10 +42,12 @@
 import json
 from rapidfuzz import fuzz
 from misc import UpdateDBgenre
-from db import get_db_connection, get_db_connection_lib , db_supervisor
+from db import get_db_connection, get_db_connection_lib, db_supervisor
 from rich.console import Console
+
 # from config import status_registry
-from state import status_registry
+from state import status_registry , tune_config
+
 console = Console()
 
 FILE_PATH = "./data/genre.json"
@@ -87,11 +89,11 @@ def writeJson(genre, noisyGenre):
     return oldData
 
 
-def readJson():
+def readJson(filePath = FILE_PATH ):
     default_data = {"app": "Tunelog"}
 
     try:
-        with open(FILE_PATH, "r") as file:
+        with open(filePath, "r") as file:
             data = json.load(file)
     except FileNotFoundError:
         console.print("[yellow]genre.json missing. Resetting to default.[/yellow]")
@@ -216,8 +218,10 @@ def autoGenre(data=None):
 
             if best_score == 100:
                 break
-
-        if best_match and best_score >= 95:
+        
+        strictness = tune_config["api_and_performance"]["sync_confidence"]["genre_map_strictness"]
+        
+        if best_match and best_score >= strictness:
             console.print(
                 f"[cyan]Auto-Mapping:[/cyan] {genre1} → {best_match} ({best_score}%)"
             )

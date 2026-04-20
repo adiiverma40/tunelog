@@ -201,8 +201,8 @@ export interface GenreListResponse {
 }
 export interface AutoMatchResponse {
   status: string;
-  unmapped: GenreListResponse; 
-  genre_updated: number; 
+  unmapped: GenreListResponse;
+  genre_updated: number;
 }
 
 export interface ImportResponse {
@@ -225,10 +225,99 @@ export interface ImportResponse {
   };
 }
 
+export type NotificationField = "songState" | "playlist" | "starredSong";
+
+export interface SongStateEvent {
+  username: string;
+  song: string;
+  state: "started" | "stopped";
+}
+
+export interface PlaylistNotifEvent {
+  username: string;
+  size: number;
+  type: "append" | "regenerate";
+}
+
+export interface StarredSongEvent {
+  username: string;
+  song: string;
+  star: number | string;
+}
+
+export interface NotificationPayload {
+  songState?: SongStateEvent[];
+  playlist?: PlaylistNotifEvent[];
+  starredSong?: StarredSongEvent[];
+}
+
 export interface PlaylistCreateRequest {
   username: string[];
   song_ids: string[];
   playlist_name: string;
+}
+
+export interface PlaylistGenerationConfig {
+  playlist_size: number;
+  wildcard_day: number;
+  signal_weights: {
+    repeat: number;
+    positive: number;
+    partial: number;
+    skip: number;
+  };
+  slot_ratios: {
+    positive: number;
+    repeat: number;
+    partial: number;
+    skip: number;
+  };
+  injection_breakdown: {
+    signal: number;
+    unheard: number;
+    wildcard: number;
+  };
+}
+
+export interface BehavioralScoringConfig {
+  skip_threshold_pct: number;
+  positive_threshold_pct: number;
+  repeat_time_window_min: number;
+  stale_session_timeout_sec: number;
+  min_listens_for_star: number;
+  historical_decay_factor: number;
+}
+
+export interface SyncAndAutomationConfig {
+  auto_sync_hour: number;
+  timezone: string;
+  use_itunes_fallback: boolean;
+  auto_sync_after_navidrome: boolean;
+}
+
+export interface ApiAndPerformanceConfig {
+  max_fuzzy_iterations: number;
+  api_max_retries: number;
+  api_retry_delay_sec: number;
+  itunes_search_depth: number;
+  sync_confidence: {
+    min_match_score: number;
+    metadata_overwrite_score: number;
+    genre_map_strictness: number;
+    duration_tolerance_pct: number;
+  };
+}
+
+export interface TuneConfig {
+  playlist_generation: PlaylistGenerationConfig;
+  behavioral_scoring: BehavioralScoringConfig;
+  sync_and_automation: SyncAndAutomationConfig;
+  api_and_performance: ApiAndPerformanceConfig;
+}
+
+export interface UpdateConfigResponse {
+  status: string;
+  message: string;
 }
 
 export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
@@ -378,12 +467,19 @@ export async function fetchPlaylistGenerate(
   size: number = 50,
   slots?: Record<string, number>,
   weights?: Record<string, number>,
-  injection:boolean = true
+  injection: boolean = true,
 ): Promise<PlaylistGenerateResponse> {
   const res = await fetch(`${BASE_URL}/api/playlist/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, explicit_filter, size, slots, weights , injection}),
+    body: JSON.stringify({
+      username,
+      explicit_filter,
+      size,
+      slots,
+      weights,
+      injection,
+    }),
   });
   if (!res.ok) throw new Error("Failed to generate playlist");
   return res.json();
@@ -395,13 +491,20 @@ export async function appendPlaylist(
   size: number = 50,
   slots?: Record<string, number>,
   weights?: Record<string, number>,
-  injection: boolean = true
+  injection: boolean = true,
 ): Promise<PlaylistGenerateResponse> {
   try {
     const res = await fetch(`${BASE_URL}/api/playlist/append`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, explicit_filter, size, slots, weights , injection}),
+      body: JSON.stringify({
+        username,
+        explicit_filter,
+        size,
+        slots,
+        weights,
+        injection,
+      }),
     });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     return res.json();
@@ -453,9 +556,7 @@ export async function fetchFallbackSyncStatus(): Promise<FallbackSyncStatus> {
 }
 
 export async function stopFallbackSync(): Promise<{ status: string }> {
-  const res = await fetch(`${BASE_URL}/api/sync/fallback/stop`, {
-    method: "POST",
-  });
+  const res = await fetch(`${BASE_URL}/api/sync/fallback/stop`);
   if (!res.ok) throw new Error("Failed to stop fallback sync");
   return res.json();
 }
@@ -514,7 +615,6 @@ export async function autoMatchGenres(): Promise<AutoMatchResponse> {
   return res.json();
 }
 
-
 export async function fetchImportCSV(file: File): Promise<ImportResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -522,7 +622,6 @@ export async function fetchImportCSV(file: File): Promise<ImportResponse> {
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csv`, {
     method: "POST",
     body: formData,
-  
   });
 
   if (!res.ok) throw new Error("Failed to upload CSV");
@@ -530,15 +629,55 @@ export async function fetchImportCSV(file: File): Promise<ImportResponse> {
 }
 
 export async function fetchCreatePlaylistFromIds(
-  data: PlaylistCreateRequest
+  data: PlaylistCreateRequest,
 ): Promise<{ status: string; message: string; reason?: string }> {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csvPlaylist`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  console.log(data)
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/import/csvPlaylist`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+  console.log(data);
   if (!res.ok) throw new Error("Failed to create playlist");
   return res.json();
 }
 
+export function connectNotificationStream(
+  onMessage: (payload: NotificationPayload) => void,
+  onError?: (err: Event) => void,
+): EventSource {
+  const es = new EventSource(`${BASE_URL}/notifications/stream`);
+  console.log("api called notification/stream");
+  es.onmessage = (event) => {
+    try {
+      const payload: NotificationPayload = JSON.parse(event.data);
+      onMessage(payload);
+    } catch (e) {
+      console.error("[SSE] Failed to parse notification:", e);
+    }
+  };
+
+  if (onError) es.onerror = onError;
+
+  return es;
+}
+
+export async function fetchGetConfig(): Promise<TuneConfig> {
+  const res = await fetch(`${BASE_URL}/api/config`);
+  if (!res.ok) throw new Error("Failed to fetch configuration");
+  return res.json();
+}
+
+export async function fetchUpdateConfig(
+  data: TuneConfig,
+): Promise<UpdateConfigResponse> {
+  const res = await fetch(`${BASE_URL}/api/config/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update configuration");
+  return res.json();
+}

@@ -1,24 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Link } from "react-router";
+import {
+  readNotifications,
+  markAsRead,
+  hasUnread,
+  type StoredSongState,
+} from "../../hooks/Usenotificationstream";
+// import { readNotifications } from "../../hooks/Usenotificationstream";
+const formatTime = (iso: string) => {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
+const avatarColor = (username: string) => {
+  const colors = [
+    "from-blue-500 to-indigo-600",
+    "from-purple-500 to-pink-600",
+    "from-green-500 to-teal-600",
+    "from-orange-500 to-red-600",
+    "from-cyan-500 to-blue-600",
+  ];
+  return colors[username.charCodeAt(0) % colors.length];
+};
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifying, setNotifying] = useState(true);
+  const [notifying, setNotifying] = useState(hasUnread);
+  const [items, setItems] = useState<StoredSongState[]>([]);
 
-  function toggleDropdown() {
-    setIsOpen(!isOpen);
-  }
-
-  function closeDropdown() {
-    setIsOpen(false);
-  }
+  useEffect(() => {
+    const sync = () => {
+      setItems(readNotifications().songState);
+      setNotifying(hasUnread());
+    };
+    sync();
+    window.addEventListener("tunelog_notif_update", sync);
+    return () => window.removeEventListener("tunelog_notif_update", sync);
+  }, []);
 
   const handleClick = () => {
-    toggleDropdown();
-    setNotifying(false);
+    setIsOpen((o) => !o);
+    if (!isOpen) {
+      markAsRead();
+      setNotifying(false);
+    }
   };
+
+  const closeDropdown = () => setIsOpen(false);
+
   return (
     <div className="relative">
       <button
@@ -30,7 +64,7 @@ export default function NotificationDropdown() {
             !notifying ? "hidden" : "flex"
           }`}
         >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
+          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping" />
         </span>
         <svg
           className="fill-current"
@@ -47,6 +81,7 @@ export default function NotificationDropdown() {
           />
         </svg>
       </button>
+
       <Dropdown
         isOpen={isOpen}
         onClose={closeDropdown}
@@ -54,10 +89,10 @@ export default function NotificationDropdown() {
       >
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-700">
           <h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Notification
+            Notifications
           </h5>
           <button
-            onClick={toggleDropdown}
+            onClick={closeDropdown}
             className="text-gray-500 transition dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             <svg
@@ -65,7 +100,6 @@ export default function NotificationDropdown() {
               width="24"
               height="24"
               viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
             >
               <path
                 fillRule="evenodd"
@@ -76,47 +110,64 @@ export default function NotificationDropdown() {
             </svg>
           </button>
         </div>
+
         <ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-          {/* Example notification items */}
-          <li>
-            <DropdownItem
-              onItemClick={closeDropdown}
-              className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-            >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <img
-                  width={40}
-                  height={40}
-                  src="/images/user/user-02.jpg"
-                  alt="User"
-                  className="w-full overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-              </span>
-
-              <span className="block">
-                <span className="mb-1.5 block  text-theme-sm text-gray-500 dark:text-gray-400 space-x-1">
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Username
+          {items.length === 0 ? (
+            <li className="py-10 text-center text-sm text-gray-400">
+              No activity yet.
+            </li>
+          ) : (
+            items.map((item, i) => (
+              <li key={i}>
+                <DropdownItem
+                  onItemClick={closeDropdown}
+                  className="flex gap-3 rounded-lg border-b border-gray-100 px-3 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
+                >
+                  {/* Avatar */}
+                  <span
+                    className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarColor(item.username)} flex items-center justify-center flex-shrink-0`}
+                  >
+                    <span className="text-white text-xs font-bold">
+                      {item.username.slice(0, 2).toUpperCase()}
+                    </span>
                   </span>
-                  <span> started playing</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                  Ham tumse pyar krte hai 
-                  </span>
-                </span>
 
-                <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Album Name</span>
-                  <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span>5 min ago</span>
-                </span>
-              </span>
-            </DropdownItem>
-          </li>
-          {/* Add more items as needed */}
+                  <span className="block min-w-0">
+                    <span className="mb-1 block text-theme-sm text-gray-500 dark:text-gray-400 space-x-1">
+                      <span className="font-medium text-gray-800 dark:text-white/90">
+                        {item.username}
+                      </span>
+                      <span>
+                        {item.state === "started"
+                          ? "started playing"
+                          : "stopped playing"}
+                      </span>
+                      <span className="font-medium text-gray-800 dark:text-white/90 truncate">
+                        {item.song}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
+                      <span
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          item.state === "started"
+                            ? "bg-brand-500/10 text-brand-500":"bg-gray-100 text-gray-500 dark:bg-gray-800"
+                            
+                        }`}
+                      >
+                        {item.state === "started" ? "Playing" : "Stopped"}
+                      </span>
+                      <span className="w-1 h-1 bg-gray-400 rounded-full" />
+                      <span>{formatTime(item.receivedAt)}</span>
+                    </span>
+                  </span>
+                </DropdownItem>
+              </li>
+            ))
+          )}
         </ul>
+
         <Link
-          to="/"
+          to="/notification"
           className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
         >
           View All Notifications

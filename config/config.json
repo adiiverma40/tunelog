@@ -1,0 +1,49 @@
+{
+    "playlist_generation": {
+        "playlist_size": 40,
+        "wildcard_day": 60,
+        "signal_weights": {
+            "repeat": 3,
+            "positive": 2,
+            "partial": 0,
+            "skip": -2
+        },
+        "slot_ratios": {
+            "positive": 0.35,
+            "repeat": 0.35,
+            "partial": 0.25,
+            "skip": 0.05
+        },
+        "injection_breakdown": {
+            "signal": 0.3,
+            "unheard": 0.56,
+            "wildcard": 0.14
+        }
+    },
+    "behavioral_scoring": {
+        "skip_threshold_pct": 30,
+        "positive_threshold_pct": 80,
+        "repeat_time_window_min": 30,
+        "stale_session_timeout_sec": 600,
+        "min_listens_for_star": 3,
+        "historical_decay_factor": 0.9
+    },
+    "sync_and_automation": {
+        "auto_sync_hour": 2,
+        "timezone": "Asia/Kolkata",
+        "use_itunes_fallback": false,
+        "auto_sync_after_navidrome": true
+    },
+    "api_and_performance": {
+        "max_fuzzy_iterations": 500,
+        "api_max_retries": 3,
+        "api_retry_delay_sec": 3,
+        "itunes_search_depth": 200,
+        "sync_confidence": {
+            "min_match_score": 70,
+            "metadata_overwrite_score": 80,
+            "genre_map_strictness": 95,
+            "duration_tolerance_pct": 10
+        }
+    }
+}

@@ -45,6 +45,467 @@ I have plans to implement plugin for navidrome for better monitoring of user int
 - [Known Limitations](#known-limitations)
   
 
+## PROXY 
+The service acts as an HTTP proxy for a Navidrome instance and adds two main behaviors:
+
+1. Custom search interception for endpoints such as `rest/search3`, `api/song`, `api/album`, and `api/artist`.
+2. Special handling for SSE endpoints like `/api/events` so that streaming responses remain stable.
+
+For all other endpoints, the proxy forwards the request to the upstream Navidrome server with minimal transformation.
+
+### FastAPI application
+
+The proxy is implemented as a single FastAPI app. It exposes a catch-all route:
+
+* `/{path:path}`
+
+This route receives nearly all incoming requests and decides whether to:
+
+* return a locally generated search response,
+* stream SSE data from the upstream server, or
+* forward the request as a normal reverse proxy.
+
+### Shared HTTPX client
+
+A single global `httpx.AsyncClient` is used for outbound requests to the upstream Navidrome server. It is configured with `timeout=None` so long-lived requests, especially SSE, do not time out prematurely.
+
+### Search layer
+
+The proxy imports `searchTable` from `search.py`. This function is used to return custom search results before the request is sent upstream.
+
+### Environment configuration
+
+The upstream base URL is read from:
+
+* `BASE_URL`
+
+This is stored in `NAVIDROME_URL` and used to build the upstream target URL for every proxied request.
+
+## Flow
+
+### Incoming request
+
+A client sends a request to the proxy. The request may be one of the following:
+
+* normal API request,
+* search request,
+* SSE event stream request.
+
+### Pre-processing
+
+The proxy reads:
+
+* raw request body,
+* query parameters,
+* form data for `application/x-www-form-urlencoded` POST requests.
+
+It combines query parameters and form fields into `mergedParams` so downstream search logic can inspect them uniformly.
+
+### Search interception
+
+Before forwarding the request upstream, the proxy calls `handle_search_logic(path, mergedParams, request)`.
+
+If this function finds a supported search endpoint and valid search term, it calls `searchTable(...)` and returns a local response.
+
+### SSE handling
+
+If the path contains `api/events`, the proxy does not use a normal buffered request. Instead, it:
+
+* opens a streaming request to the upstream server,
+* relays chunks as they arrive,
+* returns a `StreamingResponse` with SSE headers.
+
+### Normal proxying
+
+If the request is not intercepted by search logic and is not an SSE endpoint, the proxy forwards the request to the upstream server using `httpx.AsyncClient.request(...)` and returns the upstream response body and headers.
+
+### Catch-all route
+
+The route decorator handles multiple HTTP methods:
+
+* `GET`
+* `POST`
+* `PUT`
+* `DELETE`
+
+This makes the proxy generic and able to cover most Navidrome API traffic.
+
+### Search endpoint mapping
+
+The search logic uses a small mapping from path patterns to parameter names:
+
+* `rest/search3` -> `query`
+* `api/song` -> `title`
+* `api/album` -> `name`
+* `api/artist` -> `name`
+
+The proxy only performs search interception when one of these path patterns matches and a usable search term is present.
+
+## Search architecture
+
+### Search term extraction
+
+The proxy checks the relevant parameter for the endpoint, trims quotes and whitespace, and ignores empty strings.
+
+### Pagination
+
+The search helper uses different pagination rules depending on endpoint type:
+
+* For Subsonic-style `rest/search3`, it derives `start` and `end` from `songOffset` and `songCount`.
+* For JSON-style endpoints, it uses `_start` and `_end`.
+
+### Response shaping
+
+If a search result is produced, the proxy returns a local JSON payload rather than forwarding the request upstream.
+
+For `rest/search3`, the response is wrapped in a Subsonic-compatible structure:
+
+```json
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "searchResult3": {
+      "song": [ ... ]
+    }
+  }
+}
+```
+
+For other endpoints, the result is returned directly as JSON.
+
+### Result metadata
+
+The response includes:
+
+* `X-Total-Count`
+* `Access-Control-Expose-Headers: X-Total-Count`
+* `Content-Type: application/json`
+
+This allows clients to understand the total result count while consuming the custom search response.
+
+## SSE architecture
+
+### Problem addressed
+
+The code comments indicate that `/event` or `/api/events` is an SSE endpoint and needs separate treatment so streaming does not break.
+
+### Implementation
+
+The proxy:
+
+1. builds a streaming request to the upstream server,
+2. sends it with `stream=True`,
+3. yields chunks as they arrive,
+4. closes the upstream response when the stream ends or is disconnected.
+
+### SSE headers
+
+The streaming response uses headers suited for event streams:
+
+* `Content-Type: text/event-stream`
+* `Cache-Control: no-cache`
+* `Connection: keep-alive`
+* `X-Accel-Buffering: no`
+
+These headers reduce buffering and help preserve real-time delivery.
+
+## Normal proxy path
+
+When a request is not intercepted, the proxy performs a standard forward operation:
+
+* copies request headers,
+* removes `host`,
+* forwards method, path, query params, and body to `BASE_URL`.
+
+The response from upstream is returned to the client with most headers preserved, excluding hop-by-hop or body-length related headers such as:
+
+* `content-length`
+* `transfer-encoding`
+* `content-encoding`
+
+## Error and edge-case behavior
+
+### Empty or invalid search terms
+
+If the extracted search parameter is missing or empty after trimming, the proxy skips local search handling and continues with normal proxying.
+
+### Requests with `id`
+
+If the request includes an `id` parameter, search interception is skipped. This avoids overriding direct item lookups.
+
+### Client disconnects on SSE
+
+The streaming generator catches:
+
+* `httpx.ReadError`
+* `asyncio.CancelledError`
+
+This prevents the proxy from crashing when the client closes the SSE connection.
+
+## Configuration
+
+### Required environment variable
+
+* `BASE_URL`: upstream Navidrome base URL
+
+### Optional assumptions
+
+The proxy assumes the upstream server is compatible with the forwarded routes and request shapes used by Navidrome clients.
+
+## Runtime lifecycle
+
+### Startup
+
+The HTTP client is created once at module load.
+
+### Shutdown
+
+A shutdown event handler closes the shared `httpx.AsyncClient` to release connections cleanly.
+
+# Search Engine 
+
+This module provides a hybrid search system that combines:
+
+* SQLite FTS (Full-Text Search)
+* User listening history
+* External data from Navidrome APIs
+
+The goal is to return relevant, ranked, and enriched results for songs, albums, and artists.
+
+## Core Responsibilities
+
+The search engine performs the following steps:
+
+1. Normalize and sanitize user query
+2. Run FTS queries against a local database
+3. Blend ranking with listening history
+4. Fetch full metadata from Navidrome
+5. Return structured results to the proxy
+
+## Data Sources
+
+### SQLite FTS Index
+
+The module queries a table:
+
+* `song_search_index`
+
+This table supports full-text search across:
+
+* song title
+* lyrics
+* artist
+* album
+
+### Listening History
+
+The `listens` table is used to boost frequently played songs.
+
+Function:
+
+* `fetchAllFromListens()`
+
+It returns a mapping:
+
+```
+{ song_id: listen_count }
+```
+
+This is used during ranking.
+
+### Navidrome API
+
+The module fetches full entity data from Navidrome:
+
+* `/rest/getSong`
+* `/api/song/{id}`
+* `/api/artist/{id}`
+* `/api/album/{id}`
+
+### Step 1: Normalization
+
+Input query is cleaned using:
+
+* lowercase conversion
+* removal of special characters
+* collapsing repeated characters
+* trimming whitespace
+
+Function:
+
+* `normalize_text()`
+
+Example:
+
+```
+"Heeellooo!!!" → "helo"
+```
+
+### Step 2: Safe Query Construction
+
+The cleaned query is converted into an FTS-compatible prefix query:
+
+```
+safe_query = "query*"
+```
+
+This enables prefix matching in SQLite FTS.
+
+### Step 3: FTS Execution
+
+Different functions handle different entity types:
+
+* Songs: `fts_song_search`
+* Title + Lyrics: `fts_song_title_lyrics`
+* Artist: `fts_artist_search`
+* Album: `fts_album_search`
+
+Each returns rows with:
+
+* song_id
+* rank (FTS relevance score)
+* optional entity IDs
+
+## 5. Ranking Strategy
+
+### Blended Ranking Formula
+
+The system combines:
+
+* FTS rank (lower is better)
+* Listening history (higher is better)
+
+Formula:
+
+```
+score = rank - (listens * LISTEN_WEIGHT)
+```
+
+Where:
+
+* `LISTEN_WEIGHT = 5.0`
+
+This means frequently played songs are boosted significantly.
+
+### Song Ranking
+
+Function:
+
+* `_rank_songs()`
+
+Steps:
+
+1. Attach listen counts
+2. Compute blended score
+3. Sort ascending by score
+
+### Entity Ranking (Artist/Album)
+
+Function:
+
+* `_rank_entities()`
+
+Steps:
+
+1. Group by entity ID
+2. Aggregate multiple song hits
+3. Keep best score per entity
+4. Track number of hits
+5. Sort by:
+
+   * score (ascending)
+   * hits (descending)
+
+This ensures both relevance and coverage.
+
+## 6. Pagination
+
+After ranking, results are sliced:
+
+```
+results[start:end]
+```
+
+Defaults:
+
+* start = 0
+* end = 15
+
+## 7. Data Enrichment Layer
+
+FTS only returns IDs. The module enriches results by calling Navidrome APIs.
+
+### Song Fetching
+
+Function:
+
+* `fetchAll()`
+
+Supports two modes:
+
+* Subsonic (`/rest/getSong`)
+* JSON API (`/api/song/{id}`)
+
+### Artist Fetching
+
+Function:
+
+* `fetchAllArtists()`
+
+### Album Fetching
+
+Function:
+
+* `fetchAllAlbums()`
+
+All fetch operations are:
+
+* asynchronous
+* parallelized using `asyncio.gather`
+
+
+## 9. Search Modes
+
+The main entry point is:
+
+* `searchTable(request, query, start, end, type)`
+
+Supported types:
+
+* `global` → general song search (Subsonic compatible)
+* `song` → title + lyrics
+* `artist` → artist-based grouping
+* `album` → album-based grouping
+* custom → field-specific search
+
+## 10. Concurrency Model
+
+* Uses `httpx.AsyncClient`
+* Executes multiple API calls in parallel
+* Improves latency when fetching multiple entities
+
+## 11. Design Decisions
+
+### Global history instead of per-user
+
+The system intentionally uses shared listening history across all users.
+(i just didnt want to mess with multiple users)
+Rationale:
+
+* simplifies architecture
+* improves collective ranking
+* avoids user-state complexity
+
+### Prefix-based FTS
+
+Using `query*` allows partial matching and improves usability.
+
+### Rank blending
+
+Combining FTS + listens gives better real-world relevance than pure text matching.
+
+
 ## Data Flow
 ```
 Navidrome API → library.py → songlist.db (library table)

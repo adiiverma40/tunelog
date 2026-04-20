@@ -9,6 +9,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./backend/logs:/app/logs
+      - ./config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
       - FORCE_COLOR=1
@@ -17,6 +18,7 @@ services:
       - .env
     ports:
       - "8000:8000"
+      - "4534:4534"
 
   frontend:
     build:
@@ -24,6 +26,8 @@ services:
     container_name: tunelog-frontend
     restart: always 
     tty: true
+    environment:
+      VITE_ALLOWED_HOSTS: tunelog.${MY_DOMAIN}
     ports:
       - "5173:5173"
     env_file:

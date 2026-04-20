@@ -62,21 +62,17 @@ import os
 import sys
 import json
 from loguru import logger
-
-
-
-
+from state import notification_status , tune_config
 
 console = Console()
 
 
-
-LOG_MAX_SIZE      = os.getenv("LOG_MAX_SIZE", "10 MB")
-LOG_RETENTION     = os.getenv("LOG_RETENTION_DAYS", "7 days")
-LOG_LEVEL         = os.getenv("LOG_LEVEL", "DEBUG").upper()
+LOG_MAX_SIZE = os.getenv("LOG_MAX_SIZE", "10 MB")
+LOG_RETENTION = os.getenv("LOG_RETENTION_DAYS", "7 days")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
 
 LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
-MAIN_LOG_FILE     = os.path.join(LOG_DIR, "main.log")
+MAIN_LOG_FILE = os.path.join(LOG_DIR, "main.log")
 PLAYLIST_LOG_FILE = os.path.join(LOG_DIR, "playlist.jsonl")
 
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -137,17 +133,27 @@ def push_star(song, signal):
         return
 
     totalListens = len(rows)
-    if totalListens < 3:
+    minListen = tune_config['behavioral_scoring']["min_listens_for_star"]
+    if totalListens < minListen:
         console.print(
-            f"[dim]push star: {song['title']} needs at least 3 listens (has {totalListens})[/dim]"
+            f"[dim]push star: {song['title']} needs at least {minListen} listens (has {totalListens})[/dim]"
         )
+        notification_status.starredSong.append(
+            {
+                "username": user_id,
+                "song": song["title"],
+                "star": f"needs more listen, currently {totalListens}",
+            }
+        )
+
         return
 
     totalWeight = 0
     rowSongScore = 0
-
+    decay = tune_config['behavioral_scoring']['historical_decay_factor']
     for i, row in enumerate(rows):
-        weightage = 0.9**i
+        
+        weightage = decay**i
         rowSignal = row["signal"]
         rating = star_map.get(rowSignal, 0)
 
@@ -237,6 +243,9 @@ def push_star(song, signal):
         console.print(
             f"[bold green]STAR:[/bold green] {user_id} | {song['title']} → {final_rating} stars"
         )
+        notification_status.starredSong.append(
+            {"username": user_id, "song": song["title"], "star": final_rating}
+        )
     except requests.Timeout:
         console.print(
             f"[bold red]push_star: Timeout reaching Navidrome for {user_id}[/bold red]"
@@ -319,9 +328,9 @@ def UpdateDBgenre(data, connLib=None):
     }
 
 
-# setup logger  
 
 _initialized = False
+
 
 def setup_logger():
     global _initialized
@@ -331,6 +340,7 @@ def setup_logger():
 
     logger.remove()
     _setup_sinks()
+
 
 def _setup_sinks():
     logger.add(
@@ -354,11 +364,11 @@ def _setup_sinks():
 
     def _jsonl_format(record):
         entry = {
-            "time":    record["time"].isoformat(),
-            "level":   record["level"].name,
-            "source":  "playlist",
+            "time": record["time"].isoformat(),
+            "level": record["level"].name,
+            "source": "playlist",
             "message": record["message"],
-            **{k: v for k, v in record["extra"].items() if k != "source"}
+            **{k: v for k, v in record["extra"].items() if k != "source"},
         }
         record["extra"]["raw_json"] = json.dumps(entry)
         return "{extra[raw_json]}\n"
@@ -374,18 +384,19 @@ def _setup_sinks():
         filter=lambda r: r["extra"].get("source") == "playlist",
     )
 
-_main_logger     = logger.bind(source="main")
+
+_main_logger = logger.bind(source="main")
 _playlist_logger = logger.bind(source="playlist")
 
+
 def log(level: str, message: str, source: str = "main", **kwargs):
-    """Base logging function."""
+
     target = _playlist_logger if source == "playlist" else _main_logger
     if kwargs:
         target = target.bind(**kwargs)
     getattr(target, level.lower())(message)
 
 
-# playlist logging helpers
 
 def log_scores(user_id, scores, signal_contributions, titles):
     for song_id, data in scores.items():
@@ -404,6 +415,7 @@ def log_scores(user_id, scores, signal_contributions, titles):
             signal_breakdown=signal_contributions.get(song_id, {}),
         )
 
+
 def log_slot(user_id, song_id, title, score, slot, accepted, reason):
     status = "ACCEPTED" if accepted else "REJECTED"
     log(
@@ -420,6 +432,7 @@ def log_slot(user_id, song_id, title, score, slot, accepted, reason):
         reason=reason,
     )
 
+
 def log_wildcard(user_id, wildcards, selected):
     log(
         "debug",
@@ -430,6 +443,7 @@ def log_wildcard(user_id, wildcards, selected):
         pool_size=len(wildcards),
         selected_count=len(selected),
     )
+
 
 def log_genre_injection(user_id, genre_distribution, adjusted_size, selected):
     top_genres = genre_distribution[:5]
@@ -444,6 +458,7 @@ def log_genre_injection(user_id, genre_distribution, adjusted_size, selected):
         top_genres=top_genres,
     )
 
+
 def log_pool(user_id, method, song_id, title, signal):
     log(
         "debug",
@@ -457,6 +472,7 @@ def log_pool(user_id, method, song_id, title, signal):
         signal=signal,
     )
 
+
 def log_summary(user_id, size, counts):
     log(
         "info",
@@ -467,3 +483,28 @@ def log_summary(user_id, size, counts):
         total=size,
         distribution=counts,
     )
+
+
+def crossCheckDatabase(data):
+    console.print("[bold blue]Updating song metadata in batch...")
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            UPDATE listens
+            SET title = ?, 
+                artist = ?, 
+                album = ?,
+                genre = ? 
+            WHERE song_id = ?
+        """,
+            data,
+        )
+        conn.commit()
+        console.print(f"[bold green]Successfully updated {cursor.rowcount} rows.")
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[bold red]Update failed: {e}")
+    finally:
+        conn.close()

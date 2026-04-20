@@ -8,3 +8,5 @@ uvicorn==0.42.0
 python-multipart
 rich
 loguru
+asyncio
+httpx

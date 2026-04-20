@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -11,6 +13,7 @@ import {
   PlaylistStats,
   fetchLogin,
   appendPlaylist,
+  fetchGetConfig,
 } from "../API/API";
 import { useNavigate } from "react-router";
 
@@ -48,13 +51,15 @@ const SIGNAL_ORDER: (keyof SlotValues)[] = [
   "partial",
   "skip",
 ];
-const PRESETS: Preset[] = [
+
+// Replaced "balanced" with a "default" preset that we will update dynamically
+const INITIAL_PRESETS: Preset[] = [
   {
-    id: "balanced",
-    label: "Balanced",
-    desc: "Default mix — equal weight on liked and unheard",
+    id: "default",
+    label: "Default Config",
+    desc: "Uses your saved global backend settings",
     slots: { positive: 0.35, repeat: 0.35, partial: 0.25, skip: 0.05 },
-    weights: { repeat: 3, positive: 2, partial: 1, skip: -2 },
+    weights: { repeat: 3, positive: 2, partial: 0, skip: -2 },
   },
   {
     id: "discovery",
@@ -75,27 +80,22 @@ const PRESETS: Preset[] = [
     label: "Custom",
     desc: "Set your own slot ratios and signal weights",
     slots: { positive: 0.35, repeat: 0.35, partial: 0.25, skip: 0.05 },
-    weights: { repeat: 3, positive: 2, partial: 1, skip: -2 },
+    weights: { repeat: 3, positive: 2, partial: 0, skip: -2 },
   },
 ];
 
 const SIGNAL_STYLE: Record<string, string> = {
-  positive:
-    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  repeat:
-    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  partial:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+  positive: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  repeat: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  partial: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
   skip: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   unheard: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
 };
 
 const EXPLICIT_STYLE: Record<string, string> = {
   explicit: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
-  cleaned:
-    "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400",
-  notExplicit:
-    "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+  cleaned: "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400",
+  notExplicit: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
   notInItunes: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
@@ -159,9 +159,7 @@ function SliderRow({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span
-        className={`w-16 text-xs font-medium ${color} flex-shrink-0 capitalize`}
-      >
+      <span className={`w-16 text-xs font-medium ${color} flex-shrink-0 capitalize`}>
         {label}
       </span>
       <input
@@ -184,8 +182,7 @@ export default function Playlist() {
   const [users, setUsers] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState("");
   const [playlistSize, setPlaylistSize] = useState(40);
-  const [explicitFilter, setExplicitFilter] =
-    useState<ExplicitFilter>("allow_cleaned");
+  const [explicitFilter, setExplicitFilter] = useState<ExplicitFilter>("allow_cleaned");
   const [genreInjection, setGenreInjection] = useState(true);
   const [syncMode, setSyncMode] = useState<SyncMode>("regenerate");
   const [sortKey, setSortKey] = useState<SortKey>("artist");
@@ -199,22 +196,23 @@ export default function Playlist() {
   const [showCleaned, setShowCleaned] = useState(true);
   const [showClean, setShowClean] = useState(true);
 
-  const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
-  const [customSlots, setCustomSlots] = useState<SlotValues>(PRESETS[3].slots);
-  const [customWeights, setCustomWeights] = useState<WeightValues>(
-    PRESETS[3].weights,
-  );
+  // Use state for presets so we can dynamically update the default one
+  const [presets, setPresets] = useState<Preset[]>(INITIAL_PRESETS);
+  const [selectedPreset, setSelectedPreset] = useState<string>("default");
+  
+  const [customSlots, setCustomSlots] = useState<SlotValues>(INITIAL_PRESETS[3].slots);
+  const [customWeights, setCustomWeights] = useState<WeightValues>(INITIAL_PRESETS[3].weights);
 
   const navigate = useNavigate();
 
   const activeSlots =
     selectedPreset === "custom"
       ? customSlots
-      : PRESETS.find((p) => p.id === selectedPreset)!.slots;
+      : presets.find((p) => p.id === selectedPreset)!.slots;
   const activeWeights =
     selectedPreset === "custom"
       ? customWeights
-      : PRESETS.find((p) => p.id === selectedPreset)!.weights;
+      : presets.find((p) => p.id === selectedPreset)!.weights;
 
   const normaliseSlots = (updated: SlotValues): SlotValues => {
     const total = Object.values(updated).reduce((a, b) => a + b, 0);
@@ -227,6 +225,42 @@ export default function Playlist() {
     };
   };
 
+  // --- FETCH CONFIGURATION ON MOUNT ---
+  useEffect(() => {
+    fetchGetConfig()
+      .then((cfg) => {
+        setPlaylistSize(cfg.playlist_generation.playlist_size);
+        
+        const fetchedSlots = {
+          positive: cfg.playlist_generation.slot_ratios.positive,
+          repeat: cfg.playlist_generation.slot_ratios.repeat,
+          partial: cfg.playlist_generation.slot_ratios.partial,
+          skip: cfg.playlist_generation.slot_ratios.skip,
+        };
+        const fetchedWeights = {
+          positive: cfg.playlist_generation.signal_weights.positive,
+          repeat: cfg.playlist_generation.signal_weights.repeat,
+          partial: cfg.playlist_generation.signal_weights.partial,
+          skip: cfg.playlist_generation.signal_weights.skip,
+        };
+
+        // Update the "default" preset to match the global config exactly
+        setPresets((prev) =>
+          prev.map((p) =>
+            p.id === "default"
+              ? { ...p, slots: fetchedSlots, weights: fetchedWeights }
+              : p
+          )
+        );
+
+        // Pre-fill custom slots so if they switch to custom, they start from the global defaults
+        setCustomSlots(fetchedSlots);
+        setCustomWeights(fetchedWeights);
+      })
+      .catch((err) => console.error("Failed to load global config:", err));
+  }, []);
+
+  // --- EXISTING AUTH & USER FETCHING ---
   useEffect(() => {
     const token =
       localStorage.getItem("tunelog_token") ||
@@ -410,7 +444,7 @@ export default function Playlist() {
           </p>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
-            {PRESETS.map((p) => (
+            {presets.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setSelectedPreset(p.id)}

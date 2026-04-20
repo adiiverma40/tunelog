@@ -74,7 +74,7 @@ async function handleAutoMatch() {
   setAutoMsg("");
   try {
     const res = await autoMatchGenres();
-    const updated = res["genre Updated"] ?? 0;
+    const updated = res["genre_updated"] ?? 0;
 
     const dbRes: GenreListResponse = await fetchGenresFromDb();
     const alreadyMapped = new Set(

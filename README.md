@@ -146,12 +146,9 @@ Tags.Artist.Aliases = ["artist", "artists"]
 ## Notice 
 - My script will almost certainly fail if you listen song in speed up or down (1.5x) as my script will think you partially completed the song when you have completed it already
 
-## Navidrome Jam/Spotify jam
-- use navidrome as backend
-- use my proxy layer as radio broadcaster
-- use my dashboard for adding and deleting queues for the jam
-- use my dashboard for play pause skip
-- basic idea: a host starts navidrome and my tunelog, users joing using the tunelog proxy,host starts a radio , users can add and delete queues , skip play and pause
+## Navidrome Jam/Spotify jam 
+- Refer to ISSUE #9 for updates
+
 
 ## FUTURE PLANS
 - Navidrome Jam(currently working)

@@ -67,7 +67,7 @@ from db import (
 )
 from itunesFuzzy import useFallBackMethods
 import library
-from library import normalise_genre, normalise_artist
+from library import normalise_genre, normalise_artist , sync_library
 from watcher import start_sse
 from misc import push_star
 import uvicorn
@@ -391,6 +391,10 @@ def main():
             event = event_queue.get(timeout=2)
             if event == "nowPlaying":
                 Watcher()
+            elif event == "librarySync":
+                sync_library()
+                console.print("[bold blue]Tunelog library Sync -- done")
+                
         except Exception as e:
             if "Empty" not in str(type(e).__name__):
                 print(f"[ERROR] main loop: {e}")

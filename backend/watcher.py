@@ -3,13 +3,17 @@
 import requests
 from config import Navidrome_url, login, event_queue
 from rich.console import Console
-from state import status_registry
+from state import status_registry , tune_config
 import time
+import json
+
 
 console = Console()
 
+autoSync = tune_config["sync_and_automation"].get("auto_sync_after_navidrome" , False )
 
 def start_sse():
+    isScanning = False
     while True:
         response = None
         try:
@@ -34,10 +38,30 @@ def start_sse():
                     event_type = line.split(":", 1)[1].strip()
 
                 elif line.startswith("data:"):
+                    data = line.split(":", 1)[1].strip()  
                     status_registry.update("SSE", status="running")
+                    # print("event type : " , event_type , "data : " , data)
+                    
                     if event_type == "nowPlayingCount":
                         event_queue.put("nowPlaying")
-
+                    
+                    
+                    elif event_type == "scanStatus":
+                        try:
+                            parsed= json.loads(data)
+                            scanningNow = parsed.get("scanning", False)
+                            if isScanning  and not scanningNow :
+                                console.print("[bold cyan]Scan Finnished")
+                                if autoSync:
+                                    console.print("[bold cyan]Starting Tunelog Sync")
+                                    event_queue.put("librarySync")
+                                
+                            if not isScanning and scanningNow : 
+                                console.print("[bold cyan]Starting Library Sync in Navidrome")
+                            
+                            isScanning = scanningNow 
+                        except Exception as e :
+                            console.print("[bold red]Failed to parse data" , data)
         except (
             requests.exceptions.ReadTimeout,
             requests.exceptions.ConnectionError,

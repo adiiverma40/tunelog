@@ -4,6 +4,7 @@ import asyncio
 import json
 from rich.console import Console
 import os
+
 console = Console()
 
 
@@ -66,10 +67,12 @@ class SyncState:
 
 _subscribers: list[tuple[asyncio.Queue, asyncio.AbstractEventLoop]] = []
 
+
 def broadcast(field: str, data: list):
     payload = json.dumps({field: data})
     for q, loop in _subscribers:
         loop.call_soon_threadsafe(q.put_nowait, payload)
+
 
 class _ReactiveList(list):
     def __init__(self, field_name: str):
@@ -79,17 +82,19 @@ class _ReactiveList(list):
     def append(self, item):
         super().append(item)
         broadcast(self._field, list(self))
+
+
 class NotificationStatus:
     # print("function called")
     def __init__(self):
-        self.songState   = _ReactiveList("songState")
-        self.playlist    = _ReactiveList("playlist")
+        self.songState = _ReactiveList("songState")
+        self.playlist = _ReactiveList("playlist")
         self.starredSong = _ReactiveList("starredSong")
+
 
 notification_status = NotificationStatus()
 
 app_state = SyncState()
-
 
 
 # ALL VARIABLES
@@ -102,23 +107,14 @@ DEFAULT_CONFIG = {
     "playlist_generation": {
         "playlist_size": 40,
         "wildcard_day": 60,
-        "signal_weights": {
-            "repeat": 3,
-            "positive": 2,
-            "partial": 0,
-            "skip": -2
-        },
+        "signal_weights": {"repeat": 3, "positive": 2, "partial": 0, "skip": -2},
         "slot_ratios": {
             "positive": 0.35,
             "repeat": 0.35,
             "partial": 0.25,
-            "skip": 0.05
+            "skip": 0.05,
         },
-        "injection_breakdown": {
-            "signal": 0.57,
-            "unheard": 0.35,
-            "wildcard": 0.08
-        }
+        "injection_breakdown": {"signal": 0.57, "unheard": 0.35, "wildcard": 0.08},
     },
     "behavioral_scoring": {
         "skip_threshold_pct": 30,
@@ -131,7 +127,8 @@ DEFAULT_CONFIG = {
     "sync_and_automation": {
         "auto_sync_hour": 2,
         "timezone": "Asia/Kolkata",
-        "use_itunes_fallback": False
+        "use_itunes_fallback": False,
+        "auto_sync_after_navidrome": True,   ## for auto syncing after navidrome sync library
     },
     "api_and_performance": {
         "max_fuzzy_iterations": 500,
@@ -142,33 +139,35 @@ DEFAULT_CONFIG = {
             "min_match_score": 70,
             "metadata_overwrite_score": 80,
             "genre_map_strictness": 95,
-            "duration_tolerance_pct": 10
-        }
-    }
+            "duration_tolerance_pct": 10,
+        },
+    },
 }
 
 config_lock = threading.Lock()
 
+
 def save_config(new_config_data):
     global tune_config
     # print("in save config")
-    
+
     with config_lock:
         try:
             with open(CONFIG_FILE_PATH, "w") as file:
                 json.dump(new_config_data, file, indent=4)
                 # print("writing new config" ,  new_config_data)
-            
+
             tune_config.clear()
             tune_config.update(new_config_data)
-            
+
             console.print("[bold green]Configuration saved successfully.[/bold green]")
             return True, "Success"
-            
+
         except Exception as e:
             error_msg = f"Failed to save config: {e}"
             console.print(f"[bold red]{error_msg}[/bold red]")
             return False, error_msg
+
 
 def _write_default_config(data):
     try:
@@ -178,20 +177,26 @@ def _write_default_config(data):
     except OSError as e:
         console.print(f"[bold red]Failed to write default config.json:[/bold red] {e}")
 
+
 def load_config():
     try:
         with open(CONFIG_FILE_PATH, "r") as file:
             data = json.load(file)
             return data
-            
+
     except FileNotFoundError:
-        console.print("[yellow]config.json missing. Creating fresh default file.[/yellow]")
+        console.print(
+            "[yellow]config.json missing. Creating fresh default file.[/yellow]"
+        )
         _write_default_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
-        
+
     except json.JSONDecodeError as e:
-        console.print(f"[bold red]config.json is corrupted:[/bold red] {e}. Resetting to defaults.")
+        console.print(
+            f"[bold red]config.json is corrupted:[/bold red] {e}. Resetting to defaults."
+        )
         _write_default_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
+
 
 tune_config = load_config()

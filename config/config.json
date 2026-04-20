@@ -31,7 +31,8 @@
     "sync_and_automation": {
         "auto_sync_hour": 2,
         "timezone": "Asia/Kolkata",
-        "use_itunes_fallback": false
+        "use_itunes_fallback": false,
+        "auto_sync_after_navidrome": true
     },
     "api_and_performance": {
         "max_fuzzy_iterations": 500,

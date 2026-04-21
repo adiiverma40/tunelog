@@ -1,11 +1,9 @@
 import ComponentCard from "../../common/ComponentCard";
 import { useDropzone } from "react-dropzone";
-// import Dropzone from "react-dropzone";
 
 const DropzoneComponent: React.FC = () => {
   const onDrop = (acceptedFiles: File[]) => {
     console.log("Files dropped:", acceptedFiles);
-    // Handle file uploads here
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -31,11 +29,9 @@ const DropzoneComponent: React.FC = () => {
       `}
           id="demo-upload"
         >
-          {/* Hidden Input */}
           <input {...getInputProps()} />
 
           <div className="dz-message flex flex-col items-center m-0!">
-            {/* Icon Container */}
             <div className="mb-[22px] flex justify-center">
               <div className="flex h-[68px] w-[68px]  items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
                 <svg
@@ -54,7 +50,6 @@ const DropzoneComponent: React.FC = () => {
               </div>
             </div>
 
-            {/* Text Content */}
             <h4 className="mb-3 font-semibold text-gray-800 text-theme-xl dark:text-white/90">
               {isDragActive ? "Drop Files Here" : "Drag & Drop Files Here"}
             </h4>

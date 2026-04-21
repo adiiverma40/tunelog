@@ -52,7 +52,6 @@ const SIGNAL_ORDER: (keyof SlotValues)[] = [
   "skip",
 ];
 
-// Replaced "balanced" with a "default" preset that we will update dynamically
 const INITIAL_PRESETS: Preset[] = [
   {
     id: "default",
@@ -196,7 +195,6 @@ export default function Playlist() {
   const [showCleaned, setShowCleaned] = useState(true);
   const [showClean, setShowClean] = useState(true);
 
-  // Use state for presets so we can dynamically update the default one
   const [presets, setPresets] = useState<Preset[]>(INITIAL_PRESETS);
   const [selectedPreset, setSelectedPreset] = useState<string>("default");
   
@@ -225,7 +223,6 @@ export default function Playlist() {
     };
   };
 
-  // --- FETCH CONFIGURATION ON MOUNT ---
   useEffect(() => {
     fetchGetConfig()
       .then((cfg) => {
@@ -244,7 +241,6 @@ export default function Playlist() {
           skip: cfg.playlist_generation.signal_weights.skip,
         };
 
-        // Update the "default" preset to match the global config exactly
         setPresets((prev) =>
           prev.map((p) =>
             p.id === "default"
@@ -252,15 +248,12 @@ export default function Playlist() {
               : p
           )
         );
-
-        // Pre-fill custom slots so if they switch to custom, they start from the global defaults
         setCustomSlots(fetchedSlots);
         setCustomWeights(fetchedWeights);
       })
       .catch((err) => console.error("Failed to load global config:", err));
   }, []);
 
-  // --- EXISTING AUTH & USER FETCHING ---
   useEffect(() => {
     const token =
       localStorage.getItem("tunelog_token") ||

@@ -8,7 +8,6 @@ import {
   hasUnread,
   type StoredSongState,
 } from "../../hooks/Usenotificationstream";
-// import { readNotifications } from "../../hooks/Usenotificationstream";
 const formatTime = (iso: string) => {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;

@@ -16,6 +16,8 @@ import Notifications from "./pages/notification";
 import Config from "./pages/config";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
+import JamUsers from "./pages/Jam/JamUsers";
+
 import { fetchLogin, fetchGetUsers } from "./API/API";
 
 import { useNotificationStream } from "./hooks/Usenotificationstream";
@@ -71,6 +73,7 @@ export default function App() {
           <Route path="/nowplaying" element={<NowPlaying />} />
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/jamuser" element={<JamUsers />} />
         </Route>
 
         <Route path="/signin" element={<SignIn />} />

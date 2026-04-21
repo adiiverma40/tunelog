@@ -105,7 +105,6 @@ function normalizeQueuePayload(payload: any): Track[] {
   return [];
 }
 
-// ── Shared track card UI (used by both sortable row and drag overlay) ─────────
 function TrackCard({
   track,
   index,
@@ -169,7 +168,6 @@ function TrackCard({
   );
 }
 
-// ── Sortable wrapper — one row in the queue ───────────────────────────────────
 function SortableTrackRow({
   track,
   index,
@@ -206,7 +204,6 @@ function SortableTrackRow({
   );
 }
 
-// ── Plain TrackRow for search / playlist panels ───────────────────────────────
 function TrackRow({
   track,
   index,
@@ -282,12 +279,9 @@ export default function Queue() {
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [playlistTracksLoading, setPlaylistTracksLoading] = useState(false);
 
-  // Require pointer to move 8px before drag starts — prevents accidental drags on click
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
-
-  // ── Socket queue ───────────────────────────────────────────────────────────
   useEffect(() => {
     const onQueueUpdate = (payload: any) =>
       setQueue(normalizeQueuePayload(payload));
@@ -298,7 +292,6 @@ export default function Queue() {
     };
   }, [socket]);
 
-  // ── dnd-kit handlers ───────────────────────────────────────────────────────
   function handleDragStart(event: DragStartEvent) {
     const track = queue.find((t) => t.id === event.active.id);
     setDraggingTrack(track ?? null);
@@ -314,7 +307,7 @@ export default function Queue() {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const reordered = arrayMove(queue, oldIndex, newIndex);
-    setQueue(reordered); // optimistic local update
+    setQueue(reordered); 
 
     socket.emit(
       "reorder_queue",
@@ -328,7 +321,6 @@ export default function Queue() {
     );
   }
 
-  // ── Playlists ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchPlaylists() {
       setPlaylistsLoading(true);
@@ -400,7 +392,6 @@ export default function Queue() {
     });
   }
 
-  // ── Library search (debounced) ─────────────────────────────────────────────
   useEffect(() => {
     if (!librarySearch.trim()) {
       setSearchResults([]);
@@ -434,7 +425,6 @@ export default function Queue() {
     return () => clearTimeout(timer);
   }, [librarySearch]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div>
       <PageMeta
@@ -444,7 +434,6 @@ export default function Queue() {
       <PageBreadcrumb pageTitle="Queue" />
 
       <div className="grid grid-cols-12 gap-4 md:gap-6">
-        {/* Queue panel */}
         <div className="col-span-12 lg:col-span-4">
           <div
             className={`flex flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${CARD_HEIGHT}`}
@@ -493,7 +482,6 @@ export default function Queue() {
                     ))}
                   </SortableContext>
 
-                  {/* Floating ghost that follows the cursor while dragging */}
                   <DragOverlay>
                     {draggingTrack && <TrackCard track={draggingTrack} ghost />}
                   </DragOverlay>
@@ -502,10 +490,7 @@ export default function Queue() {
             </div>
           </div>
         </div>
-
-        {/* Right panels */}
         <div className="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:col-span-8">
-          {/* Library search */}
           <div
             className={`flex flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${CARD_HEIGHT}`}
           >
@@ -551,7 +536,6 @@ export default function Queue() {
             </div>
           </div>
 
-          {/* Playlists */}
           <div
             className={`flex flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${CARD_HEIGHT}`}
           >

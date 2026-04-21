@@ -19,6 +19,23 @@ export function disconnectSocket() {
 }
 
 
+
+export interface UpdateProfileRequest {
+  username: string;
+  displayName: string;
+  avatar?: File | null; 
+}
+
+export interface UpdateProfileResponse {
+  status: string;
+  message: string;
+  user?: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
 export interface Stats {
   total_songs: number;
   total_listens: number;
@@ -107,6 +124,8 @@ export interface User {
   username: string;
   password: string;
   isAdmin: boolean;
+  name : string;
+  avatarUrl : string | null; 
 }
 
 export interface GetUsersResponse {
@@ -699,4 +718,27 @@ export async function fetchUpdateConfig(
   });
   if (!res.ok) throw new Error("Failed to update configuration");
   return res.json();
+}
+
+
+
+export async function fetchUpdateProfile(
+  data: UpdateProfileRequest
+): Promise<UpdateProfileResponse> {
+  const formData = new FormData();
+  formData.append("username", data.username);
+  formData.append("displayName", data.displayName);
+  if (data.avatar) {
+    formData.append("avatar", data.avatar);
+  }
+  const response = await fetch(`${BASE_URL}/api/user/profile/update`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update profile: ${response.statusText}`);
+  }
+  const result: UpdateProfileResponse = await response.json();
+  return result;
 }

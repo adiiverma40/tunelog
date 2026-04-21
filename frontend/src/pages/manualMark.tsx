@@ -194,7 +194,6 @@ export default function ManualMarking() {
     </button>
   );
 
-  // stat counts
   const total = songs.length;
   const stillManual = songs.filter(
     (s) => !s.explicit || s.explicit === "manual",

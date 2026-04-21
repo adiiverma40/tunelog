@@ -158,7 +158,6 @@ const mapStateToApi = (state: Config): TuneConfig => ({
     auto_sync_hour: state.sync_hour,
     timezone: state.timezone,
     use_itunes_fallback: state.itunes_fallback,
-    // auto_sync_after_navidrome: ,
     auto_sync_after_navidrome: state.auto_sync_after_navidrome,
   },
   api_and_performance: {

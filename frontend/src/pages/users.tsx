@@ -1,4 +1,3 @@
-
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { useState, useEffect } from "react";
@@ -10,6 +9,8 @@ import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Switch from "../components/form/switch/Switch";
 import UserMetaCard from "../components/UserProfile/UserMetaCard";
+
+const USERS_CACHE_KEY = "tunelog_users_cache";
 
 export default function UserProfiles() {
   const [users, setUsers] = useState<User[]>([]);
@@ -27,21 +28,72 @@ export default function UserProfiles() {
     const storage = localStorage.getItem("tunelog_user")
       ? localStorage
       : sessionStorage;
+
     return {
       admin: storage.getItem("tunelog_user") ?? "",
       adminPD: storage.getItem("tunelog_password") ?? "",
     };
   };
 
+  const syncUsersToStorage = (userList: User[]) => {
+    try {
+      localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(userList));
+
+      userList.forEach((user) => {
+        const displayNameKey = `tunelog_displayname_${user.username}`;
+        const avatarKey = `tunelog_avatar_${user.username}`;
+
+        if (user.name) {
+          localStorage.setItem(displayNameKey, user.name);
+        } else {
+          localStorage.removeItem(displayNameKey);
+        }
+
+        if (user.avatarUrl) {
+          localStorage.setItem(avatarKey, user.avatarUrl);
+        } else {
+          localStorage.removeItem(avatarKey);
+        }
+      });
+    } catch (err) {
+      console.error("Failed to sync users to localStorage", err);
+    }
+  };
+
+  const loadCachedUsers = () => {
+    try {
+      const cached = localStorage.getItem(USERS_CACHE_KEY);
+      if (!cached) return false;
+
+      const parsed = JSON.parse(cached) as User[];
+      if (Array.isArray(parsed)) {
+        setUsers(parsed);
+        return true;
+      }
+    } catch (err) {
+      console.error("Failed to read cached users", err);
+    }
+    return false;
+  };
+
   const loadUsers = () => {
     setLoading(true);
     const { admin, adminPD } = getAdminCredentials();
-    fetchGetUsers({ admin, adminPD }).then((data) => {
-      if (data.status === "ok" && data.users) {
-        setUsers(data.users);
-      }
-      setLoading(false);
-    });
+
+    fetchGetUsers({ admin, adminPD })
+      .then((data) => {
+        if (data.status === "ok" && data.users) {
+          const userList: User[] = data.users;
+          setUsers(userList);
+          syncUsersToStorage(userList);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load users", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const handleCreateUser = () => {
@@ -51,7 +103,7 @@ export default function UserProfiles() {
     }
 
     const { admin, adminPD } = getAdminCredentials();
-    
+
     fetchCreateUser({
       name,
       username,
@@ -60,7 +112,7 @@ export default function UserProfiles() {
       admin,
       adminPD,
       email: "",
-      isUpdate : toggleUpdateUser
+      isUpdate: toggleUpdateUser,
     }).then((data) => {
       if (data.status === "success") {
         setCreateError("");
@@ -68,18 +120,22 @@ export default function UserProfiles() {
         setUsername("");
         setPassword("");
         setToggleIsAdmin(false);
-        setToggleUpdateUser(false)
+        setToggleUpdateUser(false);
         closeModal();
         loadUsers();
       } else {
         setCreateError(data.reason ?? "Failed to create user");
-        console.log("Is Update : " , toggleUpdateUser)
       }
     });
   };
 
   useEffect(() => {
+    const hasCached = loadCachedUsers();
     loadUsers();
+
+    if (!hasCached) {
+      setLoading(true);
+    }
   }, []);
 
   return (
@@ -88,7 +144,6 @@ export default function UserProfiles() {
       <PageBreadcrumb pageTitle="Users" />
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-        {/* Header row */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -100,6 +155,7 @@ export default function UserProfiles() {
                 : `${users.length} user${users.length !== 1 ? "s" : ""} registered`}
             </p>
           </div>
+
           <Button variant="outline" size="sm" onClick={openModal}>
             + Add User
           </Button>
@@ -107,10 +163,8 @@ export default function UserProfiles() {
 
         <hr className="border-gray-100 dark:border-gray-800 mb-6" />
 
-        {/* User list */}
         <div className="space-y-4">
           {loading ? (
-            // Skeleton loader
             Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
@@ -129,7 +183,6 @@ export default function UserProfiles() {
         </div>
       </div>
 
-      {/* Create user modal */}
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[700px] m-4">
         <div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">
           <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">

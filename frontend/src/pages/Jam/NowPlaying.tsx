@@ -43,7 +43,6 @@ export default function NowPlaying() {
   } = usePlayer();
 
   const { socket, isConnected, activeHost } = useGlobalSocket();
-  // console.log(track?.coverArt)
   const [loading, setLoading] = useState(false);
   const [isHost, setIsHost] = useState(
     localStorage.getItem("isHost") === "true",

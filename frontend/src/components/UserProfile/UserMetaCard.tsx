@@ -1,11 +1,7 @@
-
-import { useState , useEffect} from "react";
-import { User , fetchUserData, UserDataResponse } from "../../API/API";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-
-
-
+import { User, fetchUserData, UserDataResponse } from "../../API/API";
 
 interface Props {
   user: User;
@@ -40,10 +36,11 @@ const SIGNAL_CONFIG = [
     bg: "bg-yellow-500/10",
     border: "border-yellow-500/20",
   },
-];
+] as const;
 
 export default function UserMetaCard({ user }: Props) {
   const [stats, setStats] = useState<UserDataResponse | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
   const navigate = useNavigate();
 
   const formatDate = (dateString: string | undefined) => {
@@ -61,22 +58,35 @@ export default function UserMetaCard({ user }: Props) {
   };
 
   useEffect(() => {
-  
+    let alive = true;
+
+    setLoadingStats(true);
+    setStats(null);
+
     fetchUserData(user.username, user.password)
       .then((data) => {
+        if (!alive) return;
+
         if (data.status === "ok") {
           setStats(data);
         }
       })
-      .catch((err) => console.error("Failed to load user stats", err));
-  }, [user.username, user.password]); 
+      .catch((err) => console.error("Failed to load user stats", err))
+      .finally(() => {
+        if (alive) setLoadingStats(false);
+      });
 
-  const PLACEHOLDER_STATS = {
-    totalListens: stats?.totalListens,
-    skips: stats?.skips,
-    repeat: stats?.repeat,
-    complete: stats?.complete,
-    partial: stats?.partial,
+    return () => {
+      alive = false;
+    };
+  }, [user.username, user.password]);
+
+  const placeholderStats = {
+    totalListens: stats?.totalListens ?? 0,
+    skips: stats?.skips ?? 0,
+    repeat: stats?.repeat ?? 0,
+    complete: stats?.complete ?? 0,
+    partial: stats?.partial ?? 0,
     lastLogged: formatDate(stats?.lastLogged),
   };
 
@@ -86,8 +96,17 @@ export default function UserMetaCard({ user }: Props) {
     });
   };
 
-  
-  const avatarColor = () => {
+  const getAvatarContent = () => {
+    if (user.avatarUrl) {
+      return (
+        <img
+          src={user.avatarUrl}
+          alt={user.name || user.username}
+          className="w-full h-full object-cover rounded-xl"
+        />
+      );
+    }
+
     const colors = [
       "from-blue-500 to-indigo-600",
       "from-purple-500 to-pink-600",
@@ -95,11 +114,22 @@ export default function UserMetaCard({ user }: Props) {
       "from-orange-500 to-red-600",
       "from-cyan-500 to-blue-600",
     ];
+
     const idx = user.username.charCodeAt(0) % colors.length;
-    return colors[idx];
+    const initials = (user.name || user.username).slice(0, 2).toUpperCase();
+
+    return (
+      <div
+        className={`w-full h-full rounded-xl bg-gradient-to-br ${colors[idx]} flex items-center justify-center`}
+      >
+        <span className="text-white text-sm font-bold tracking-wide">
+          {initials}
+        </span>
+      </div>
+    );
   };
 
-  const initials = user.username.slice(0, 2).toUpperCase();
+  const displayName = user.name || user.username;
 
   return (
     <div
@@ -110,37 +140,34 @@ export default function UserMetaCard({ user }: Props) {
                  transition-all duration-200 cursor-pointer"
     >
       <div className="flex items-center gap-4">
-  
-        <div
-          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${avatarColor()} flex items-center justify-center flex-shrink-0`}
-        >
-          <span className="text-white text-sm font-bold tracking-wide">
-            {initials}
-          </span>
+        <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+          {getAvatarContent()}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="text-base font-semibold text-gray-800 dark:text-white/90 truncate">
-              {user.username}
+              {displayName}
             </h4>
+
             {user.isAdmin && (
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium
-                               bg-brand-500/10 text-brand-500 border border-brand-500/20 flex-shrink-0"
-              >
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-brand-500/10 text-brand-500 border border-brand-500/20 flex-shrink-0">
                 Admin
               </span>
             )}
           </div>
+
           <p className="text-xs text-gray-400 mt-0.5">
-            Last active: {PLACEHOLDER_STATS.lastLogged}
+            @{user.username} ·{" "}
+            {loadingStats
+              ? "Loading stats..."
+              : `Last active: ${placeholderStats.lastLogged}`}
           </p>
         </div>
 
         <div className="hidden sm:flex flex-col items-end flex-shrink-0">
           <span className="text-xl font-bold text-gray-800 dark:text-white/90">
-            {PLACEHOLDER_STATS.totalListens}
+            {loadingStats ? "—" : placeholderStats.totalListens}
           </span>
           <span className="text-xs text-gray-400">total listens</span>
         </div>
@@ -148,16 +175,14 @@ export default function UserMetaCard({ user }: Props) {
 
       <hr className="border-gray-100 dark:border-gray-800" />
 
-    <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {SIGNAL_CONFIG.map((s) => (
           <div
             key={s.key}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium
                         ${s.bg} ${s.border} ${s.color}`}
           >
-            <span>
-              {PLACEHOLDER_STATS[s.key as keyof typeof PLACEHOLDER_STATS]}
-            </span>
+            <span>{loadingStats ? "—" : placeholderStats[s.key]}</span>
             <span className="opacity-70">{s.label}</span>
           </div>
         ))}

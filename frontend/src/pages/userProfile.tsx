@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import { fetchUserProfile, UserProfileResponse } from "../API/API";
+import {
+  fetchUserProfile,
+  fetchUpdateProfile,
+  UserProfileResponse,
+} from "../API/API";
 
 const formatDate = (raw: string | undefined) => {
   if (!raw || raw === "never") return "No activity";
@@ -63,6 +67,20 @@ const GENRE_COLORS = [
   "bg-teal-400",
 ];
 
+const AVATAR_GRADIENTS = [
+  "from-blue-500 to-indigo-600",
+  "from-purple-500 to-pink-600",
+  "from-green-500 to-teal-600",
+  "from-orange-500 to-red-600",
+  "from-cyan-500 to-blue-600",
+];
+
+function getAvatarGradient(username: string) {
+  return AVATAR_GRADIENTS[
+    (username?.charCodeAt(0) ?? 0) % AVATAR_GRADIENTS.length
+  ];
+}
+
 const SignalPill = ({ signal }: { signal: string }) => {
   const s = SIGNAL_STYLE[signal] ?? SIGNAL_STYLE["partial"];
   return (
@@ -104,6 +122,156 @@ const BarRow = ({
   );
 };
 
+interface EditProfileModalProps {
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  onSave: (displayName: string, avatarFile: File | null) => Promise<void>;
+  onClose: () => void;
+}
+
+function EditProfileModal({
+  username,
+  displayName,
+  avatarUrl,
+  onSave,
+  onClose,
+}: EditProfileModalProps) {
+  const [name, setName] = useState(displayName);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(avatarUrl);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const gradient = getAvatarGradient(username);
+  const initials = username.slice(0, 2).toUpperCase();
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreviewUrl(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onSave(name.trim(), selectedFile);
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        <h3 className="mb-5 text-base font-semibold text-gray-800 dark:text-white/90">
+          Edit Profile
+        </h3>
+
+        <div className="mb-5 flex flex-col items-center gap-3">
+          <div className="relative">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="avatar"
+                className="h-20 w-20 rounded-2xl object-cover"
+              />
+            ) : (
+              <div
+                className={`h-20 w-20 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}
+              >
+                <span className="text-2xl font-bold text-white">
+                  {initials}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSubmitting}
+              className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-brand-500 text-white shadow dark:border-gray-900 disabled:opacity-50"
+              title="Change photo"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+              </svg>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+          {previewUrl && (
+            <button
+              onClick={() => {
+                setPreviewUrl(null);
+                setSelectedFile(null);
+              }}
+              disabled={isSubmitting}
+              className="text-xs text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50"
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
+
+        <div className="mb-2">
+          <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+            Display Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={isSubmitting}
+            placeholder={username}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-white/[0.04] dark:text-white/90 disabled:opacity-50"
+          />
+        </div>
+        <p className="mb-5 text-xs text-gray-400">
+          Username:{" "}
+          <span className="font-medium text-gray-600 dark:text-gray-300">
+            @{username}
+          </span>{" "}
+          (cannot be changed)
+        </p>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={!name.trim() || isSubmitting}
+            className="flex-1 rounded-xl bg-brand-500 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-40 hover:opacity-90"
+          >
+            {isSubmitting ? "Saving..." : "Save"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1 rounded-xl border border-gray-200 py-2 text-sm text-gray-500 transition-colors hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
   const location = useLocation();
@@ -111,30 +279,67 @@ export default function UserProfilePage() {
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const currentUser = localStorage.getItem("tunelog_user") ?? "";
+  const isOwnProfile = currentUser === username;
+  const isHost = localStorage.getItem("isHost") === "true";
+
+  const [displayName, setDisplayName] = useState<string>(username ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!username) return;
+
+    const savedName = localStorage.getItem(`tunelog_displayname_${username}`);
+    const savedAvatar = localStorage.getItem(`tunelog_avatar_${username}`);
+    if (savedName) setDisplayName(savedName);
+    if (savedAvatar) setAvatarUrl(savedAvatar);
+
     fetchUserProfile(username, password)
       .then((d) => {
         setData(d);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-      console.log("Fetched user profile")
   }, [username, password]);
 
-  const avatarColor = () => {
-    const colors = [
-      "from-blue-500 to-indigo-600",
-      "from-purple-500 to-pink-600",
-      "from-green-500 to-teal-600",
-      "from-orange-500 to-red-600",
-      "from-cyan-500 to-blue-600",
-    ];
-    return colors[(username?.charCodeAt(0) ?? 0) % colors.length];
-  };
+  async function handleSaveProfile(newName: string, avatarFile: File | null) {
+    if (!username) return;
 
+    try {
+      const response = await fetchUpdateProfile({
+        username,
+        displayName: newName,
+        avatar: avatarFile,
+      });
+
+      if (response.status === "success" && response.user) {
+        setDisplayName(response.user.displayName);
+
+        if (response.user.avatarUrl) {
+          setAvatarUrl(response.user.avatarUrl);
+          localStorage.setItem(
+            `tunelog_avatar_${username}`,
+            response.user.avatarUrl,
+          );
+        }
+
+        localStorage.setItem(
+          `tunelog_displayname_${username}`,
+          response.user.displayName,
+        );
+        setShowEditModal(false);
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("Failed to update profile. Please try again.");
+    }
+  }
+
+  const gradient = getAvatarGradient(username ?? "");
   const initials = (username ?? "??").slice(0, 2).toUpperCase();
+
   const totalSignals =
     (data?.skips ?? 0) +
     (data?.partial ?? 0) +
@@ -148,8 +353,6 @@ export default function UserProfilePage() {
   if (loading) {
     return (
       <>
-        {/* <PageMeta title="Loading... | TuneLog" description="" />
-        <PageBreadcrumb pageTitle="User Profile" /> */}
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 xl:col-span-4 space-y-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -178,20 +381,83 @@ export default function UserProfilePage() {
       <div className="grid grid-cols-12 gap-4 md:gap-6">
         <div className="col-span-12 xl:col-span-4 space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-4 mb-5">
-              <div
-                className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${avatarColor()} flex items-center justify-center flex-shrink-0`}
-              >
-                <span className="text-white text-lg font-bold">{initials}</span>
+            <div className="flex items-start gap-4 mb-5">
+              <div className="relative flex-shrink-0">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="avatar"
+                    className="h-14 w-14 rounded-2xl object-cover"
+                  />
+                ) : (
+                  <div
+                    className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}
+                  >
+                    <span className="text-white text-lg font-bold">
+                      {initials}
+                    </span>
+                  </div>
+                )}
+                {isOwnProfile && (
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-500 text-white shadow dark:border-gray-900"
+                    title="Edit profile"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-3 w-3"
+                    >
+                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                    </svg>
+                  </button>
+                )}
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white/90">
-                  {username}
-                </h2>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  <h2 className="text-lg font-bold text-gray-800 dark:text-white/90 truncate">
+                    {displayName}
+                  </h2>
+                  {isHost && isOwnProfile && (
+                    <span className="flex-shrink-0 rounded-md bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-500">
+                      Host
+                    </span>
+                  )}
+                  {(() => {
+                    try {
+                      const cache = JSON.parse(
+                        localStorage.getItem("tunelog_users_cache") ?? "[]",
+                      );
+                      const user = cache.find(
+                        (u: any) => u.username === username,
+                      );
+                      return user?.isAdmin ? (
+                        <span className="flex-shrink-0 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+                          Admin
+                        </span>
+                      ) : null;
+                    } catch {
+                      return null;
+                    }
+                  })()}
+                </div>
+                <p className="text-xs text-gray-400">@{username}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Last active: {formatDate(data?.lastLogged)}
                 </p>
               </div>
+
+              {isOwnProfile && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="flex-shrink-0 rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-500 transition-colors hover:border-brand-500 hover:text-brand-500 dark:border-gray-700 dark:text-gray-400"
+                >
+                  Edit
+                </button>
+              )}
             </div>
 
             <div className="rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-gray-800 p-4 text-center mb-3">
@@ -232,7 +498,6 @@ export default function UserProfilePage() {
               ))}
             </div>
           </div>
-
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <h4 className="text-sm font-semibold text-gray-700 dark:text-white/80 mb-4">
               Signal Breakdown
@@ -291,7 +556,6 @@ export default function UserProfilePage() {
               ))}
             </div>
           </div>
-
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <h4 className="text-sm font-semibold text-gray-700 dark:text-white/80 mb-4">
               Top Artists
@@ -311,7 +575,6 @@ export default function UserProfilePage() {
               )}
             </div>
           </div>
-
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <h4 className="text-sm font-semibold text-gray-700 dark:text-white/80 mb-4">
               Genre Breakdown
@@ -368,8 +631,6 @@ export default function UserProfilePage() {
               )}
             </div>
           </div>
-
-         
           <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <div>
@@ -381,7 +642,6 @@ export default function UserProfilePage() {
                 </p>
               </div>
             </div>
-
             <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
@@ -450,6 +710,15 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
+      {showEditModal && username && (
+        <EditProfileModal
+          username={username}
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          onSave={handleSaveProfile}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
     </>
   );
 }

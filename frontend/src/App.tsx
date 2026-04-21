@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { Routes, Route, useNavigate } from "react-router";
+import { useEffect } from "react";
 import SignIn from "./pages/AuthPages/SignIn";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/users";
@@ -13,51 +14,68 @@ import GenreMatch from "./pages/genreMatching";
 import Import from "./pages/import";
 import Notifications from "./pages/notification";
 import Config from "./pages/config";
-// import QueuePage from "./pages/Jam/QueuePage";
-// import QueuePanel from "./pages/Jam/Queue";
-// import Jam from "./pages/jam";
-// import QueuePage from "./pages/Jam/Queue";
-// import QueuePage from "./pages/Jam/Queue";
-// import Jam from "./pages/Jam/jam";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
+import { fetchLogin, fetchGetUsers } from "./API/API";
 
 import { useNotificationStream } from "./hooks/Usenotificationstream";
+
 export default function App() {
-  useNotificationStream()
+  const navigate = useNavigate();
+
+  useNotificationStream();
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem("tunelog_token") ||
+      sessionStorage.getItem("tunelog_token");
+
+    const username =
+      localStorage.getItem("tunelog_user") ||
+      sessionStorage.getItem("tunelog_user") ||
+      "";
+    const password =
+      localStorage.getItem("tunelog_password") ||
+      sessionStorage.getItem("tunelog_password") ||
+      "";
+    if (token) {
+      return;
+    }
+    if (username && password) {
+      fetchLogin({ username, password })
+        .then(() => {
+          fetchGetUsers({ admin: username, adminPD: password }).catch(() => {});
+        })
+        .catch(() => {
+          navigate("/signin");
+        });
+      return;
+    }
+    navigate("/signin");
+  }, [navigate]);
+
   return (
     <>
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route index path="/" element={<Home />} />
+      <ScrollToTop />
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index path="/" element={<Home />} />
+          <Route path="/user" element={<UserProfiles />} />
+          <Route path="/librarySync" element={<LibrarySync />} />
+          <Route path="/playlist" element={<Playlist />} />
+          <Route path="/users/:username" element={<UserProfilePage />} />
+          <Route path="/manual" element={<ManualMarking />} />
+          <Route path="/genre" element={<GenreMatch />} />
+          <Route path="/notification" element={<Notifications />} />
+          <Route path="/config" element={<Config />} />
+          <Route path="/nowplaying" element={<NowPlaying />} />
+          <Route path="/queue" element={<Queue />} />
+          <Route path="/import" element={<Import />} />
+        </Route>
 
-            <Route path="/user" element={<UserProfiles />} />
-            <Route path="/librarySync" element={<LibrarySync />} />
-            <Route path="/playlist" element={<Playlist />} />
-            <Route path="/users/:username" element={<UserProfilePage />} />
-            <Route path="/manual" element={<ManualMarking />} />
-            <Route path="/genre" element={<GenreMatch />} />
-            <Route path="/notification" element={<Notifications />} />
-            <Route path="/config" element={<Config />} />
-            <Route path="/nowplaying" element={<NowPlaying />} />
-            
-            {/* <Route path="/jam" element={<Jam />} /> */}
-
-
-            <Route path="/queue" element={<Queue />} />
-            {/* <Route path="/queue" element={<QueuePanel />} /> */}
-
-            <Route path="/import" element={<Import />} />
-          </Route>
-
-          <Route path="/signin" element={<SignIn />} />
-          {/* <Route path="/signup" element={<SignUp />} /> */}
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </>
   );
 }

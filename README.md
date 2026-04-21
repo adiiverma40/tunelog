@@ -4,6 +4,11 @@
 
 ---
 
+##  Jam Todo 
+- Server side jam Status (Jam running or not) currently uses LocalStorage that makes stale info from previous session
+- Add Playlist
+
+
 ## Currently:-
  currently working on Spotify jam for navidrome. 
 

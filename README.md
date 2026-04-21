@@ -11,12 +11,17 @@
 It is recommened to delete or alter the existing database to inculde the changes
 Changes : two new tables in songlist.db,  
 - in library table, new colmns : `artistId` ,  `albumId` , `artistJSON`
+
   
 The new update includes a proxy layer between navidrome and the client,
 - It can improve search results
 - Added a new `lyrics` search option, when you search songs, with the lyrics, if the song has lyrics it will be in the results
 - Using the `tunelog` history of listens, the search results can be ranked.
 - A improved searches for songs like `AAAHHHHA! MEN` now you only need to type `ah Men` for the result
+
+
+**Library Auto Sync** - (default on) After Navidrome is done `scanning(quick or full)` Tunelog's Library Sync will start(itunes api : off)  to quickly add that in database so it wont affect `search results`
+
 
 ## Proxy :
 Proxy layer is optional, but recommened, I am planning future updates based on the proxy layer
@@ -38,10 +43,29 @@ It is recommened to run both servers in `same computer` or will might see `laten
 * **Docker & Docker Compose** (Recommended) OR **Python 3.10+**.
 * A Navidrome client that supports scrobbling/Now Playing reporting.
 
-### 2. Installation (Docker - Recommended)
+### 2. Installation
 >  **Critical:** Docker and manual runs (`python main.py`) are mutually exclusive. Docker marks the `data/` folder as `rootowned`. If you switch between them, run `sudo chown -R $USER:$USER data/` to fix permissions.
 
-### DOCKER
+#### Option A: Use published Docker images (recommended)
+
+1. Create a folder and download the environment template:
+   ```bash
+   mkdir tunelog && cd tunelog
+   curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
+   curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
+   ```
+
+2. Edit the `.env` file with your Navidrome URL and Admin credentials.
+
+3. Launch the stack:
+   ```bash
+   docker compose -f ghcr-compose.yaml up -d
+   ```
+
+* **Web UI:** `http://localhost:5173`
+* **API Server:** `http://localhost:8000`
+
+#### Option B: Build from Source
 - This will create two containers, use manual way if you dont want that
 
 ```bash
@@ -61,9 +85,7 @@ docker compose up --build
 * **Proxy** `http://localhost:4534`
 * **API Server:** `http://localhost:8000`
 
----
-
-### Manual
+#### Option C: Manual (Without Docker)
 - Use this if you dont want to run two containers
 
 ```bash
@@ -89,12 +111,12 @@ by default port `5173` of localhost is allowed to access the backend api, to add
 
 ```bash
 #Navidrome Server
-BASE_URL=http://192.168.29.118:4533 #Chnage your ip 
-ADMIN_USERNAME=adii # change username
+BASE_URL=http://192.168.29.118:4533 # Change your ip 
+ADMIN_USERNAME=adii # Change username
 ADMIN_PASSWORD=1234 # Change password
 
 # Frontend / API
-VITE_API_URL=http://192.168.29.118:8000 # change ip
+VITE_API_URL=http://192.168.29.118:8000 # Change ip
 MY_DOMAIN=localhost
 
 
@@ -141,12 +163,9 @@ Tags.Artist.Aliases = ["artist", "artists"]
 ## Notice 
 - My script will almost certainly fail if you listen song in speed up or down (1.5x) as my script will think you partially completed the song when you have completed it already
 
-## Navidrome Jam/Spotify jam
-- use navidrome as backend
-- use my proxy layer as radio broadcaster
-- use my dashboard for adding and deleting queues for the jam
-- use my dashboard for play pause skip
-- basic idea: a host starts navidrome and my tunelog, users joing using the tunelog proxy,host starts a radio , users can add and delete queues , skip play and pause
+## Navidrome Jam/Spotify jam 
+- Refer to ISSUE #9 for updates
+
 
 ## FUTURE PLANS
 - Navidrome Jam(currently working)

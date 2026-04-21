@@ -1,0 +1,32 @@
+services:
+  tunelog-backend:
+    image: ghcr.io/adiiverma40/tunelog/backend:main
+    container_name: tunelog-backend
+    restart: unless-stopped
+    tty: true 
+    stdin_open: true
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+    - PYTHONUNBUFFERED=1
+    - FORCE_COLOR=1
+    - TERM=xterm-256color
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+      - "4534:4534"
+
+  tunelog-frontend:
+    image: ghcr.io/adiiverma40/tunelog/frontend:main
+    container_name: tunelog-frontend
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    depends_on:
+      - tunelog-backend

@@ -142,22 +142,6 @@ slotsValue = tune_config["playlist_generation"]["slot_ratios"]
 
 
 PLAYLIST_NAME = "Tunelog - {}"
-# PLAYLIST_SIZE = 40
-# WILDCARD_DAY = 60
-
-# SIGNAL_WEIGHTS = {
-#     "repeat": 3,
-#     "positive": 2,
-#     "partial": 0,
-#     "skip": -2,
-# }
-
-# slotsValue = {
-#     "positive": 0.35,
-#     "repeat": 0.35,
-#     "partial": 0.25,
-#     "skip": 0.05,
-# }
 
 
 def signalWeights(weights: dict):

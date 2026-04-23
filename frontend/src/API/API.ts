@@ -256,10 +256,24 @@ export interface PlaylistCreateRequest {
   song_ids: string[];
   playlist_name: string;
 }
+export type AutoGenerateExplicit =
+  | "all"
+  | "cleaned"
+  | "explicit"
+  | "notExplicit";
 
 export interface PlaylistGenerationConfig {
   playlist_size: number;
   wildcard_day: number;
+  auto_generate_playlist: boolean;
+  auto_generate_time: number;
+  auto_generate_when_complete: boolean;
+  auto_generate_completion_percent: number;
+  auto_generate_explicit: AutoGenerateExplicit;
+  auto_generate_for: string[];
+  auto_generate_injection: boolean;
+  last_auto_generate:string;
+
   signal_weights: {
     repeat: number;
     positive: number;

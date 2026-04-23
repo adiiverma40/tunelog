@@ -50,21 +50,6 @@ class SyncState:
     fallback_stop = False
 
 
-# Notification apis to implement
-# 1. Who started playling what
-# 2. Last sycned
-# 3. last playlist generated for who
-# 4. last song that got started
-# start, stopped same -- song state
-# notification_status.starredSong.append({"username" : user_id , "song" : song['title'] , "star" : f"needs more listen, currently {totalListens}"})
-# notification_status.starredSong.append({"username" : user_id , "song" : song['title'] , "star" : final_rating})
-# notification_status.playlist.append({"username" : user_id, "size" : len(data) , "type" : "append"})
-# notification_status.playlist.append({"username" : user_id, "size" : len(data) , "type" : "regenerate"})
-# class notificationStatus:
-#     songState = []
-#     playlist = []
-#     starredSong = []
-
 _subscribers: list[tuple[asyncio.Queue, asyncio.AbstractEventLoop]] = []
 
 
@@ -107,6 +92,14 @@ DEFAULT_CONFIG = {
     "playlist_generation": {
         "playlist_size": 40,
         "wildcard_day": 60,
+        "auto_generate_playlist": True,
+        "auto_generate_time": 4,
+        "auto_generate_when_complete": True,
+        "auto_generate_completion_percent": 80,
+        "auto_generate_explicit" : "all",
+        "auto_generate_for" : [],
+        "auto_generate_injection" : True , 
+        "last_auto_generate" : 0 , 
         "signal_weights": {"repeat": 3, "positive": 2, "partial": 0, "skip": -2},
         "slot_ratios": {
             "positive": 0.35,
@@ -128,7 +121,7 @@ DEFAULT_CONFIG = {
         "auto_sync_hour": 2,
         "timezone": "Asia/Kolkata",
         "use_itunes_fallback": False,
-        "auto_sync_after_navidrome": True,   ## for auto syncing after navidrome sync library
+        "auto_sync_after_navidrome": True,  ## for auto syncing after navidrome sync library
     },
     "api_and_performance": {
         "max_fuzzy_iterations": 500,
@@ -149,15 +142,12 @@ config_lock = threading.Lock()
 
 def save_config(new_config_data):
     global tune_config
-    # print("in save config")
-
     with config_lock:
         try:
             with open(CONFIG_FILE_PATH, "w") as file:
                 json.dump(new_config_data, file, indent=4)
-                # print("writing new config" ,  new_config_data)
 
-            tune_config.clear()
+            # tune_config.clear()
             tune_config.update(new_config_data)
 
             console.print("[bold green]Configuration saved successfully.[/bold green]")

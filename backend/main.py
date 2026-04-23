@@ -67,13 +67,23 @@ from db import (
 )
 from itunesFuzzy import useFallBackMethods
 import library
-from library import normalise_genre, normalise_artist , sync_library
+from library import normalise_genre, normalise_artist, sync_library
 from watcher import start_sse
 from misc import push_star
 import uvicorn
-from state import notification_status , tune_config
+from state import notification_status, tune_config, save_config
 from dotenv import load_dotenv
 import os
+
+from playlist import (
+    getDataFromDb,
+    score_song,
+    get_unheard_songs,
+    get_wildcard_songs,
+    build_playlist,
+    push_playlist,
+)
+
 # from misc import setup_logger
 
 load_dotenv()
@@ -167,7 +177,7 @@ def Watcher():
 
 
 def signal_system(percent_played, song_id, user_id):
-    scoring = tune_config['behavioral_scoring']
+    scoring = tune_config["behavioral_scoring"]
     if percent_played <= scoring["skip_threshold_pct"]:
         base = "skip"
     elif percent_played < scoring["positive_threshold_pct"]:
@@ -187,7 +197,7 @@ def signal_system(percent_played, song_id, user_id):
             AND signal IN ('positive', 'repeat')
             AND timestamp > datetime('now', '-{window} minutes')
         """,
-            (song_id, user_id ),
+            (song_id, user_id),
         )
 
         valid_prior_positives = cursor.fetchone()[0]
@@ -364,7 +374,7 @@ def main():
             sys.exit(1)
 
     last_auto_sync_day = None
-
+    isGenerated = False
     while True:
         if library._startSyncSong and not library._isSyncing:
             console.print("[bold blue] Manual sync triggered from UI...")
@@ -387,6 +397,57 @@ def main():
             last_auto_sync_day = current_day
             syncThread = threading.Thread(target=autoSyncWithFallback, daemon=True)
             syncThread.start()
+        playlistConf = tune_config["playlist_generation"]
+
+        # print("current hour : " , current_day)
+        # print(playlistConf['auto_generate_playlist'])
+        conf = tune_config
+
+        if playlistConf["auto_generate_playlist"] and playlistConf[
+            "last_auto_generate"
+        ] != str(current_day):
+            print(
+                "current day : ",
+                current_day,
+                "playlist day : ",
+                playlistConf["last_auto_generate"],
+            )
+            print("auto playlist generate : True")
+
+            if current_hour == playlistConf["auto_generate_time"]:
+
+                console.print(
+                    f"[bold yellow]Auto generate playlist triggered at {current_hour}"
+                )
+                size = playlistConf["playlist_size"]
+                explicit_filter = playlistConf["auto_generate_explicit"]
+                injection = playlistConf["auto_generate_injection"]
+                library1, history = getDataFromDb()
+                for user in playlistConf["auto_generate_for"]:
+                    scores = score_song(
+                        user, history_dict=history, library_dict=library1
+                    )
+                    unheard, unheard_ratio = get_unheard_songs(scores)
+                    wildcards = get_wildcard_songs(scores, user)
+                    playlist, song_signals = build_playlist(
+                        library1,
+                        history,
+                        scores,
+                        unheard,
+                        wildcards,
+                        unheard_ratio,
+                        user,
+                        explicit_filter,
+                        size,
+                        injection,
+                    )
+                    push_playlist(playlist, user, song_signals)
+                    isGenerated = True
+        if isGenerated:
+            conf["playlist_generation"]["last_auto_generate"] = str(current_day)
+            save_config(conf)
+            isGenerated = False
+
         try:
             event = event_queue.get(timeout=2)
             if event == "nowPlaying":
@@ -394,7 +455,7 @@ def main():
             elif event == "librarySync":
                 sync_library()
                 console.print("[bold blue]Tunelog library Sync -- done")
-                
+
         except Exception as e:
             if "Empty" not in str(type(e).__name__):
                 print(f"[ERROR] main loop: {e}")

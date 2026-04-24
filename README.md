@@ -64,6 +64,11 @@ curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.exa
 curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
 docker compose -f ghcr-compose.yaml up -d
 ```
+**Update:**
+```bash
+docker compose -f ghcr-compose.yaml pull
+```
+
 
 Edit `.env` before starting the stack.
 

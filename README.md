@@ -1,138 +1,117 @@
+# TuneLog
 
-#  TuneLog
-**A self-hosted music recommendation system for Navidrome.** TuneLog learns your taste by watching how you actually interact with your music tracking skips, finishes, and replays to build evolving, personalized playlists without you ever touching a "Like" button.
+TuneLog is a self-hosted music recommendation system for Navidrome. It learns from listening behavior such as skips, partial plays, full plays, and repeats to generate personalized playlists and improve search results.
 
----
+## Features
 
-##  Jam Todo 
-- Server side jam Status (Jam running or not) currently uses LocalStorage that makes stale info from previous session
-- Add Playlist
+- Personalized playlist generation from listening history
+- Navidrome library sync
+- Optional proxy layer for improved search and ranking
+- Lyrics-aware search
+- Fuzzy metadata matching
+- CSV playlist import
+- Logging and error handling
+- Web dashboard and API backend
+- Navidrome jam
+
+### Navidrome jam
+In the dashboard there is a jam section, if you wish to use jam go to jam and `now playing` section in the dashboard
+
+**features**
+- sync play , pause , skip
+- Queue reorder
+- Transfer host
+- Chats for joined user
+- Queue can be added from library or playlist
+- In `config` you can toggle some features for jam like `only host reorder queue`, `only host clear queue` and more
+
+**Requirements**
+- Navidrome Running
+- `VITE_NAVIDROME_URL` in .env for search and album arts
+- All users in same server/dashboard
+
+**Setup**
+- Start the navidrome server
+- start tunelog server and frontend
+- go to dashboard
+- do a library sync if havent
+- Add or create users in users
+- go to jam/nowplaying
+- start jam
+- users that have logged in the dashboard will see join jam option in nowplaying page,
+- join it and enjoy
 
 
-## Currently:-
- currently working on Spotify jam for navidrome. 
+## Requirements
 
-## Update :
-It is recommened to delete or alter the existing database to inculde the changes
-Changes : two new tables in songlist.db,  
-- in library table, new colmns : `artistId` ,  `albumId` , `artistJSON`
+- Navidrome instance with API access
+- Docker and Docker Compose, or Python 3.10+
+- Node.js for the frontend if running manually
 
-  
-The new update includes a proxy layer between navidrome and the client,
-- It can improve search results
-- Added a new `lyrics` search option, when you search songs, with the lyrics, if the song has lyrics it will be in the results
-- Using the `tunelog` history of listens, the search results can be ranked.
-- A improved searches for songs like `AAAHHHHA! MEN` now you only need to type `ah Men` for the result
+## Installation
 
+### Option 1: Docker Compose
 
-**Library Auto Sync** - (default on) After Navidrome is done `scanning(quick or full)` Tunelog's Library Sync will start(itunes api : off)  to quickly add that in database so it wont affect `search results`
+```bash
+mkdir tunelog && cd tunelog
+curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
+curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
+docker compose -f ghcr-compose.yaml up -d
+```
 
+Edit `.env` before starting the stack.
 
-## Proxy :
-Proxy layer is optional, but recommened, I am planning future updates based on the proxy layer
-
-### Setup :
-- TO set up proxy, define `PROXY_PORT` in `.env` or defaults to `4534`
-- In subsonic/navidrome client, change server url to match the `port`
-- Done
-All the url request will be routed through `proxy to navidrome` , when any search request comes it will use `my script` or fallback to the Default `navidrome results`
-It is recommened to run both servers in `same computer` or will might see `latency issue`
-  
-## New Update will come after new version of navidrome 
-- Navidrome new version will include  `now playing` endpoint which will futher increase the accuracy of my project
-
-##  Getting Started
-
-### 1. Prerequisites
-* **Navidrome** instance (Running and accessible via API).
-* **Docker & Docker Compose** (Recommended) OR **Python 3.10+**.
-* A Navidrome client that supports scrobbling/Now Playing reporting.
-
-## Error and Fix:
-- If you are getting error in the recent update, the most likely culprit is the `config file`, copy the config file from github in your `config folder`, or just use the new `ghcr method` to launch `tunelog`
-
-### 2. Installation
->  **Critical:** Docker and manual runs (`python main.py`) are mutually exclusive. Docker marks the `data/` folder as `rootowned`. If you switch between them, run `sudo chown -R $USER:$USER data/` to fix permissions.
-
-#### Option A: Use published Docker images (recommended)
-
-1. Create a folder and download the environment template:
-   ```bash
-   mkdir tunelog && cd tunelog
-   curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
-   curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
-   ```
-
-2. Edit the `.env` file with your Navidrome URL and Admin credentials.
-
-3. Launch the stack:
-   ```bash
-   docker compose -f ghcr-compose.yaml up -d
-   ```
-
-* **Web UI:** `http://localhost:5173`
-* **API Server:** `http://localhost:8000`
-
-#### Option B: Build from Source
-- This will create two containers, use manual way if you dont want that
+### Option 2: Build from source
 
 ```bash
 git clone https://github.com/adiiverma40/tunelog
 cd tunelog
-
-# Configure environment
 cp .env.example .env
-# Edit .env with your Navidrome URL and Admin credentials
-```
-
-**Launch the stack:**
-```bash
 docker compose up --build
 ```
-* **Web UI:** `http://localhost:5173`
-* **Proxy** `http://localhost:4534`
-* **API Server:** `http://localhost:8000`
 
-#### Option C: Manual (Without Docker)
-- Use this if you dont want to run two containers
+### Option 3: Run without Docker
 
-```bash
-git clone https://github.com/adiiverma40/tunelog
-cd tunelog
-```
-- Backend
+Backend:
+
 ```bash
 cd backend
 pip install -r requirements.txt
 python3 main.py
 ```
-- Frontend
+
+Frontend:
+
 ```bash
 cd frontend
-npm install 
+npm install
 npm run dev
 ```
 
-### .env
-`issue #3`
-by default port `5173` of localhost is allowed to access the backend api, to add more devices or ip, add it in `.env`
+## Configuration
+
+Update `.env` with your Navidrome details and the addresses you want to allow.
 
 ```bash
-#Navidrome Server
-BASE_URL=http://192.168.29.118:4533 # Change your ip 
-ADMIN_USERNAME=adii # Change username
-ADMIN_PASSWORD=1234 # Change password
+# Navidrome Server
+BASE_URL=http://192.168.29.118:4533  # your navidrome ip
+ADMIN_USERNAME=adii                  # your admin username
+ADMIN_PASSWORD=1234                  # your admin password
 
-# Frontend / API
-VITE_API_URL=http://192.168.29.118:8000 # Change ip
-MY_DOMAIN=localhost
 
 
 # Allowed origins to make api request to backend
 # This is to allow user to access website form diffrent ip or devices,. just add your ip here 
-ALLOWED_ORIGINS=http://localhost:5173,http://192.168.29.118:5173   #add more as you need or add * to allow everyone
+ALLOWED_ORIGINS=http://localhost:5173, http://192.168.29.118
+
+# change the allowed origins as needed, use "*" for everyone
 
 
+
+#Frontend / API 
+VITE_API_URL=http://localhost:8000            # if local host doesnt work then use your server's ip
+VITE_NAVIDROME_URL=http://localhost:4534      # Give here the proxy port if you want search enchancment
+MY_DOMAIN=localhost
 
 # Logging 
 # Forces the logs to save exactly where Docker is listening for the volume mount
@@ -141,191 +120,67 @@ LOG_MAX_SIZE=10 MB
 LOG_RETENTION_DAYS=7 days
 LOG_LEVEL=DEBUG
 
-
 # Proxy for search result alteration in clients 
+
 PROXY_PORT=4534
 
 ```
-- You can get your ip address by doing, `ipconfig` in windows and `ip a` in linux or use `localhost` if its works for you
 
+### Optional Navidrome tag mapping
 
-### Additionally 
-`issue 5`
-To improve efficieny and better artist mapping you can add a `custom tag` for navidrome
+For better artist mapping, you can add this to `navidrome.toml`:
 
-Steps : 
-1. locate your `navidrome` folder.
-2. go to `data` folder
-3. Create a `navidrome.toml` file
-4. Add the following
 ```bash
 Tags.Artist.Aliases = ["artist", "artists"]
 ```
-5. Do a full library scan inside navidrome 
 
-> Note: if you have diffrent tag for your own need, i m currently trying to add that to this, i planned to give a option to add your custom tag
+Then run a full library scan in Navidrome.
 
-## Warning
-- I think i implemented musicbrainz api as it was written in the docs but i got ip blocked, if you are dev, can you review it? if you are user, try using vpn before doing fuzzy matching
+## Proxy mode
 
-## Notice 
-- My script will almost certainly fail if you listen song in speed up or down (1.5x) as my script will think you partially completed the song when you have completed it already
+The proxy layer is optional. When enabled, client search requests are routed through TuneLog before falling back to Navidrome.
 
-## Navidrome Jam/Spotify jam 
-- Refer to ISSUE #9 for updates
+To use it:
 
+1. Set `PROXY_PORT` in `.env` if needed
+2. Point your client to the proxy port instead of Navidrome directly
+3. Keep the proxy and Navidrome on the same machine when possible
 
-## FUTURE PLANS
-- Navidrome Jam(currently working)
-- Use librosa to find audio mood
-- A way to inject custom queue in client side apps like [Vibrdrome](https://web.vibrdrome.io/) to make it behave the way i want, probally a chromium extenstion for dynamically changing songs playlist
-- Translate lyrics of one language to other or translate query to all laungages to break the language barrier in search history , like to search a japanese song
+## How it works
 
-## TODO:
-- ADD : when sse event = library sync, do sync in tunelog too
-- ISSUE : after reviewing playlist.jsonl, if a song has plays, and was choosen because of unheard pool or genre injection, meaning its faling 
-- Cold start: in ui. ask user to give location of navidrome.db, using db as a reference map out the past listen history, using the tunelog.db and navidrome.db check if the navidrome last listen song is in tunelog.db if not then add it in tunelog.db with score of 1 for every plays, song a with 5 plays will get score of 5 to counter the cold start probelm
-- Add A proxy btw client and navidrome backend, when client search for any music, intercept the request, use lyrics and tunelog db to suggest the best songs 'the weekend' look for most heard song of artist in tunelog db as well as song that contain it in lyrics
+TuneLog uses implicit feedback from Navidrome activity to score tracks:
 
-- Add Auto playlist reload
-- Add config for all the settings
-- Add music sessions
-- Add Mood detector - 5 skips in a row means bad mood
-  
+- Skipped tracks are penalized
+- Partially played tracks get a small positive score
+- Fully played tracks get a higher score
+- Replayed tracks get the highest score
 
+The playlist engine combines those scores with recency and discovery logic to keep playlists balanced.
 
-## How It Works
-TuneLog uses **Implicit Feedback**. Instead of manual ratings, it watches "Signals" via the Navidrome SSE (Server-Sent Events) stream to judge your interest.
+## Project structure
 
-### The Signal System
-- Can Be changed
-
-| Behavior | Signal | Weight | Logic |
-| :--- | :--- | :--- | :--- |
-| **Skipped < 30%** | `skip` | -5 | Heavy penalty; removes from high-rotation. |
-| **Played 30–80%** | `partial` | +1 | Interest shown; kept in "Discovery" rotation. |
-| **Played 80–100%** | `positive` | +2 | Solid interest; increases playlist frequency. |
-| **Replayed < 24h** | `repeat` | +3 | Highest signal; moves to "Heavy Rotation." |
-
-### Smart Playlist Generation 
-- Can be changed from DashBoard
-* TuneLog manages a balanced "Diet" of music across several slots:
-* **Scored Songs:** Ranked by (Signal Weight × Recency Decay). Yesterday's favorite counts more than last year's.
-* **Genre Injection:** Scans for unheard songs in your top genres (e.g., Bollywood, Rap) and injects them as discoveries.
-* **Wildcards:** Resurrects "Lost Favorites" you haven't heard in 60+ days.
-* **Second Chances:** Occasional re-exposure to "Skips" (configurable via UI) to account for changing moods.
-
-- updated check architecture.md
-
-
-
-## **Gloabal configration**
-Added a page to change the global config of the backend, like every variable that user can use
-## **Genre injection rework** 
-
-Before genre injection used to get all distcint genre from `tunelog.db` then make ratio , and inject those ratio from `songlist.db`
-
- - currently it takes genre, (hindi ost, rap) converts  it in hindi ost , rap, gets ratio of hindi ost and rap from listens and inject them
- - this creates ineficeny, i changed my method of genre mapping, now i dont write genre in db according to genre.json but i take that and
-
-Now : - 
- - create a `translation` layer in `playlist`, 
- -  get all `distinct genre`
- -  use `genre.json` (if there is no genre.json thne use og genre) as refrance and map them , `hindi ost , rap` to `bollywood , rap`
- -  then using this count ratio, now get all song from library , song id and genre 
- -  map the genre using genre.json , 
- -  calculate the unheard song , 
- -  get the genre needed from the pool , if needed genre are bollywood - songs, rap - 4 songs, and a song has bollywood, rap as the mapped genre, give priorty to iter
- -  and then decrease the pool bollywood 4 , rap - 3 song, but doing so will create a risk of less song in playlist so we will inject two song of unknown genre, and 
- -  the rest will go to artist injection(new) , artist injection will do this, take all the artists from listens, then calculate the ratio, finds the artist which
- -  which is listened the most artist(60%) and least artist(40%) and inject 1 song from the artist and that user has never listened, till the list of artist is exchausted
- - might encounter multiple artist (badsha , honey signh) , count them as separate artist and separate ratio,
- - if still pool is empty then god knows what cause i sure dont
-
-
----
-
-### **Auto Genre Match**
-Added a option to match genre automatically, this is needed for better genre injection of songs, if there is a messy genre in db, song recommended becomes in accurate.
-- Currently there is no option for multiple genre like `rap, hip hop`
-- you can create a category genre and map noisy genre in it,
-- The Auto match features take the noisy genre and its data and matches it against genre in db, the one with heightest score gets added in Genre.json file
-- you can get a sample genre from `architecture.md`
-- If there is data in genre.json, when doing library sync, it will automatically change the matching genre to the category genre
-
----
-
-### **CSV IMPORT**
-Added a option to import playlist from csv files, you can download csv for spotify from [Exportify](https://exportify.net/).
-- Currently I dont know how it works, My library has limited songs and Messy meta data, so I am getting matching results of 14 songs out of 50
-- I havent tested with other csv file. But I think it can handle other files as well, as long as it have Title, artist name and album name
-- For workings read `Architecture.md`
-
-### **ERROR HANDLING**
-Added better error handling, i took some help from ai
-- `error.py` is now the entry point
-- Using Supervisor pattern to ensure it dont crash when navidrome is down
-- it will exit if `port 8000` is taken
-- if `port  5173` is taken
-- uses a heartbeat mechanism
-For more info read architecture.md
-
-
-### **Logging**
-Added a loging system that logs the info, its purpose is to refine the playlist generation script better
-- Before this i was not able to distinguish btw why this song was choosen to be in playlist and why this was not choosen
-- This can also be used to get the reason of why script broke
-- By default the scrip is set `INFO` for Main and `DEBUG` for playlist
-- If you want to contirebute you can do so by sumbitting `playlist.jsonl` so that i can make the script better
- 
-
-### **Library Sync**
-Library sync was intially used to get all the song from navidrome and store it in db for playlist genreation
-
-Changes :
-- Genre auto match : Intitally it was using `genre auto match` function to categories messy or noise genre in one catergory, removed it so that it wont change the db and db will be the `source of truth`
-- Batch updating : Initially it was updating and commiting songs every 5 song creating a massive read and write, - fixed : by adding `batch : 100` for fast sync and `batch : 5` for slow sync(dont want the api result get waste if any error and batch is 100)
-- Delete : if the song is deleted from navidrome during sync delete them from db
-- Diffrance : if the song meta data and db meta data is diffrent taking `navidrome as source of truth` update db to the navidrome
-- Artist : Change artist meta data form `issue #5` to include only artist name 
-
-
-### Notification
-Uses an SSE to report event live to the frontend notification section
-
-
-## Roadmap & TODO
-
-- [] **Notification Bridge:** Real-time "Now Playing" popups on the React Dashboard.
-- [] **Rnadom Song Toggle:** Add a Better toggle to turn of random song integration in playlist
-
-
----
-
-## Project Structure
 ```text
 TuneLog/
 ├── backend/
-│   ├── main.py          # Entry point (Watcher loop + SSE listener)
-│   ├── playlist.py      # Scoring logic & Navidrome API push
-│   ├── library.py       # Library sync & iTunes metadata fallback
-│   ├── db.py            # SQLite schemas (History & Library)
+│   ├── main.py
+│   ├── playlist.py
+│   ├── library.py
+│   ├── db.py
 │   └── Data/
-│       ├── tunelog.db   # Listen history & signals
-│       └── songlist.db  # Full library metadata cache
-├── frontend/            # React + TypeScript + Vite (TailAdmin based)
-└── compose.yaml         # Docker orchestration
+├── frontend/
+└── compose.yaml
 ```
 
+## Notes
 
+- If you switch between Docker and manual runs, fix permissions on `data/` if needed.
+- Some features depend on Navidrome scanning and event support.
+- Search quality depends on the metadata in your library.
+- Speeding up or slowing down playback can affect listening detection.
 
+## Credits
 
-
-
----
-
-## Credits & Stack
-* **Navidrome:** Self-hosted music server (Subsonic API).
-* **FastAPI:** REST layer for the Dashboard.
-* **RapidFuzz:** High-performance fuzzy matching for metadata.
-* **TailAdmin:** Base for the React Dashboard UI.
+- Navidrome
+- FastAPI
+- RapidFuzz
+- TailAdmin

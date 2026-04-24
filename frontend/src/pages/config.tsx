@@ -50,6 +50,10 @@ interface Config {
   meta_overwrite: number;
   genre_strictness: number;
   duration_tol: number;
+  jam_same_song_in_queue: boolean;
+  jam_only_host_change_queue: boolean;
+  jam_only_host_clear_queue: boolean;
+  jam_only_host_add_queue: boolean;
 }
 
 const DEFAULTS: Config = {
@@ -92,6 +96,10 @@ const DEFAULTS: Config = {
   meta_overwrite: 80,
   genre_strictness: 95,
   duration_tol: 10,
+  jam_same_song_in_queue: false,
+  jam_only_host_change_queue: false,
+  jam_only_host_clear_queue: true,
+  jam_only_host_add_queue: false,
 };
 
 const mapApiToState = (api: TuneConfig): Config => ({
@@ -138,6 +146,10 @@ const mapApiToState = (api: TuneConfig): Config => ({
   genre_strictness:
     api.api_and_performance.sync_confidence.genre_map_strictness,
   duration_tol: api.api_and_performance.sync_confidence.duration_tolerance_pct,
+  jam_same_song_in_queue: api.jam?.same_song_in_queue ?? false,
+  jam_only_host_change_queue: api.jam?.only_host_change_queue ?? false,
+  jam_only_host_clear_queue: api.jam?.only_host_clear_queue ?? true,
+  jam_only_host_add_queue: api.jam?.only_host_add_queue ?? false,
 });
 
 const mapStateToApi = (state: Config): TuneConfig => ({
@@ -196,6 +208,12 @@ const mapStateToApi = (state: Config): TuneConfig => ({
       duration_tolerance_pct: state.duration_tol,
     },
   },
+  jam: {
+    same_song_in_queue: state.jam_same_song_in_queue,
+    only_host_change_queue: state.jam_only_host_change_queue,
+    only_host_clear_queue: state.jam_only_host_clear_queue,
+    only_host_add_queue: state.jam_only_host_add_queue,
+  },
 });
 
 const TIMEZONES = [
@@ -234,7 +252,7 @@ function SectionCard({
   desc,
   icon,
   children,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
   title: string;
   desc: string;
@@ -248,7 +266,7 @@ function SectionCard({
     <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] overflow-hidden">
       <button
         onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gray-100 dark:bg-gray-800">
@@ -276,17 +294,51 @@ function SectionCard({
         </svg>
       </button>
 
-      {open && <div>{children}</div>}
+      {open && (
+        <div className="border-t border-gray-100 dark:border-gray-800">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-function SubgroupLabel({ label }: { label: string }) {
+// Collapsible subgroup — replaces the old static SubgroupLabel
+function SubgroupSection({
+  label,
+  children,
+  defaultOpen = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <div className="px-5 py-2 bg-gray-50 dark:bg-white/[0.02] border-b border-gray-100 dark:border-gray-800">
-      <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-        {label}
-      </span>
+    <div>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-2 bg-gray-50 dark:bg-white/[0.02] border-b border-gray-100 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors group"
+      >
+        <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider group-hover:text-gray-500 dark:group-hover:text-gray-300 transition-colors">
+          {label}
+        </span>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`text-gray-300 dark:text-gray-600 flex-shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && <div>{children}</div>}
     </div>
   );
 }
@@ -377,6 +429,7 @@ function RatioBar({
     </div>
   );
 }
+
 function UserChips({
   allUsers,
   selected,
@@ -505,6 +558,24 @@ const IconAPI = (
     <line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 );
+const IconJam = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="text-gray-500 dark:text-gray-400"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
 
 export default function Config() {
   const [cfg, setCfg] = useState<Config>(DEFAULTS);
@@ -575,6 +646,7 @@ export default function Config() {
     try {
       await fetchUpdateConfig(mapStateToApi(cfg));
       setSaved(true);
+      console.log(cfg);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error("Failed to save config:", err);
@@ -615,386 +687,396 @@ export default function Config() {
           desc="Size, auto-generation rules, signal weights, and injection breakdown"
           icon={IconPlaylist}
         >
-          <SubgroupLabel label="General" />
-          <ConfigRow
-            label="Playlist size"
-            desc="Number of tracks to generate per session"
-          >
-            <NumInput
-              value={cfg.playlist_size}
-              onChange={(v) => set("playlist_size", v)}
-              min={1}
-              max={200}
-              unit="songs"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Wildcard day"
-            desc="Days a song must be unplayed to enter the wildcard pool"
-          >
-            <NumInput
-              value={cfg.wildcard_day}
-              onChange={(v) => set("wildcard_day", v)}
-              min={1}
-              unit="days"
-            />
-          </ConfigRow>
-
-          <SubgroupLabel label="Auto-generation" />
-          <ConfigRow
-            label="Auto-generate playlist"
-            desc="Automatically generate new playlists on a schedule"
-          >
-            <Switch
-              label=""
-              defaultChecked={cfg.auto_generate_playlist}
-              onChange={(v) => set("auto_generate_playlist", v)}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Generation time"
-            desc="Hour of the day (24h) to trigger generation"
-          >
-            <NumInput
-              value={cfg.auto_generate_time}
-              onChange={(v) => set("auto_generate_time", v)}
-              min={0}
-              max={23}
-              unit="h"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Generate when complete"
-            desc="Trigger generation early when current playlist finishes"
-          >
-            <Switch
-              label=""
-              defaultChecked={cfg.auto_generate_when_complete}
-              onChange={(v) => set("auto_generate_when_complete", v)}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Completion percentage"
-            desc="Percentage played to be considered complete"
-          >
-            <NumInput
-              value={cfg.auto_generate_completion_percent}
-              onChange={(v) => set("auto_generate_completion_percent", v)}
-              min={1}
-              max={100}
-              unit="%"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Explicit content"
-            desc="Filter rules for explicit tracks during generation"
-          >
-            <select
-              value={cfg.auto_generate_explicit}
-              onChange={(e) =>
-                set(
-                  "auto_generate_explicit",
-                  e.target.value as AutoGenerateExplicit,
-                )
-              }
-              className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          <SubgroupSection label="General">
+            <ConfigRow
+              label="Playlist size"
+              desc="Number of tracks to generate per session"
             >
-              <option value="all">All</option>
-              <option value="clean">Clean only</option>
-              <option value="explicit">Explicit only</option>
-            </select>
-          </ConfigRow>
+              <NumInput
+                value={cfg.playlist_size}
+                onChange={(v) => set("playlist_size", v)}
+                min={1}
+                max={200}
+                unit="songs"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Wildcard day"
+              desc="Days a song must be unplayed to enter the wildcard pool"
+            >
+              <NumInput
+                value={cfg.wildcard_day}
+                onChange={(v) => set("wildcard_day", v)}
+                min={1}
+                unit="days"
+              />
+            </ConfigRow>
+          </SubgroupSection>
 
-          <ConfigRow
-            label="Target users"
-            desc="Users to generate playlists for"
-            fullWidth
-          >
-            <UserChips
-              allUsers={allUsers}
-              selected={cfg.auto_generate_for}
-              onChange={(v) => set("auto_generate_for", v)}
-            />
-          </ConfigRow>
+          <SubgroupSection label="Auto-generation">
+            <ConfigRow
+              label="Auto-generate playlist"
+              desc="Automatically generate new playlists on a schedule"
+            >
+              <Switch
+                label=""
+                defaultChecked={cfg.auto_generate_playlist}
+                onChange={(v) => set("auto_generate_playlist", v)}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Generation time"
+              desc="Hour of the day (24h) to trigger generation"
+            >
+              <NumInput
+                value={cfg.auto_generate_time}
+                onChange={(v) => set("auto_generate_time", v)}
+                min={0}
+                max={23}
+                unit="h"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Generate when complete"
+              desc="Trigger generation early when current playlist finishes"
+            >
+              <Switch
+                label=""
+                defaultChecked={cfg.auto_generate_when_complete}
+                onChange={(v) => set("auto_generate_when_complete", v)}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Completion percentage"
+              desc="Percentage played to be considered complete"
+            >
+              <NumInput
+                value={cfg.auto_generate_completion_percent}
+                onChange={(v) => set("auto_generate_completion_percent", v)}
+                min={1}
+                max={100}
+                unit="%"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Explicit content"
+              desc="Filter rules for explicit tracks during generation"
+            >
+              <select
+                value={cfg.auto_generate_explicit}
+                onChange={(e) =>
+                  set(
+                    "auto_generate_explicit",
+                    e.target.value as AutoGenerateExplicit,
+                  )
+                }
+                className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="all">All</option>
+                <option value="clean">Clean only</option>
+                <option value="explicit">Explicit only</option>
+              </select>
+            </ConfigRow>
+            <ConfigRow
+              label="Target users"
+              desc="Users to generate playlists for"
+              fullWidth
+            >
+              <UserChips
+                allUsers={allUsers}
+                selected={cfg.auto_generate_for}
+                onChange={(v) => set("auto_generate_for", v)}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Enable injection"
+              desc="Apply standard injection breakdown for auto-generation"
+            >
+              <Switch
+                label=""
+                defaultChecked={cfg.auto_generate_injection}
+                onChange={(v) => set("auto_generate_injection", v)}
+              />
+            </ConfigRow>
+          </SubgroupSection>
 
-          <ConfigRow
-            label="Enable injection"
-            desc="Apply standard injection breakdown for auto-generation"
-          >
-            <Switch
-              label=""
-              defaultChecked={cfg.auto_generate_injection}
-              onChange={(v) => set("auto_generate_injection", v)}
-            />
-          </ConfigRow>
+          <SubgroupSection label="Signal weights">
+            <ConfigRow
+              label="Repeat"
+              desc="Points awarded when a song is played again shortly after"
+            >
+              <NumInput
+                value={cfg.w_repeat}
+                onChange={(v) => set("w_repeat", v)}
+                min={-10}
+                max={10}
+                unit="pts"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Positive"
+              desc="Points for a full listen past the positive threshold"
+            >
+              <NumInput
+                value={cfg.w_positive}
+                onChange={(v) => set("w_positive", v)}
+                min={-10}
+                max={10}
+                unit="pts"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Partial"
+              desc="Points for a listen that didn't reach positive or skip thresholds"
+            >
+              <NumInput
+                value={cfg.w_partial}
+                onChange={(v) => set("w_partial", v)}
+                min={-10}
+                max={10}
+                unit="pts"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Skip"
+              desc="Points deducted when a song is skipped early"
+            >
+              <NumInput
+                value={cfg.w_skip}
+                onChange={(v) => set("w_skip", v)}
+                min={-10}
+                max={10}
+                unit="pts"
+              />
+            </ConfigRow>
+          </SubgroupSection>
 
-          <SubgroupLabel label="Signal weights" />
-          <ConfigRow
-            label="Repeat"
-            desc="Points awarded when a song is played again shortly after"
-          >
-            <NumInput
-              value={cfg.w_repeat}
-              onChange={(v) => set("w_repeat", v)}
-              min={-10}
-              max={10}
-              unit="pts"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Positive"
-            desc="Points for a full listen past the positive threshold"
-          >
-            <NumInput
-              value={cfg.w_positive}
-              onChange={(v) => set("w_positive", v)}
-              min={-10}
-              max={10}
-              unit="pts"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Partial"
-            desc="Points for a listen that didn't reach positive or skip thresholds"
-          >
-            <NumInput
-              value={cfg.w_partial}
-              onChange={(v) => set("w_partial", v)}
-              min={-10}
-              max={10}
-              unit="pts"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Skip"
-            desc="Points deducted when a song is skipped early"
-          >
-            <NumInput
-              value={cfg.w_skip}
-              onChange={(v) => set("w_skip", v)}
-              min={-10}
-              max={10}
-              unit="pts"
-            />
-          </ConfigRow>
-
-          <SubgroupLabel label="Slot ratios — auto-balances to 1.0" />
-          <div className="px-5 pt-1 pb-2 border-b border-gray-100 dark:border-gray-800">
-            <RatioBar
-              values={[
-                {
-                  label: "positive",
-                  value: cfg.s_positive,
-                  color: slotColors[0],
-                },
-                { label: "repeat", value: cfg.s_repeat, color: slotColors[1] },
-                {
-                  label: "partial",
-                  value: cfg.s_partial,
-                  color: slotColors[2],
-                },
-                { label: "skip", value: cfg.s_skip, color: slotColors[3] },
-              ]}
-            />
-            <div className="flex gap-3 mt-1">
-              {[
-                {
-                  key: "s_positive" as keyof Config,
-                  label: "Positive",
-                  color: "text-blue-500",
-                },
-                {
-                  key: "s_repeat" as keyof Config,
-                  label: "Repeat",
-                  color: "text-violet-500",
-                },
-                {
-                  key: "s_partial" as keyof Config,
-                  label: "Partial",
-                  color: "text-amber-400",
-                },
-                {
-                  key: "s_skip" as keyof Config,
-                  label: "Skip",
-                  color: "text-red-400",
-                },
-              ].map((item) => (
-                <span key={item.key} className={`text-[11px] ${item.color}`}>
-                  {item.label} {Math.round((cfg[item.key] as number) * 100)}%
-                </span>
-              ))}
+          <SubgroupSection label="Slot ratios — auto-balances to 1.0">
+            <div className="px-5 pt-1 pb-2 border-b border-gray-100 dark:border-gray-800">
+              <RatioBar
+                values={[
+                  {
+                    label: "positive",
+                    value: cfg.s_positive,
+                    color: slotColors[0],
+                  },
+                  {
+                    label: "repeat",
+                    value: cfg.s_repeat,
+                    color: slotColors[1],
+                  },
+                  {
+                    label: "partial",
+                    value: cfg.s_partial,
+                    color: slotColors[2],
+                  },
+                  { label: "skip", value: cfg.s_skip, color: slotColors[3] },
+                ]}
+              />
+              <div className="flex gap-3 mt-1">
+                {[
+                  {
+                    key: "s_positive" as keyof Config,
+                    label: "Positive",
+                    color: "text-blue-500",
+                  },
+                  {
+                    key: "s_repeat" as keyof Config,
+                    label: "Repeat",
+                    color: "text-violet-500",
+                  },
+                  {
+                    key: "s_partial" as keyof Config,
+                    label: "Partial",
+                    color: "text-amber-400",
+                  },
+                  {
+                    key: "s_skip" as keyof Config,
+                    label: "Skip",
+                    color: "text-red-400",
+                  },
+                ].map((item) => (
+                  <span key={item.key} className={`text-[11px] ${item.color}`}>
+                    {item.label} {Math.round((cfg[item.key] as number) * 100)}%
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-          <ConfigRow
-            label="Positive slot"
-            desc="Fraction of playlist reserved for positively scored songs"
-          >
-            <NumInput
-              value={cfg.s_positive}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["s_positive", "s_repeat", "s_partial", "s_skip"],
-                  "s_positive",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Repeat slot"
-            desc="Fraction reserved for repeat-signal songs"
-          >
-            <NumInput
-              value={cfg.s_repeat}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["s_positive", "s_repeat", "s_partial", "s_skip"],
-                  "s_repeat",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Partial slot"
-            desc="Fraction reserved for partially-listened songs"
-          >
-            <NumInput
-              value={cfg.s_partial}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["s_positive", "s_repeat", "s_partial", "s_skip"],
-                  "s_partial",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Skip slot"
-            desc="Fraction reserved for skipped songs (exposure retry)"
-          >
-            <NumInput
-              value={cfg.s_skip}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["s_positive", "s_repeat", "s_partial", "s_skip"],
-                  "s_skip",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.05}
-            />
-          </ConfigRow>
+            <ConfigRow
+              label="Positive slot"
+              desc="Fraction of playlist reserved for positively scored songs"
+            >
+              <NumInput
+                value={cfg.s_positive}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["s_positive", "s_repeat", "s_partial", "s_skip"],
+                    "s_positive",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Repeat slot"
+              desc="Fraction reserved for repeat-signal songs"
+            >
+              <NumInput
+                value={cfg.s_repeat}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["s_positive", "s_repeat", "s_partial", "s_skip"],
+                    "s_repeat",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Partial slot"
+              desc="Fraction reserved for partially-listened songs"
+            >
+              <NumInput
+                value={cfg.s_partial}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["s_positive", "s_repeat", "s_partial", "s_skip"],
+                    "s_partial",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Skip slot"
+              desc="Fraction reserved for skipped songs (exposure retry)"
+            >
+              <NumInput
+                value={cfg.s_skip}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["s_positive", "s_repeat", "s_partial", "s_skip"],
+                    "s_skip",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </ConfigRow>
+          </SubgroupSection>
 
-          <SubgroupLabel label="Injection breakdown — auto-balances to 1.0" />
-          <div className="px-5 pt-1 pb-2 border-b border-gray-100 dark:border-gray-800">
-            <RatioBar
-              values={[
-                { label: "signal", value: cfg.inj_signal, color: injColors[0] },
-                {
-                  label: "unheard",
-                  value: cfg.inj_unheard,
-                  color: injColors[1],
-                },
-                {
-                  label: "wildcard",
-                  value: cfg.inj_wildcard,
-                  color: injColors[2],
-                },
-              ]}
-            />
-            <div className="flex gap-3 mt-1">
-              {[
-                {
-                  key: "inj_signal" as keyof Config,
-                  label: "Signal",
-                  color: "text-emerald-500",
-                },
-                {
-                  key: "inj_unheard" as keyof Config,
-                  label: "Unheard",
-                  color: "text-sky-500",
-                },
-                {
-                  key: "inj_wildcard" as keyof Config,
-                  label: "Wildcard",
-                  color: "text-orange-400",
-                },
-              ].map((item) => (
-                <span key={item.key} className={`text-[11px] ${item.color}`}>
-                  {item.label} {Math.round((cfg[item.key] as number) * 100)}%
-                </span>
-              ))}
+          <SubgroupSection label="Injection breakdown — auto-balances to 1.0">
+            <div className="px-5 pt-1 pb-2 border-b border-gray-100 dark:border-gray-800">
+              <RatioBar
+                values={[
+                  {
+                    label: "signal",
+                    value: cfg.inj_signal,
+                    color: injColors[0],
+                  },
+                  {
+                    label: "unheard",
+                    value: cfg.inj_unheard,
+                    color: injColors[1],
+                  },
+                  {
+                    label: "wildcard",
+                    value: cfg.inj_wildcard,
+                    color: injColors[2],
+                  },
+                ]}
+              />
+              <div className="flex gap-3 mt-1">
+                {[
+                  {
+                    key: "inj_signal" as keyof Config,
+                    label: "Signal",
+                    color: "text-emerald-500",
+                  },
+                  {
+                    key: "inj_unheard" as keyof Config,
+                    label: "Unheard",
+                    color: "text-sky-500",
+                  },
+                  {
+                    key: "inj_wildcard" as keyof Config,
+                    label: "Wildcard",
+                    color: "text-orange-400",
+                  },
+                ].map((item) => (
+                  <span key={item.key} className={`text-[11px] ${item.color}`}>
+                    {item.label} {Math.round((cfg[item.key] as number) * 100)}%
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-          <ConfigRow
-            label="Signal fraction"
-            desc="Portion of the playlist filled from scored signal slots"
-          >
-            <NumInput
-              value={cfg.inj_signal}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["inj_signal", "inj_unheard", "inj_wildcard"],
-                  "inj_signal",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.01}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Unheard fraction"
-            desc="Portion filled with songs you have never listened to"
-          >
-            <NumInput
-              value={cfg.inj_unheard}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["inj_signal", "inj_unheard", "inj_wildcard"],
-                  "inj_unheard",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.01}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="Wildcard fraction"
-            desc="Portion filled from the long-unplayed wildcard pool"
-          >
-            <NumInput
-              value={cfg.inj_wildcard}
-              onChange={(v) =>
-                handleNormalizedChange(
-                  ["inj_signal", "inj_unheard", "inj_wildcard"],
-                  "inj_wildcard",
-                  v,
-                )
-              }
-              min={0}
-              max={1}
-              step={0.01}
-            />
-          </ConfigRow>
+            <ConfigRow
+              label="Signal fraction"
+              desc="Portion of the playlist filled from scored signal slots"
+            >
+              <NumInput
+                value={cfg.inj_signal}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["inj_signal", "inj_unheard", "inj_wildcard"],
+                    "inj_signal",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.01}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Unheard fraction"
+              desc="Portion filled with songs you have never listened to"
+            >
+              <NumInput
+                value={cfg.inj_unheard}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["inj_signal", "inj_unheard", "inj_wildcard"],
+                    "inj_unheard",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.01}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Wildcard fraction"
+              desc="Portion filled from the long-unplayed wildcard pool"
+            >
+              <NumInput
+                value={cfg.inj_wildcard}
+                onChange={(v) =>
+                  handleNormalizedChange(
+                    ["inj_signal", "inj_unheard", "inj_wildcard"],
+                    "inj_wildcard",
+                    v,
+                  )
+                }
+                min={0}
+                max={1}
+                step={0.01}
+              />
+            </ConfigRow>
+          </SubgroupSection>
         </SectionCard>
-
         <SectionCard
           title="Behavioral scoring"
           desc="Thresholds and decay that determine how interactions become signals"
@@ -1070,7 +1152,6 @@ export default function Config() {
             />
           </ConfigRow>
         </SectionCard>
-
         <SectionCard
           title="Sync and automation"
           desc="Background sync schedule and external API toggles"
@@ -1125,102 +1206,148 @@ export default function Config() {
             />
           </ConfigRow>
         </SectionCard>
-
         <SectionCard
           title="API and performance"
           desc="Retry limits, search depth, and fuzzy match confidence thresholds"
           icon={IconAPI}
-          defaultOpen={false}
         >
-          <SubgroupLabel label="General" />
-          <ConfigRow
-            label="Max fuzzy iterations"
-            desc="Max title comparisons per song before giving up"
-          >
-            <NumInput
-              value={cfg.fuzzy_iter}
-              onChange={(v) => set("fuzzy_iter", v)}
-              min={1}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="API max retries"
-            desc="Retries for 4xx/5xx API errors before failing"
-          >
-            <NumInput
-              value={cfg.api_retries}
-              onChange={(v) => set("api_retries", v)}
-              min={0}
-              max={20}
-              unit="tries"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="API retry delay"
-            desc="Wait time between failed API calls"
-          >
-            <NumInput
-              value={cfg.retry_delay}
-              onChange={(v) => set("retry_delay", v)}
-              min={0}
-              unit="sec"
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="iTunes search depth"
-            desc="Number of results to pull during broad iTunes searches"
-          >
-            <NumInput
-              value={cfg.itunes_depth}
-              onChange={(v) => set("itunes_depth", v)}
-              min={1}
-            />
-          </ConfigRow>
+          <SubgroupSection label="General">
+            <ConfigRow
+              label="Max fuzzy iterations"
+              desc="Max title comparisons per song before giving up"
+            >
+              <NumInput
+                value={cfg.fuzzy_iter}
+                onChange={(v) => set("fuzzy_iter", v)}
+                min={1}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="API max retries"
+              desc="Retries for 4xx/5xx API errors before failing"
+            >
+              <NumInput
+                value={cfg.api_retries}
+                onChange={(v) => set("api_retries", v)}
+                min={0}
+                max={20}
+                unit="tries"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="API retry delay"
+              desc="Wait time between failed API calls"
+            >
+              <NumInput
+                value={cfg.retry_delay}
+                onChange={(v) => set("retry_delay", v)}
+                min={0}
+                unit="sec"
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="iTunes search depth"
+              desc="Number of results to pull during broad iTunes searches"
+            >
+              <NumInput
+                value={cfg.itunes_depth}
+                onChange={(v) => set("itunes_depth", v)}
+                min={1}
+              />
+            </ConfigRow>
+          </SubgroupSection>
 
-          <SubgroupLabel label="Sync confidence" />
+          <SubgroupSection label="Sync confidence">
+            <ConfigRow
+              label="Min match score"
+              desc="Baseline fuzzy score required to accept an API match"
+            >
+              <NumInput
+                value={cfg.min_match}
+                onChange={(v) => set("min_match", v)}
+                min={0}
+                max={100}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Metadata overwrite score"
+              desc="Score required to overwrite local Navidrome tags"
+            >
+              <NumInput
+                value={cfg.meta_overwrite}
+                onChange={(v) => set("meta_overwrite", v)}
+                min={0}
+                max={100}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Genre map strictness"
+              desc="How strictly local genres must match the normalisation map"
+            >
+              <NumInput
+                value={cfg.genre_strictness}
+                onChange={(v) => set("genre_strictness", v)}
+                min={0}
+                max={100}
+              />
+            </ConfigRow>
+            <ConfigRow
+              label="Duration tolerance"
+              desc="Allowed variance in track length for tie-breakers"
+            >
+              <NumInput
+                value={cfg.duration_tol}
+                onChange={(v) => set("duration_tol", v)}
+                min={0}
+                max={100}
+                unit="%"
+              />
+            </ConfigRow>
+          </SubgroupSection>
+        </SectionCard>
+        <SectionCard
+          title="Jam"
+          desc="Shared listening session permissions and queue behaviour"
+          icon={IconJam}
+        >
           <ConfigRow
-            label="Min match score"
-            desc="Baseline fuzzy score required to accept an API match"
+            label="Allow same song in queue"
+            desc="Let multiple users queue the same track before it has played"
           >
-            <NumInput
-              value={cfg.min_match}
-              onChange={(v) => set("min_match", v)}
-              min={0}
-              max={100}
+            <Switch
+              label=""
+              defaultChecked={cfg.jam_same_song_in_queue}
+              onChange={(v) => set("jam_same_song_in_queue", v)}
             />
           </ConfigRow>
           <ConfigRow
-            label="Metadata overwrite score"
-            desc="Score required to overwrite local Navidrome tags"
+            label="Only host can change queue order"
+            desc="Prevent guests from reordering the queue"
           >
-            <NumInput
-              value={cfg.meta_overwrite}
-              onChange={(v) => set("meta_overwrite", v)}
-              min={0}
-              max={100}
+            <Switch
+              label=""
+              defaultChecked={cfg.jam_only_host_change_queue}
+              onChange={(v) => set("jam_only_host_change_queue", v)}
             />
           </ConfigRow>
           <ConfigRow
-            label="Genre map strictness"
-            desc="How strictly local genres must match the normalisation map"
+            label="Only host can clear queue"
+            desc="Prevent guests from wiping the entire queue"
           >
-            <NumInput
-              value={cfg.genre_strictness}
-              onChange={(v) => set("genre_strictness", v)}
-              min={0}
-              max={100}
+            <Switch
+              label=""
+              defaultChecked={cfg.jam_only_host_clear_queue}
+              onChange={(v) => set("jam_only_host_clear_queue", v)}
             />
           </ConfigRow>
           <ConfigRow
-            label="Duration tolerance"
-            desc="Allowed variance in track length for tie-breakers"
+            label="Only host can add to queue"
+            desc="Restrict queue additions to the session host only"
           >
-            <NumInput
-              value={cfg.duration_tol}
-              onChange={(v) => set("duration_tol", v)}
-              min={0}
-              max={100}
-              unit="%"
+            <Switch
+              label=""
+              defaultChecked={cfg.jam_only_host_add_queue}
+              onChange={(v) => set("jam_only_host_add_queue", v)}
             />
           </ConfigRow>
         </SectionCard>

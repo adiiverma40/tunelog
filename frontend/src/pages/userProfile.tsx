@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import { Modal } from "../components/ui/modal";
+import Button from "../components/ui/button/Button";
+import Input from "../components/form/input/InputField";
+import Label from "../components/form/Label";
 import {
   fetchUserProfile,
   fetchUpdateProfile,
@@ -123,6 +127,7 @@ const BarRow = ({
 };
 
 interface EditProfileModalProps {
+  isOpen: boolean;
   username: string;
   displayName: string;
   avatarUrl: string | null;
@@ -131,6 +136,7 @@ interface EditProfileModalProps {
 }
 
 function EditProfileModal({
+  isOpen,
   username,
   displayName,
   avatarUrl,
@@ -170,9 +176,9 @@ function EditProfileModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-5 text-base font-semibold text-gray-800 dark:text-white/90">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[400px] m-4">
+      <div className="no-scrollbar relative w-full max-w-[400px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
+        <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90">
           Edit Profile
         </h3>
 
@@ -230,20 +236,17 @@ function EditProfileModal({
           )}
         </div>
 
-        <div className="mb-2">
-          <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-            Display Name
-          </label>
-          <input
+        <div className="mb-2 text-left">
+          <Label>Display Name</Label>
+          <Input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={isSubmitting}
             placeholder={username}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-white/[0.04] dark:text-white/90 disabled:opacity-50"
           />
         </div>
-        <p className="mb-5 text-xs text-gray-400">
+        <p className="mb-6 text-xs text-gray-400">
           Username:{" "}
           <span className="font-medium text-gray-600 dark:text-gray-300">
             @{username}
@@ -251,24 +254,25 @@ function EditProfileModal({
           (cannot be changed)
         </p>
 
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || isSubmitting}
-            className="flex-1 rounded-xl bg-brand-500 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-40 hover:opacity-90"
-          >
-            {isSubmitting ? "Saving..." : "Save"}
-          </button>
-          <button
+        <div className="flex gap-3">
+          <Button
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex-1 rounded-xl border border-gray-200 py-2 text-sm text-gray-500 transition-colors hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 disabled:opacity-50"
+            variant="outline"
+            className="flex-1"
           >
             Cancel
-          </button>
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!name.trim() || isSubmitting}
+            className="flex-1"
+          >
+            {isSubmitting ? "Saving..." : "Save"}
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -710,15 +714,15 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
-      {showEditModal && username && (
-        <EditProfileModal
-          username={username}
-          displayName={displayName}
-          avatarUrl={avatarUrl}
-          onSave={handleSaveProfile}
-          onClose={() => setShowEditModal(false)}
-        />
-      )}
+
+      <EditProfileModal
+        isOpen={showEditModal}
+        username={username ?? ""}
+        displayName={displayName}
+        avatarUrl={avatarUrl}
+        onSave={handleSaveProfile}
+        onClose={() => setShowEditModal(false)}
+      />
     </>
   );
 }

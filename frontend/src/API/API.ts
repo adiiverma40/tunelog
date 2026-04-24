@@ -363,11 +363,18 @@ export interface ApiAndPerformanceConfig {
   };
 }
 
+
 export interface TuneConfig {
   playlist_generation: PlaylistGenerationConfig;
   behavioral_scoring: BehavioralScoringConfig;
   sync_and_automation: SyncAndAutomationConfig;
   api_and_performance: ApiAndPerformanceConfig;
+  jam?: {
+  same_song_in_queue: boolean;
+  only_host_change_queue: boolean;
+  only_host_clear_queue: boolean;
+  only_host_add_queue: boolean;
+};
 }
 
 export interface UpdateConfigResponse {

@@ -155,7 +155,7 @@ def save_config(new_config_data):
 
             # tune_config.clear()
             tune_config.update(new_config_data)
-
+            
             console.print("[bold green]Configuration saved successfully.[/bold green]")
             return True, "Success"
 

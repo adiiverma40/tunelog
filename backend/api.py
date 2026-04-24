@@ -140,6 +140,7 @@ class configData(BaseModel):
     behavioral_scoring: dict
     sync_and_automation: dict
     api_and_performance: dict
+    jam : dict
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
@@ -1163,6 +1164,7 @@ def SendConfig():
 def update_config(payload: configData):
     # print(payload)
     console.print("[bold blue]Received config update request...")
+    # print(payload.dict())
     success, message = save_config(payload.dict())
     if not success:
         raise HTTPException(status_code=500, detail=message)
@@ -1411,6 +1413,7 @@ async def reorder_queue(sid, data):
             item["song_id"],
             item.get("title"),
             item.get("artist", "Unknown"),
+            item.get("user", "unknown")
         )
     await sio.emit("queue_update", currentQueue(), room="jam")
 
@@ -1445,6 +1448,8 @@ async def stop_jam(sid):
     await sio.emit("now_playing", None, room="jam")
     await sio.emit("queue_update", [], room="jam")
 
+    await sio.close_room("jam")
+    
     await broadcast_users()
     console.print("[bold yellow]Jam stopped by host")
 

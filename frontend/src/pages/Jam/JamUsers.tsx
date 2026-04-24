@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { useGlobalSocket, ConnectedUser } from "../../context/SocketContext";
+import { Modal } from "../../components/ui/modal";
+import Button from "../../components/ui/button/Button";
 
 function getStoredValue(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -137,10 +139,12 @@ function enrichUsers(raw: ConnectedUser[]): EnrichedUser[] {
 }
 
 function TransferHostModal({
+  isOpen,
   users,
   onTransfer,
   onClose,
 }: {
+  isOpen: boolean;
   users: EnrichedUser[];
   onTransfer: (username: string) => void;
   onClose: () => void;
@@ -148,9 +152,9 @@ function TransferHostModal({
   const eligible = users.filter((u) => !u.isHost && u.isActive);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[400px] m-4">
+      <div className="no-scrollbar relative w-full max-w-[400px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
+        <h3 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
           Transfer Host
         </h3>
         <p className="mb-4 text-xs text-gray-400">
@@ -182,14 +186,11 @@ function TransferHostModal({
           </div>
         )}
 
-        <button
-          onClick={onClose}
-          className="mt-4 w-full rounded-xl border border-gray-200 py-2 text-sm text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600"
-        >
+        <Button variant="outline" onClick={onClose} className="mt-5 w-full">
           Cancel
-        </button>
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -471,13 +472,12 @@ export default function JamUsers() {
         </div>
       </div>
 
-      {showTransferModal && (
-        <TransferHostModal
-          users={users}
-          onTransfer={handleTransferHost}
-          onClose={() => setShowTransferModal(false)}
-        />
-      )}
+      <TransferHostModal
+        isOpen={showTransferModal}
+        users={users}
+        onTransfer={handleTransferHost}
+        onClose={() => setShowTransferModal(false)}
+      />
     </div>
   );
 }

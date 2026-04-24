@@ -14,7 +14,7 @@
             "aditi"
         ],
         "auto_generate_injection": true,
-        "last_auto_generate": "2026-04-23",
+        "last_auto_generate": "0",
         "signal_weights": {
             "repeat": 3,
             "positive": 2,
@@ -60,8 +60,8 @@
         }
     },
     "jam": {
-        "same_song_in_queue": false,
-        "only_host_change_queue": false,
+        "same_song_in_queue": true,
+        "only_host_change_queue": true,
         "only_host_clear_queue": true,
         "only_host_add_queue": false
     }

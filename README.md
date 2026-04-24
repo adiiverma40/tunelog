@@ -43,6 +43,9 @@ It is recommened to run both servers in `same computer` or will might see `laten
 * **Docker & Docker Compose** (Recommended) OR **Python 3.10+**.
 * A Navidrome client that supports scrobbling/Now Playing reporting.
 
+## Error and Fix:
+- If you are getting error in the recent update, the most likely culprit is the `config file`, copy the config file from github in your `config folder`, or just use the new `ghcr method` to launch `tunelog`
+
 ### 2. Installation
 >  **Critical:** Docker and manual runs (`python main.py`) are mutually exclusive. Docker marks the `data/` folder as `rootowned`. If you switch between them, run `sudo chown -R $USER:$USER data/` to fix permissions.
 

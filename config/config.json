@@ -14,7 +14,7 @@
             "aditi"
         ],
         "auto_generate_injection": true,
-        "last_auto_generate": "0",
+        "last_auto_generate": "2026-04-25",
         "signal_weights": {
             "repeat": 3,
             "positive": 2,
@@ -64,5 +64,15 @@
         "only_host_change_queue": true,
         "only_host_clear_queue": true,
         "only_host_add_queue": false
+    },
+    "listenbrainz": {
+        "username": "adiiverma40",
+        "treat_data_as": "partial",
+        "pool_listen_brainz": 5,
+        "last_synced": 1777151057,
+        "for_users": [
+            "adii"
+        ],
+        "enabled": true
     }
 }

@@ -1,3 +1,11 @@
-from search import searchTable
+# # from search import searchTable
 
-searchTable("mere")
+# # searchTable("mere")
+
+# from scrobble.listenBrainz import getListenBrainzResponse , deep_history_sync , fuzzyMatchingSong
+
+# # getListenBrainzResponse()
+
+# fuzzyMatchingSong()
+
+# # deep_history_sync()

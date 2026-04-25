@@ -850,7 +850,8 @@ def getUserProfile(username: str, password: str):
             (username, song_id),
         ).fetchone()
         top_songs.append(
-            {
+            {   
+                "id" : song_id,
                 "title": meta[0],
                 "artist": meta[1],
                 "count": count,
@@ -916,7 +917,8 @@ def getUserProfile(username: str, password: str):
             "SELECT title, artist, genre FROM library WHERE song_id = ?", (song_id,)
         ).fetchone()
         recent_history.append(
-            {
+            {   
+                "id" : song_id,
                 "title": meta[0] if meta else "Unknown",
                 "artist": meta[1] if meta else "Unknown",
                 "genre": meta[2] if meta else "—",

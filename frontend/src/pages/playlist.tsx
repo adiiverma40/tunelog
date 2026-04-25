@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -14,6 +12,8 @@ import {
   fetchLogin,
   appendPlaylist,
   fetchGetConfig,
+  getSong,
+  getCoverArtUrl,
 } from "../API/API";
 import { useNavigate } from "react-router";
 
@@ -83,18 +83,62 @@ const INITIAL_PRESETS: Preset[] = [
   },
 ];
 
-const SIGNAL_STYLE: Record<string, string> = {
-  positive: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  repeat: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  partial: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
-  skip: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-  unheard: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+const SIGNAL_CONFIG: Record<
+  string,
+  {
+    label: string;
+    color: string;
+    lightBg: string;
+    darkBg: string;
+    lightText: string;
+    darkText: string;
+    barColor: string;
+  }
+> = {
+  skip: {
+    label: "Skip",
+    color: "#E24B4A",
+    lightBg: "#FCEBEB",
+    darkBg: "rgba(226,75,74,0.15)",
+    lightText: "#A32D2D",
+    darkText: "#F09595",
+    barColor: "#E24B4A",
+  },
+  partial: {
+    label: "Partial",
+    color: "#EF9F27",
+    lightBg: "#FAEEDA",
+    darkBg: "rgba(239,159,39,0.15)",
+    lightText: "#854F0B",
+    darkText: "#FAC775",
+    barColor: "#EF9F27",
+  },
+  positive: {
+    label: "Complete",
+    color: "#639922",
+    lightBg: "#EAF3DE",
+    darkBg: "rgba(99,153,34,0.15)",
+    lightText: "#3B6D11",
+    darkText: "#97C459",
+    barColor: "#639922",
+  },
+  repeat: {
+    label: "Repeat",
+    color: "#7F77DD",
+    lightBg: "#EEEDFE",
+    darkBg: "rgba(127,119,221,0.15)",
+    lightText: "#534AB7",
+    darkText: "#AFA9EC",
+    barColor: "#7F77DD",
+  },
 };
 
 const EXPLICIT_STYLE: Record<string, string> = {
   explicit: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
-  cleaned: "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400",
-  notExplicit: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+  cleaned:
+    "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400",
+  notExplicit:
+    "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
   notInItunes: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
@@ -122,6 +166,84 @@ const formatLastGenerated = (raw: string | null) => {
     minute: "2-digit",
   });
 };
+
+function useDarkMode() {
+  const [dark, setDark] = useState(() =>
+    document.documentElement.classList.contains("dark"),
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setDark(document.documentElement.classList.contains("dark")),
+    );
+    obs.observe(document.documentElement, { attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
+
+function AlbumArt({
+  coverArtId,
+  title,
+  size = 40,
+}: {
+  coverArtId: string | null;
+  title: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [coverArtId]);
+
+  if (coverArtId && !failed) {
+    return (
+      <img
+        src={getCoverArtUrl(coverArtId)}
+        alt={title}
+        onError={() => setFailed(true)}
+        className="object-cover rounded-lg flex-shrink-0"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-lg flex items-center justify-center flex-shrink-0 bg-gray-100 dark:bg-gray-800"
+      style={{ width: size, height: size }}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="text-gray-400"
+        style={{ width: size * 0.45, height: size * 0.45 }}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function SignalPill({ signal, dark }: { signal: string; dark: boolean }) {
+  const s = SIGNAL_CONFIG[signal] ?? SIGNAL_CONFIG["partial"];
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold"
+      style={{
+        backgroundColor: dark ? s.darkBg : s.lightBg,
+        color: dark ? s.darkText : s.lightText,
+      }}
+    >
+      {s.label}
+    </span>
+  );
+}
 
 function SlotBar({ slots }: { slots: SlotValues }) {
   const entries = Object.entries(slots) as [keyof SlotValues, number][];
@@ -158,7 +280,9 @@ function SliderRow({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className={`w-16 text-xs font-medium ${color} flex-shrink-0 capitalize`}>
+      <span
+        className={`w-16 text-xs font-medium ${color} flex-shrink-0 capitalize`}
+      >
         {label}
       </span>
       <input
@@ -178,10 +302,12 @@ function SliderRow({
 }
 
 export default function Playlist() {
+  const dark = useDarkMode();
   const [users, setUsers] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState("");
   const [playlistSize, setPlaylistSize] = useState(40);
-  const [explicitFilter, setExplicitFilter] = useState<ExplicitFilter>("allow_cleaned");
+  const [explicitFilter, setExplicitFilter] =
+    useState<ExplicitFilter>("allow_cleaned");
   const [genreInjection, setGenreInjection] = useState(true);
   const [syncMode, setSyncMode] = useState<SyncMode>("regenerate");
   const [sortKey, setSortKey] = useState<SortKey>("artist");
@@ -194,12 +320,17 @@ export default function Playlist() {
   const [showExplicit, setShowExplicit] = useState(true);
   const [showCleaned, setShowCleaned] = useState(true);
   const [showClean, setShowClean] = useState(true);
+  const [coverArtMap, setCoverArtMap] = useState<Record<string, string>>({});
 
   const [presets, setPresets] = useState<Preset[]>(INITIAL_PRESETS);
   const [selectedPreset, setSelectedPreset] = useState<string>("default");
-  
-  const [customSlots, setCustomSlots] = useState<SlotValues>(INITIAL_PRESETS[3].slots);
-  const [customWeights, setCustomWeights] = useState<WeightValues>(INITIAL_PRESETS[3].weights);
+
+  const [customSlots, setCustomSlots] = useState<SlotValues>(
+    INITIAL_PRESETS[3].slots,
+  );
+  const [customWeights, setCustomWeights] = useState<WeightValues>(
+    INITIAL_PRESETS[3].weights,
+  );
 
   const navigate = useNavigate();
 
@@ -227,7 +358,7 @@ export default function Playlist() {
     fetchGetConfig()
       .then((cfg) => {
         setPlaylistSize(cfg.playlist_generation.playlist_size);
-        
+
         const fetchedSlots = {
           positive: cfg.playlist_generation.slot_ratios.positive,
           repeat: cfg.playlist_generation.slot_ratios.repeat,
@@ -245,8 +376,8 @@ export default function Playlist() {
           prev.map((p) =>
             p.id === "default"
               ? { ...p, slots: fetchedSlots, weights: fetchedWeights }
-              : p
-          )
+              : p,
+          ),
         );
         setCustomSlots(fetchedSlots);
         setCustomWeights(fetchedWeights);
@@ -298,6 +429,28 @@ export default function Playlist() {
       .finally(() => setLoadingSongs(false));
   }, [selectedUser]);
 
+
+  useEffect(() => {
+    if (!songs.length) return;
+
+    const uniqueIds = [...new Set(songs.map((s) => s.song_id).filter(Boolean))];
+
+    Promise.all(
+      uniqueIds.map(async (id) => {
+        const song = await getSong(id);
+        return song?.coverArt
+          ? ([id, song.coverArt] as [string, string])
+          : null;
+      }),
+    ).then((results) => {
+      const map: Record<string, string> = {};
+      results.forEach((r) => {
+        if (r) map[r[0]] = r[1];
+      });
+      setCoverArtMap(map);
+    });
+  }, [songs]);
+
   const handleGenerate = async () => {
     if (!selectedUser) return;
     setIsGenerating(true);
@@ -311,7 +464,7 @@ export default function Playlist() {
               playlistSize,
               activeSlots,
               activeWeights,
-              genreInjection
+              genreInjection,
             )
           : await appendPlaylist(
               selectedUser,
@@ -319,7 +472,7 @@ export default function Playlist() {
               playlistSize,
               activeSlots,
               activeWeights,
-              genreInjection
+              genreInjection,
             );
 
       if (res.status === "ok") {
@@ -400,8 +553,7 @@ export default function Playlist() {
       <PageBreadcrumb pageTitle="Playlist" />
 
       <div className="grid grid-cols-12 gap-4 md:gap-6">
-        {/* ── Stats row ── */}
-        <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="col-span-12 flex flex-col sm:flex-row items-stretch rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800">
           {[
             {
               label: "Last Generated",
@@ -413,21 +565,26 @@ export default function Playlist() {
             },
             { label: "Showing", value: `${sortedSongs.length} songs` },
             { label: "Top Genre", value: stats?.top_genre ?? "—" },
-          ].map((item) => (
+          ].map((item, i, arr) => (
             <div
               key={item.label}
-              className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+              className={`flex-1 px-4 py-4 text-center bg-gray-50 dark:bg-gray-800/60 ${
+                i < arr.length - 1
+                  ? "border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800"
+                  : ""
+              }`}
             >
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                {item.label}
-              </p>
-              <p className="text-xl font-semibold text-gray-800 dark:text-white/90">
+              <p className="text-xl font-bold tabular-nums text-gray-800 dark:text-white/90">
                 {item.value}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-1">
+                {item.label}
               </p>
             </div>
           ))}
         </div>
-        <div className="col-span-12 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+
+        <div className="col-span-12 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">
             Playlist Profile
           </h4>
@@ -623,7 +780,7 @@ export default function Playlist() {
           </div>
         </div>
 
-        <div className="col-span-12 xl:col-span-7 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="col-span-12 xl:col-span-7 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">
             Generate Playlist
           </h4>
@@ -716,7 +873,7 @@ export default function Playlist() {
           )}
         </div>
 
-        <div className="col-span-12 xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="col-span-12 xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-6">
             Playlist Settings
           </h4>
@@ -855,7 +1012,7 @@ export default function Playlist() {
           </div>
         </div>
 
-        <div className="col-span-12 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
+        <div className="col-span-12 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
             <div>
               <h4 className="text-base font-semibold text-gray-800 dark:text-white/90">
@@ -874,7 +1031,7 @@ export default function Playlist() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ maxHeight: "480px" }}>
             {loadingSongs ? (
               <p className="text-sm text-gray-400 px-6 py-8">Loading...</p>
             ) : sortedSongs.length === 0 ? (
@@ -883,44 +1040,55 @@ export default function Playlist() {
               </p>
             ) : (
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-800 text-xs text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-6 py-3 font-medium">#</th>
-                    <th className="text-left px-4 py-3 font-medium">Title</th>
-                    <th className="text-left px-4 py-3 font-medium">Artist</th>
-                    <th className="text-left px-4 py-3 font-medium">Genre</th>
-                    <th className="text-left px-4 py-3 font-medium">Signal</th>
-                    <th className="text-left px-4 py-3 font-medium">
-                      Explicit
-                    </th>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-50 dark:bg-gray-800/80 border-b border-gray-100 dark:border-gray-800">
+                    {["#", "Song", "Artist", "Genre", "Signal", "Explicit"].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 first:pl-6 whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
                   {sortedSongs.map((song, idx) => (
                     <tr
                       key={song.song_id}
-                      className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
                     >
-                      <td className="px-6 py-3 text-gray-400 text-xs">
+                      <td className="pl-6 pr-2 py-3 text-gray-300 dark:text-gray-600 text-xs tabular-nums">
                         {idx + 1}
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-800 dark:text-white/90 truncate max-w-[180px]">
-                          {song.title}
-                        </p>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <AlbumArt
+                            coverArtId={coverArtMap[song.song_id] ?? null}
+                            title={song.title}
+                            size={36}
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-800 dark:text-white/90 truncate max-w-[180px] hover:text-brand-500 transition-colors">
+                              {song.title}
+                            </p>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs truncate max-w-[150px]">
                         {song.artist}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs capitalize">
                         {song.genre ?? "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${SIGNAL_STYLE[song.signal] ?? ""}`}
-                        >
-                          {song.signal ?? "—"}
-                        </span>
+                        {song.signal ? (
+                          <SignalPill signal={song.signal} dark={dark} />
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {song.explicit ? (

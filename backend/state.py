@@ -96,10 +96,10 @@ DEFAULT_CONFIG = {
         "auto_generate_time": 4,
         "auto_generate_when_complete": True,
         "auto_generate_completion_percent": 80,
-        "auto_generate_explicit" : "all",
-        "auto_generate_for" : [],
-        "auto_generate_injection" : True , 
-        "last_auto_generate" : 0 , 
+        "auto_generate_explicit": "all",
+        "auto_generate_for": [],
+        "auto_generate_injection": True,
+        "last_auto_generate": 0,
         "signal_weights": {"repeat": 3, "positive": 2, "partial": 0, "skip": -2},
         "slot_ratios": {
             "positive": 0.35,
@@ -141,6 +141,15 @@ DEFAULT_CONFIG = {
         "only_host_clear_queue": True,
         "only_host_add_queue": False,
     },
+    "listenbrainz": {
+        "username": "", 
+        "treat_data_as": "partial",
+        "pool_listen_brainz" : 1,
+        "last_synced" : "",
+        "for_users" : [],
+        "enabled" : True
+        
+        },
 }
 
 config_lock = threading.Lock()
@@ -155,7 +164,7 @@ def save_config(new_config_data):
 
             # tune_config.clear()
             tune_config.update(new_config_data)
-            
+
             console.print("[bold green]Configuration saved successfully.[/bold green]")
             return True, "Success"
 

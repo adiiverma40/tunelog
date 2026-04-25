@@ -84,6 +84,8 @@ from playlist import (
     push_playlist,
 )
 
+from scrobble.listenBrainz import fuzzyMatchingSong
+
 # from misc import setup_logger
 
 load_dotenv()
@@ -328,7 +330,7 @@ def main():
                 )
                 sys.exit(1)
             else:
-                status_registry.update("uvicorn", status="running" )
+                status_registry.update("uvicorn", status="running")
                 console.print(
                     f"[bold green]API Started & Verified on Port {proxyPort}[/bold green]"
                 )
@@ -379,6 +381,11 @@ def main():
 
     last_auto_sync_day = None
     isGenerated = False
+    # last_auto_sync_day = None
+    # isGenerated = False
+
+    # NEW: Flag to prevent spawning multiple LB syncs at the exact same time
+    is_lb_syncing = False
     while True:
         if library._startSyncSong and not library._isSyncing:
             console.print("[bold blue] Manual sync triggered from UI...")
@@ -442,7 +449,41 @@ def main():
             conf["playlist_generation"]["last_auto_generate"] = str(current_day)
             save_config(conf)
             isGenerated = False
+        listenBrainzconf = tune_config["listenbrainz"]
+        if listenBrainzconf.get("enabled", False) and not is_lb_syncing:
+            pool_time_hours = float(listenBrainzconf.get("pool_listen_brainz", 6))
+            last_time_synced = listenBrainzconf.get("last_synced")
+            current_unix_time = int(time.time())
+            seconds_threshold = pool_time_hours * 3600
+            if not last_time_synced or (
+                current_unix_time - int(last_time_synced) >= seconds_threshold
+            ):
 
+                console.print(
+                    f"\n[bold magenta]ListenBrainz Auto-Sync Triggered[/bold magenta] (Interval: {pool_time_hours}h)"
+                )
+                is_lb_syncing = True
+
+                def run_lb_sync():
+                    try:
+                        fuzzyMatchingSong()
+
+                        tune_config["listenbrainz"]["last_synced"] = int(time.time())
+                        save_config(tune_config)
+
+                        console.print(
+                            "[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]"
+                        )
+                    except Exception as e:
+                        console.print(
+                            f"[bold red]ListenBrainz Auto-Sync Failed:[/bold red] {e}"
+                        )
+                    finally:
+                        nonlocal is_lb_syncing
+                        is_lb_syncing = False
+
+                lbSyncThread = threading.Thread(target=run_lb_sync, daemon=True)
+                lbSyncThread.start()
         try:
             event = event_queue.get(timeout=2)
             if event == "nowPlaying":

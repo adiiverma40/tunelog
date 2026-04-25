@@ -83,7 +83,21 @@ async def proxy_all(request: Request, path: str):
 
     headers = dict(request.headers)
     headers.pop("host", None)
-
+    if "getPodcasts" in path or "getNewestPodcasts" in path:
+        mock_payload = {
+            "subsonic-response": {
+                "status": "ok",
+                "version": "1.16.1",
+                "podcasts": [],     
+                "newestPodcasts": []
+            }
+        }
+        return Response(
+            content=json.dumps(mock_payload),
+            status_code=200,
+            headers={"Content-Type": "application/json"}
+        )
+        
     if "api/events" in path:
         req = client.build_request(
             request.method,

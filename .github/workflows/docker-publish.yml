@@ -18,7 +18,7 @@ env:
 jobs:
   build-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # Increased timeout for multi-platform emulation
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -26,13 +26,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 # Updated to v4 for stability
+        uses: actions/checkout@v4
 
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3
 
-      # CRITICAL: Add QEMU for arm64 emulation
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -60,7 +59,7 @@ jobs:
           load: true
           push: false
           tags: backend-image:local
-          platforms: linux/amd64 , linux/arm64
+          platforms: linux/amd64 # Restricted to single architecture for local loading
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -76,7 +75,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64 # Multi-architecture push to registry
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -88,7 +87,7 @@ jobs:
 
   build-frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # Frontend builds (npm install) are very slow under emulation
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -102,7 +101,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3
 
-      # CRITICAL: Add QEMU for arm64 emulation
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -130,7 +128,7 @@ jobs:
           load: true
           push: false
           tags: frontend-image:local
-          platforms: linux/amd64
+          platforms: linux/amd64 # Restricted to single architecture for local loading
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -142,7 +140,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64 # Multi-architecture push to registry
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

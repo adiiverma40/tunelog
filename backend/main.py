@@ -90,6 +90,8 @@ load_dotenv()
 console = Console()
 active = {}
 
+CURRENT_VERSION = "0.001"
+
 
 def navidrome_url(endpoint):
     url = build_url(endpoint)
@@ -293,6 +295,8 @@ def main():
             init_db_playlist()
             init_search_db()
             status_registry.update("Db", status="initialized")
+            # if CURRENT_VERSION =="0.001":
+            #     console.print("dropping the table and create new index")
         except Exception as e:
             status_registry.update("Db", status="crashed", error=e)
             console.print("[bold red]Failed TO Initialize Database")
@@ -399,20 +403,11 @@ def main():
             syncThread.start()
         playlistConf = tune_config["playlist_generation"]
 
-        # print("current hour : " , current_day)
-        # print(playlistConf['auto_generate_playlist'])
         conf = tune_config
 
         if playlistConf["auto_generate_playlist"] and playlistConf[
             "last_auto_generate"
         ] != str(current_day):
-            # print(
-            #     "current day : ",
-            #     current_day,
-            #     "playlist day : ",
-            #     playlistConf["last_auto_generate"],
-            # )
-            # print("auto playlist generate : True")
 
             if current_hour == playlistConf["auto_generate_time"]:
 

@@ -41,7 +41,7 @@ import json  # ADDED
 import requests
 import time
 from config import build_url, itunesApi
-from db import init_db_lib, get_db_connection_lib
+from db import init_db_lib, get_db_connection_lib , init_search_db
 
 # from genre import autoGenre, sync_database_to_json
 import re
@@ -60,7 +60,7 @@ from misc import crossCheckDatabase
 from state import tune_config
 import asyncio
 import httpx
-from db import get_db_connection_lib
+# from db import get_db_connection_lib
 
 SEMAPHORE_LIMIT = 10
 
@@ -76,6 +76,8 @@ _isSyncing = False
 _progress = 0
 _stopSync = False
 _fallbackStop = False
+
+isDroppedSearchTable = False
 
 
 def setSyncSettings(auto_sync=2, itunes=False, timezone="Asia/Kolkata"):
@@ -241,7 +243,7 @@ def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
     finally:
         conn.close()
 
-        import re
+       
 
 def normalize_text(text: str) -> str:
     if not text:
@@ -253,13 +255,18 @@ def normalize_text(text: str) -> str:
    
     return text
 
+
 def normalize_dbSongs(dbSongs: dict) -> dict:
     normalized = {}
-    SKIP_KEYS = {"song_id", "artistId", "albumId", "artistJSON"}
+    SKIP_KEYS = {"song_id", "artistId", "albumId", "artistJSON" , "actualArtist" , "actualAlbum", "actualTitle"}
     
-    console.print("[bold purple]Normalizing DB list")
+    console.print("[bold purple]Normalizing DB list[/bold purple]")
     for sid, song in dbSongs.items():
         new_song = {}
+        new_song["actualArtist"] = song.get("artist", "")
+        new_song["actualAlbum"] = song.get("album", "")
+        # new_song["actualTitle"] = song.get("title", "")
+        
         for key, value in song.items():
             if key in SKIP_KEYS:
                 new_song[key] = value
@@ -272,8 +279,8 @@ def normalize_dbSongs(dbSongs: dict) -> dict:
         
     return normalized
 
-
 def populate_search_index(dbSongs):
+    global isDroppedSearchTable
     conn = get_db_connection_lib()
     cursor = conn.cursor()
 
@@ -288,25 +295,38 @@ def populate_search_index(dbSongs):
             fts_data.append(
                 (
                     sid,
-                    song["title"],
-                    song["artist"],
-                    song.get("artistId") or "",
-                    song.get("artistJSON") or "",
-                    song.get("album") or "",
-                    song.get("albumId") or "",
+                    song.get("title", ""),
+                    song.get("artist", ""),         
+                    song.get("actualArtist", ""),    
+                    song.get("artistId", ""),
+                    song.get("artistJSON", ""),
+                    song.get("album", ""),           
+                    song.get("actualAlbum", ""),     
+                    song.get("albumId", ""),
                     current_lyrics,
                 )
             )
-            metadata_data.append((sid, song.get("lyrics")))
+            metadata_data.append((sid, current_lyrics))
 
         if not fts_data:
             return
-
-        cursor.execute("DELETE FROM song_search_index")
+        if not isDroppedSearchTable:
+            console.print("[bold red]Dropping FTS Search table")
+            cursor.execute("DROP TABLE song_search_index")
+            console.print("[bold yellow]Closing the database")
+            conn.commit()
+            conn.close()
+            console.print("[bold yellow]Initalising table")
+            init_search_db()
+            console.print("[bold green]Creating new db connetion")
+            conn = get_db_connection_lib()
+            cursor = conn.cursor()
+            isDroppedSearchTable = True
+        
         cursor.executemany(
             """INSERT INTO song_search_index 
-               (song_id, title, artist, artistId, artistJSON, album, albumId, lyrics) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (song_id, title, artist, actualArtist, artistId, artistJSON, album, actualAlbum, albumId, lyrics) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             fts_data,
         )
         cursor.executemany(
@@ -314,16 +334,16 @@ def populate_search_index(dbSongs):
             metadata_data,
         )
         conn.commit()
-        console.log(
+        console.print(
             f"[bold green]Search Index & Metadata Refreshed:[/bold green] {len(fts_data)} tracks synced."
         )
     except Exception as e:
-        console.log(f"[bold red]Indexing Error:[/bold red] {e}")
+        console.print(f"[bold red]Indexing Error:[/bold red] {e}")
         conn.rollback()
     finally:
         conn.close()
-
-
+        
+        
 async def fetch_lyrics_task(client, song_id, semaphore):
     async with semaphore:
         url = build_url("getLyricsBySongId") + f"&id={song_id}&f=json"

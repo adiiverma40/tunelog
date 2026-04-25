@@ -34,9 +34,9 @@ export default function Home() {
 
     if (username && password) {
       fetchLogin({ username, password })
-        .then(() => {
-          fetchGetUsers({ admin: username, adminPD: password }).catch(() => {});
-        })
+        .then(() =>
+          fetchGetUsers({ admin: username, adminPD: password }).catch(() => {}),
+        )
         .catch(() => {});
     }
 
@@ -49,28 +49,28 @@ export default function Home() {
         title="Dashboard - Tunelog"
         description="Dashboard for tunelog and navidrome"
       />
-      <div className="grid grid-cols-12 gap-4 md:gap-6">
-        <div className="col-span-12 xl:col-span-8">
-          <LibraryMetrics stats={stats} />
-        </div>
 
-        <div className="col-span-12 xl:col-span-4">
-          <MostSkippedPercentage stats={stats} />
+      <div className="flex flex-col gap-5">
+        <LibraryMetrics stats={stats} />
+        <div className="grid grid-cols-12 gap-5" style={{ minHeight: "460px" }}>
+          <div className="col-span-12 lg:col-span-5 h-full flex flex-col">
+            <MostSkippedPercentage stats={stats} />
+          </div>
+          <div className="col-span-12 lg:col-span-7 h-full flex flex-col">
+            <MostHeardArtist stats={stats} />
+          </div>
         </div>
-
-        <div className="col-span-12 xl:col-span-7">
-          <MostHeardArtist stats={stats} />
-        </div>
-
-        <div className="col-span-12 xl:col-span-5">
-          <MonthlyPlayed />
-        </div>
-
-        <div className="col-span-12 xl:col-span-5">
-          <MostPlaysbyUser />
+        <div className="grid grid-cols-12 gap-5" style={{ minHeight: "360px" }}>
+          <div className="col-span-12 lg:col-span-6 h-full flex flex-col">
+            <MonthlyPlayed />
+          </div>
+          <div className="col-span-12 lg:col-span-6 h-full flex flex-col">
+            <MostPlaysbyUser />
+          </div>
         </div>
       </div>
-      <MiniPlayer/>
+
+      <MiniPlayer />
     </>
   );
 }

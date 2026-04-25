@@ -230,10 +230,12 @@ def init_search_db():
         CREATE VIRTUAL TABLE IF NOT EXISTS song_search_index USING fts5(
             song_id UNINDEXED, 
             title, 
-            artist, 
+            artist,
+            actualArtist, 
             artistId UNINDEXED,
             artistJSON UNINDEXED, 
             album,
+            actualAlbum, 
             albumId UNINDEXED, 
             lyrics,
             tokenize='unicode61 remove_diacritics 1'

@@ -62,9 +62,8 @@ async def proxy_all(request: Request, path: str):
                 "subsonic-response": {
                     "status": "ok",
                     "version": "1.16.1",
-                    "searchResult3": {
-                        "song": searchResponse
-                    }
+                    "searchResult3": searchResponse
+                    
                 }
             }
         else :
@@ -140,6 +139,8 @@ async def proxy_all(request: Request, path: str):
 async def shutdown_event():
     await client.aclose()
     
+    
+    
 async def handle_search_logic(path: str, params: dict , request):
     category_map = {
         "rest/search3": "query", 
@@ -164,8 +165,14 @@ async def handle_search_logic(path: str, params: dict , request):
                     return None, None
                 is_subsonic = (target_path == "rest/search3")
                 if is_subsonic:
+                    song_count = int(params.get("songCount"))
+                    album_count = int(params.get("albumCount"))
+                    artist_count = int(params.get("artistCount"))
+                    
                     song_offset = int(params.get("songOffset", 0))
-                    song_count = int(params.get("songCount", 20))
+                    album_offset = int(params.get("albumOffset", 0))
+                    artist_offset = int(params.get("artistOffset", 0))
+                    
                 
                     start = song_offset
                     end = song_offset + song_count
@@ -181,6 +188,18 @@ async def handle_search_logic(path: str, params: dict , request):
                     #     return None , None  #symphonifum usses "" in search term for library caching
                     
                     results =  await searchTable(request , search_term , end , start) 
+                    # if album_count is not None:
+                    #     albumResult = await searchTable(request, search_term , album_count , 0  , type="actualAlbum")
+                    # if artist_count is not None:
+                    #     artistResult = await searchTable(request, search_term , artist_count , 0  , type="actualArtist")
+                        
+                    # if artist_count and album_count is not None :
+                    #     albumArtistResult =  await searchTable(request , search_term , end , start , type="albumArtist") 
+                        
+                        
+                    
+                
+                
                 elif target_path == "api/song":
                     results =  await searchTable(request, search_term , end , start , "song")
                 elif target_path == "api/album":

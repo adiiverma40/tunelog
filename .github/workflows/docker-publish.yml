@@ -60,7 +60,7 @@ jobs:
           load: true
           push: false
           tags: backend-image:local
-          platforms: linux/amd64
+          platforms: linux/amd64 , linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

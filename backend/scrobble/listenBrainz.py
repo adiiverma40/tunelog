@@ -1,5 +1,4 @@
 import requests
-import rapidfuzz
 from rapidfuzz import process, fuzz
 from collections import defaultdict
 import datetime
@@ -8,11 +7,13 @@ import json
 from db import get_db_connection, get_db_connection_lib
 from rich.console import Console
 from state import tune_config
+import sqlite3 
 
 console = Console()
 
 listenBrainzConf = tune_config.get("listenbrainz", {})
 behaviour = tune_config.get("behavioral_scoring", {})
+
 
 
 def batchSave(matched_records):
@@ -22,56 +23,100 @@ def batchSave(matched_records):
 
     allowed_users = listenBrainzConf.get("for_users", [])
     if not allowed_users:
-        console.print(
-            "[bold red]ABORT: No users defined in config ('for_users' is empty).[/bold red]"
-        )
+        console.print("[bold red]ABORT: No users defined in config ('for_users' is empty).[/bold red]")
         return
 
-    console.print(
-        f"\n[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]"
-    )
+    console.print(f"[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]")
 
-    default_signal = listenBrainzConf.get("treat_data_as", "scrobble")
+    default_signal = str(listenBrainzConf.get("treat_data_as", "complete")).lower()
     repeat_window_seconds = behaviour.get("repeat_time_window_min", 30) * 60
+    dedup_window_seconds = 30 * 60  
+
+    percent_map = {
+        "skip": 15.0,     
+        "partial": 55.0,   
+        "complete": 100.0, 
+        "scrobble": 100.0  
+    }
+    
+    base_percent = percent_map.get(default_signal, 100.0)
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    
     matched_records.sort(key=lambda x: x["listen"]["listened_at"])
+    song_ids = list({r["song"]["songId"] for r in matched_records})
 
-    song_ids = list(set([r["song"]["songId"] for r in matched_records]))
-    placeholders = ",".join(["?"] * len(song_ids))
+    existing_history = defaultdict(list)
+    chunk_size = 900
 
-    cursor.execute(
-        f"SELECT song_id, MAX(timestamp) FROM listens WHERE song_id IN ({placeholders}) GROUP BY song_id",
-        song_ids,
-    )
-
-    last_played = {}
-    for row in cursor.fetchall():
-        if row[1]:
+    console.print("[cyan]Querying database for recent history...[/cyan]")
+    for i in range(0, len(song_ids), chunk_size):
+        chunk = song_ids[i:i + chunk_size]
+        placeholders = ",".join(["?"] * len(chunk))
+        
+        query = f"""
+            SELECT song_id, timestamp
+            FROM (
+                SELECT song_id, timestamp,
+                       ROW_NUMBER() OVER (PARTITION BY song_id ORDER BY timestamp DESC) as rn
+                FROM listens
+                WHERE song_id IN ({placeholders})
+            )
+            WHERE rn <= 10
+        """
+        
+        cursor.execute(query, chunk)
+        
+        for row in cursor.fetchall():
             dt_obj = datetime.datetime.strptime(row[1], "%Y-%m-%d %H:%M:%S")
-            last_played[row[0]] = int(dt_obj.timestamp())
+            existing_history[row[0]].append(int(dt_obj.timestamp()))
 
     insert_data = []
+    duplicates_ignored = 0
 
+    console.print("[cyan]Processing and Deduplicating records...[/cyan]")
+    
     for record in matched_records:
         listen = record["listen"]
         song = record["song"]
 
         song_id = song["songId"]
         listened_at = listen["listened_at"]
+        title = song.get("title", "Unknown")
+        artist = song.get("artist", "Unknown")
+        human_time = datetime.datetime.utcfromtimestamp(listened_at).strftime('%Y-%m-%d %H:%M:%S')
+        console.print(f"[dim]Analyzing: '{title}' by {artist} ({human_time})[/dim]")
+
+        history = existing_history[song_id]
+
+        is_duplicate = False
+        for past_ts in history:
+            if abs(listened_at - past_ts) <= dedup_window_seconds:
+                is_duplicate = True
+                break
+
+        if is_duplicate:
+            duplicates_ignored += 1
+            console.print(f"[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
+            continue
 
         current_signal = default_signal
-        if song_id in last_played:
-            time_diff = listened_at - last_played[song_id]
-            if 0 <= time_diff <= repeat_window_seconds:
+        current_percent = base_percent
+
+        past_plays_before = [ts for ts in history if ts < listened_at]
+        
+        if past_plays_before:
+            last_played_ts = max(past_plays_before)
+            time_diff = listened_at - last_played_ts
+            
+            if time_diff <= repeat_window_seconds:
                 current_signal = "repeat"
+                current_percent = 100.0  
+                console.print(f"[bold blue] ↳ ↻ Flagged as Repeat (Gap: {int(time_diff/60)}m)[/bold blue]")
 
-        last_played[song_id] = listened_at
-
-        dt_string = datetime.datetime.fromtimestamp(listened_at).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        existing_history[song_id].append(listened_at)
+        dt_string = datetime.datetime.utcfromtimestamp(listened_at).strftime("%Y-%m-%d %H:%M:%S")
 
         metadata = listen.get("track_metadata", {}).get("additional_info", {})
         duration_ms = metadata.get("duration_ms", 0)
@@ -79,35 +124,36 @@ def batchSave(matched_records):
 
         for username in allowed_users:
             insert_data.append(
-                (
-                    song_id,
-                    song.get("title", ""),
-                    song.get("artist", ""),
-                    song.get("album", ""),
-                    song.get("genre", ""),
-                    duration_sec,
-                    1,
-                    100.0,
-                    current_signal,
-                    dt_string,
-                    username,
-                )
+                (song_id, title, artist, song.get("album", ""), song.get("genre", ""), duration_sec, 1, current_percent, current_signal, dt_string, username)
             )
+            
+        console.print(f"[bold green] ↳ ✔ Queued for insertion ({current_signal})[/bold green]")
+    console.print("[cyan]Attempting to write to database...[/cyan]")
+    if insert_data:
+        try:
+            cursor.executemany(
+                """
+                INSERT INTO listens (song_id, title, artist, album, genre, duration, played, percent_played, signal, timestamp, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                insert_data,
+            )
+            conn.commit()
+            
+            unique_tracks = len(insert_data) // len(allowed_users)
+            console.print(f"[bold green]✔ Successfully saved {unique_tracks} unique tracks ({len(insert_data)} total plays)![/bold green]\n")
+            
+        except sqlite3.OperationalError as e:
+            conn.rollback()
+            console.print(f"[bold red]✖ Database Save Failed: {e}[/bold red]")
+            console.print("[bold red]The database was locked by another process (likely a websocket or API call). The sync will retry next cycle.[/bold red]")
+    else:
+        console.print(f"[bold yellow]Total Duplicates Ignored: {duplicates_ignored}[/bold yellow]")
+        console.print("[bold red]No new unique tracks to save to the database.[/bold red]")
 
-    cursor.executemany(
-        """
-        INSERT INTO listens (song_id, title, artist, album, genre, duration, played, percent_played, signal, timestamp, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        insert_data,
-    )
-
-    conn.commit()
     conn.close()
 
-    console.print(
-        f"[bold green]✔ Successfully saved {len(insert_data)} total plays across {len(allowed_users)} users![/bold green]\n"
-    )
+
 
 
 def getListenBrainzResponse():
@@ -212,7 +258,7 @@ def getSongsFromDb():
 
 def fallback_stage_1(unmatched_listens, songs_list, matched_records):
     console.print(
-        "\n[cyan]Building Artist, Album, and Title indexes for fallback...[/cyan]"
+        "[cyan]Building Artist, Album, and Title indexes for fallback...[/cyan]"
     )
     artist_dict = defaultdict(list)
     album_dict = defaultdict(list)
@@ -277,7 +323,7 @@ def fallback_stage_1(unmatched_listens, songs_list, matched_records):
 
 def fallback_stage_2(unmatched_listens, artist_dict, matched_records):
     console.print(
-        "\n[bold yellow]Starting Fallback 2: Strict Artist -> Title Dictionary Search[/bold yellow]"
+        "[bold yellow]Starting Fallback 2: Strict Artist -> Title Dictionary Search[/bold yellow]"
     )
     known_artists = list(artist_dict.keys())
     final_misses = []
@@ -325,7 +371,7 @@ def fallback_stage_2(unmatched_listens, artist_dict, matched_records):
 
 def fallback_stage_3(unmatched_listens, songs_list, matched_records):
     console.print(
-        "\n[bold yellow]Starting Fallback 3: Global Title -> Multi-Artist Verification[/bold yellow]"
+        "[bold yellow]Starting Fallback 3: Global Title -> Multi-Artist Verification[/bold yellow]"
     )
     absolute_misses = []
 
@@ -431,12 +477,12 @@ def fuzzyMatchingSong():
             unmatched_listens.append(listen)
 
     console.print(
-        f"\n[bold green]Direct Matches Found: {len(matched_records)}/{len(responseSongs)}[/bold green]"
+        f"[bold green]Direct Matches Found: {len(matched_records)}/{len(responseSongs)}[/bold green]"
     )
 
     if unmatched_listens:
         console.print(
-            f"\n[bold yellow]Sending {len(unmatched_listens)} tracks to Fallback Pipeline...[/bold yellow]"
+            f"[bold yellow]Sending {len(unmatched_listens)} tracks to Fallback Pipeline...[/bold yellow]"
         )
 
         remaining_1, artist_index = fallback_stage_1(
@@ -447,6 +493,6 @@ def fuzzyMatchingSong():
         if remaining_2:
             final_garbage = fallback_stage_3(remaining_2, songs_list, matched_records)
             console.print(
-                f"\n[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
+                f"[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
             )
     batchSave(matched_records)

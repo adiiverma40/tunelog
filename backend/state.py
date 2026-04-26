@@ -147,7 +147,8 @@ DEFAULT_CONFIG = {
         "pool_listen_brainz" : 1,
         "last_synced" : "",
         "for_users" : [],
-        "enabled" : True
+        "enabled" : True,
+        "dedup_window_seconds" : 30
         
         },
 }

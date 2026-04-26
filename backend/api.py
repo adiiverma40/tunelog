@@ -141,6 +141,7 @@ class configData(BaseModel):
     sync_and_automation: dict
     api_and_performance: dict
     jam : dict
+    listenbrainz : dict
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}

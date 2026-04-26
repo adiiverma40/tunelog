@@ -118,7 +118,9 @@ def init_db():
         )
         """
     )
-
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_song_id ON listens(song_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_user_song ON listens(user_id, song_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_timestamp ON listens(timestamp);")
     conn.commit()
     conn.close()
 

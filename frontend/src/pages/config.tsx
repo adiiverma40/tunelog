@@ -8,6 +8,7 @@ import {
   fetchUpdateConfig,
   TuneConfig,
   AutoGenerateExplicit,
+  TreatDataAs,
 } from "../API/API";
 
 interface Config {
@@ -54,6 +55,13 @@ interface Config {
   jam_only_host_change_queue: boolean;
   jam_only_host_clear_queue: boolean;
   jam_only_host_add_queue: boolean;
+  lb_enabled: boolean;
+  lb_username: string;
+  lb_treat_data_as: TreatDataAs;
+  lb_pool_interval: number;
+  lb_for_users: string[];
+  lb_dedup_window: number;
+  lb_last_synced: number;
 }
 
 const DEFAULTS: Config = {
@@ -100,6 +108,13 @@ const DEFAULTS: Config = {
   jam_only_host_change_queue: false,
   jam_only_host_clear_queue: true,
   jam_only_host_add_queue: false,
+  lb_enabled: false,
+  lb_username: "",
+  lb_treat_data_as: "partial",
+  lb_pool_interval: 1,
+  lb_for_users: [],
+  lb_dedup_window: 30,
+  lb_last_synced: 0, 
 };
 
 const mapApiToState = (api: TuneConfig): Config => ({
@@ -150,6 +165,13 @@ const mapApiToState = (api: TuneConfig): Config => ({
   jam_only_host_change_queue: api.jam?.only_host_change_queue ?? false,
   jam_only_host_clear_queue: api.jam?.only_host_clear_queue ?? true,
   jam_only_host_add_queue: api.jam?.only_host_add_queue ?? false,
+  lb_enabled: api.listenbrainz?.enabled ?? false,
+  lb_username: api.listenbrainz?.username ?? "",
+  lb_treat_data_as: api.listenbrainz?.treat_data_as ?? "partial",
+  lb_pool_interval: api.listenbrainz?.pool_listen_brainz ?? 1,
+  lb_for_users: api.listenbrainz?.for_users ?? [],
+  lb_dedup_window: api.listenbrainz?.dedup_window_seconds ?? 30,
+  lb_last_synced: api.listenbrainz?.last_synced ?? 0,
 });
 
 const mapStateToApi = (state: Config): TuneConfig => ({
@@ -213,6 +235,15 @@ const mapStateToApi = (state: Config): TuneConfig => ({
     only_host_change_queue: state.jam_only_host_change_queue,
     only_host_clear_queue: state.jam_only_host_clear_queue,
     only_host_add_queue: state.jam_only_host_add_queue,
+  },
+  listenbrainz: {
+    enabled: state.lb_enabled,
+    username: state.lb_username,
+    treat_data_as: state.lb_treat_data_as,
+    pool_listen_brainz: state.lb_pool_interval,
+    for_users: state.lb_for_users,
+    dedup_window_seconds: state.lb_dedup_window,
+    last_synced: state.lb_last_synced,
   },
 });
 
@@ -303,7 +334,6 @@ function SectionCard({
   );
 }
 
-// Collapsible subgroup — replaces the old static SubgroupLabel
 function SubgroupSection({
   label,
   children,
@@ -576,6 +606,22 @@ const IconJam = (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
+const IconListenBrainz = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="text-gray-500 dark:text-gray-400"
+  >
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+  </svg>
+);
 
 export default function Config() {
   const [cfg, setCfg] = useState<Config>(DEFAULTS);
@@ -655,7 +701,8 @@ export default function Config() {
     }
   };
 
-  const handleReset = () => setCfg(DEFAULTS);
+  const handleReset = () =>
+    setCfg((prev) => ({ ...DEFAULTS, lb_last_synced: prev.lb_last_synced }));
 
   if (isLoading) {
     return (
@@ -1077,6 +1124,7 @@ export default function Config() {
             </ConfigRow>
           </SubgroupSection>
         </SectionCard>
+
         <SectionCard
           title="Behavioral scoring"
           desc="Thresholds and decay that determine how interactions become signals"
@@ -1152,6 +1200,7 @@ export default function Config() {
             />
           </ConfigRow>
         </SectionCard>
+
         <SectionCard
           title="Sync and automation"
           desc="Background sync schedule and external API toggles"
@@ -1206,6 +1255,7 @@ export default function Config() {
             />
           </ConfigRow>
         </SectionCard>
+
         <SectionCard
           title="API and performance"
           desc="Retry limits, search depth, and fuzzy match confidence thresholds"
@@ -1305,6 +1355,7 @@ export default function Config() {
             </ConfigRow>
           </SubgroupSection>
         </SectionCard>
+
         <SectionCard
           title="Jam"
           desc="Shared listening session permissions and queue behaviour"
@@ -1351,6 +1402,85 @@ export default function Config() {
             />
           </ConfigRow>
         </SectionCard>
+
+        <SectionCard
+          title="ListenBrainz"
+          desc="Import scrobble history from ListenBrainz as scored signals"
+          icon={IconListenBrainz}
+        >
+          <ConfigRow
+            label="Enable ListenBrainz"
+            desc="Master toggle — pull and process listens from ListenBrainz"
+          >
+            <Switch
+              label=""
+              defaultChecked={cfg.lb_enabled}
+              onChange={(v) => set("lb_enabled", v)}
+            />
+          </ConfigRow>
+          <ConfigRow
+            label="ListenBrainz username"
+            desc="Public ListenBrainz account to fetch listens from"
+          >
+            <input
+              type="text"
+              value={cfg.lb_username}
+              onChange={(e) => set("lb_username", e.target.value)}
+              placeholder="e.g. adiiverma40"
+              className="w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </ConfigRow>
+          <ConfigRow
+            label="Treat data as"
+            desc="Signal type to assign to imported ListenBrainz listens"
+          >
+            <select
+              value={cfg.lb_treat_data_as}
+              onChange={(e) =>
+                set("lb_treat_data_as", e.target.value as TreatDataAs)
+              }
+              className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="partial">Partial</option>
+              <option value="complete">Complete</option>
+              <option value="skip">Skip</option>
+            </select>
+          </ConfigRow>
+          <ConfigRow
+            label="Poll interval"
+            desc="How often to fetch new listens from ListenBrainz"
+          >
+            <NumInput
+              value={cfg.lb_pool_interval}
+              onChange={(v) => set("lb_pool_interval", v)}
+              min={1}
+              unit="hr"
+            />
+          </ConfigRow>
+          <ConfigRow
+            label="Target users"
+            desc="TuneLog users whose scoring gets updated with LB data"
+            fullWidth
+          >
+            <UserChips
+              allUsers={allUsers}
+              selected={cfg.lb_for_users}
+              onChange={(v) => set("lb_for_users", v)}
+            />
+          </ConfigRow>
+          <ConfigRow
+            label="Dedup window"
+            desc="Ignore duplicate scrobbles arriving within this window"
+          >
+            <NumInput
+              value={cfg.lb_dedup_window}
+              onChange={(v) => set("lb_dedup_window", v)}
+              min={0}
+              unit="min"
+            />
+          </ConfigRow>
+        </SectionCard>
+
         <div className="flex items-center justify-between rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] px-5 py-4">
           <span
             className={`text-xs text-green-500 transition-opacity duration-300 ${saved ? "opacity-100" : "opacity-0"}`}

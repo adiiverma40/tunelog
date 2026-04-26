@@ -1,11 +1,11 @@
 const BASE_URL = import.meta.env.VITE_API_URL;
 
-import { io , Socket } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 
-// socket for jam  
+// socket for jam
 
 export const socket: Socket = io(BASE_URL, {
-   auth: {
+  auth: {
     username: localStorage.getItem("tunelog_user"),
   },
   autoConnect: true,
@@ -21,12 +21,10 @@ export function disconnectSocket() {
   if (socket.connected) socket.disconnect();
 }
 
-
-
 export interface UpdateProfileRequest {
   username: string;
   displayName: string;
-  avatar?: File | null; 
+  avatar?: File | null;
 }
 
 export interface UpdateProfileResponse {
@@ -127,8 +125,8 @@ export interface User {
   username: string;
   password: string;
   isAdmin: boolean;
-  name : string;
-  avatarUrl : string | null; 
+  name: string;
+  avatarUrl: string | null;
 }
 
 export interface GetUsersResponse {
@@ -157,7 +155,7 @@ export interface UserProfileResponse {
   repeat: number;
   lastLogged: string;
   topSongs: {
-    id : string;
+    id: string;
     title: string;
     artist: string;
     count: number;
@@ -172,7 +170,7 @@ export interface UserProfileResponse {
     count: number;
   }[];
   recentHistory: {
-    id : string; 
+    id: string;
     title: string;
     artist: string;
     genre: string;
@@ -299,11 +297,14 @@ export interface PlaylistCreateRequest {
   song_ids: string[];
   playlist_name: string;
 }
+
 export type AutoGenerateExplicit =
   | "all"
   | "cleaned"
   | "explicit"
   | "notExplicit";
+
+export type TreatDataAs = "partial" | "complete" | "skip";
 
 export interface PlaylistGenerationConfig {
   playlist_size: number;
@@ -315,7 +316,7 @@ export interface PlaylistGenerationConfig {
   auto_generate_explicit: AutoGenerateExplicit;
   auto_generate_for: string[];
   auto_generate_injection: boolean;
-  last_auto_generate:string;
+  last_auto_generate: string;
 
   signal_weights: {
     repeat: number;
@@ -365,6 +366,15 @@ export interface ApiAndPerformanceConfig {
   };
 }
 
+export interface ListenBrainzConfig {
+  enabled: boolean;
+  username: string;
+  treat_data_as: TreatDataAs;
+  pool_listen_brainz: number;
+  for_users: string[];
+  dedup_window_seconds: number;
+  last_synced: number; 
+}
 
 export interface TuneConfig {
   playlist_generation: PlaylistGenerationConfig;
@@ -372,11 +382,12 @@ export interface TuneConfig {
   sync_and_automation: SyncAndAutomationConfig;
   api_and_performance: ApiAndPerformanceConfig;
   jam?: {
-  same_song_in_queue: boolean;
-  only_host_change_queue: boolean;
-  only_host_clear_queue: boolean;
-  only_host_add_queue: boolean;
-};
+    same_song_in_queue: boolean;
+    only_host_change_queue: boolean;
+    only_host_clear_queue: boolean;
+    only_host_add_queue: boolean;
+  };
+  listenbrainz?: ListenBrainzConfig;
 }
 
 export interface UpdateConfigResponse {
@@ -636,13 +647,9 @@ export async function writeGenre(
   noisyGenre: string,
 ): Promise<GenreResponse> {
   const res = await fetch(
-    `${BASE_URL}/api/genre/write?genre=${encodeURIComponent(
-      genre,
-    )}&noisyGenre=${encodeURIComponent(noisyGenre)}`,
+    `${BASE_URL}/api/genre/write?genre=${encodeURIComponent(genre)}&noisyGenre=${encodeURIComponent(noisyGenre)}`,
   );
-
   if (!res.ok) throw new Error("Failed to write genre");
-
   return res.json();
 }
 
@@ -650,26 +657,16 @@ export async function deleteGenre(
   category: string,
   value?: string,
 ): Promise<GenreResponse> {
-  let url = `${BASE_URL}/api/genre/delete?category=${encodeURIComponent(
-    category,
-  )}`;
-
-  if (value) {
-    url += `&value=${encodeURIComponent(value)}`;
-  }
-
+  let url = `${BASE_URL}/api/genre/delete?category=${encodeURIComponent(category)}`;
+  if (value) url += `&value=${encodeURIComponent(value)}`;
   const res = await fetch(url);
-
   if (!res.ok) throw new Error("Failed to delete genre");
-
   return res.json();
 }
 
 export async function fetchGenresFromDb(): Promise<GenreListResponse> {
   const res = await fetch(`${BASE_URL}/api/genre/get`);
-
   if (!res.ok) throw new Error("Failed to fetch genres from DB");
-
   return res.json();
 }
 
@@ -682,12 +679,10 @@ export async function autoMatchGenres(): Promise<AutoMatchResponse> {
 export async function fetchImportCSV(file: File): Promise<ImportResponse> {
   const formData = new FormData();
   formData.append("file", file);
-
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csv`, {
     method: "POST",
     body: formData,
   });
-
   if (!res.ok) throw new Error("Failed to upload CSV");
   return res.json();
 }
@@ -722,9 +717,7 @@ export function connectNotificationStream(
       console.error("[SSE] Failed to parse notification:", e);
     }
   };
-
   if (onError) es.onerror = onError;
-
   return es;
 }
 
@@ -746,10 +739,8 @@ export async function fetchUpdateConfig(
   return res.json();
 }
 
-
-
 export async function fetchUpdateProfile(
-  data: UpdateProfileRequest
+  data: UpdateProfileRequest,
 ): Promise<UpdateProfileResponse> {
   const formData = new FormData();
   formData.append("username", data.username);
@@ -761,15 +752,11 @@ export async function fetchUpdateProfile(
     method: "POST",
     body: formData,
   });
-
   if (!response.ok) {
     throw new Error(`Failed to update profile: ${response.statusText}`);
   }
-  const result: UpdateProfileResponse = await response.json();
-  return result;
+  return response.json();
 }
-
-
 
 export interface NavidromeSong {
   id: string;
@@ -809,8 +796,8 @@ export async function getSong(songId: string): Promise<NavidromeSong | null> {
 
     const song = data?.["subsonic-response"]?.song;
     if (!song) return null;
-    console.log("get song ")
-    console.log(song)
+    console.log("get song");
+    console.log(song);
     return song as NavidromeSong;
   } catch {
     return null;
@@ -831,7 +818,7 @@ export function getCoverArtUrl(coverArtId: string): string {
     size: "80",
   });
 
-  const url =  `${baseUrl}/rest/getCoverArt?${params}`;
-  console.log(url)
-  return url
+  const url = `${baseUrl}/rest/getCoverArt?${params}`;
+  console.log(url);
+  return url;
 }

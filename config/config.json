@@ -3,18 +3,13 @@
         "playlist_size": 40,
         "wildcard_day": 60,
         "auto_generate_playlist": true,
-        "auto_generate_time": 20,
+        "auto_generate_time": 4,
         "auto_generate_when_complete": true,
         "auto_generate_completion_percent": 80,
         "auto_generate_explicit": "all",
-        "auto_generate_for": [
-            "adii",
-            "vedika",
-            "rajkrit",
-            "aditi"
-        ],
+        "auto_generate_for": [],
         "auto_generate_injection": true,
-        "last_auto_generate": "2026-04-25",
+        "last_auto_generate": "0",
         "signal_weights": {
             "repeat": 3,
             "positive": 2,
@@ -36,7 +31,7 @@
     "behavioral_scoring": {
         "skip_threshold_pct": 30,
         "positive_threshold_pct": 80,
-        "repeat_time_window_min": 60,
+        "repeat_time_window_min": 30,
         "stale_session_timeout_sec": 600,
         "min_listens_for_star": 3,
         "historical_decay_factor": 0.9
@@ -60,19 +55,18 @@
         }
     },
     "jam": {
-        "same_song_in_queue": true,
-        "only_host_change_queue": true,
+        "same_song_in_queue": false,
+        "only_host_change_queue": false,
         "only_host_clear_queue": true,
         "only_host_add_queue": false
     },
     "listenbrainz": {
+        "enabled": true,
         "username": "adiiverma40",
         "treat_data_as": "partial",
         "pool_listen_brainz": 5,
-        "last_synced": 1777151057,
-        "for_users": [
-            "adii"
-        ],
-        "enabled": true
+        "for_users": [],
+        "dedup_window_seconds": 30,
+        "last_synced": 1777176977
     }
 }

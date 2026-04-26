@@ -17,6 +17,7 @@ import Config from "./pages/config";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
 import JamUsers from "./pages/Jam/JamUsers";
+// import SongPage from "./pages/songHistory";
 
 import { fetchLogin, fetchGetUsers } from "./API/API";
 
@@ -74,6 +75,8 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
           <Route path="/jamuser" element={<JamUsers />} />
+
+          {/* <Route path="/song/:songId" element={<SongPage />} /> */}
         </Route>
 
         <Route path="/signin" element={<SignIn />} />

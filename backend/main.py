@@ -471,11 +471,12 @@ def main():
                             return
 
                         isFuzz = fuzzyMatchingSong()
-                        if isFuzz:
-                            
-                            tune_config["listenbrainz"]["last_synced"] = int(time.time())
-                            save_config(tune_config)
-                            console.print("[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]")
+                        print(isFuzz)
+                        # if isFuzz:
+                        
+                        tune_config["listenbrainz"]["last_synced"] = int(time.time())
+                        save_config(tune_config)
+                        console.print("[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]")
                     except Exception as e:
                         console.print(f"[bold red]ListenBrainz Auto-Sync Failed:[/bold red] {e}")
                     finally:

@@ -65,7 +65,9 @@
         "username": "",
         "treat_data_as": "partial",
         "pool_listen_brainz": 5,
-        "for_users": [],
+        "for_users": [
+            
+        ],
         "dedup_window_seconds": 30,
         "last_synced": 0
     }

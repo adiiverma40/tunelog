@@ -13,6 +13,9 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - [ListenBrainz Integration](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz) : guide on Listenbrainz integration in tunelog and dev info
 
 
+### Note 
+> If there is any error, try copy pasting the config.json from github to your local file
+
 ## Features
 
 - Personalized playlist generation from listening history

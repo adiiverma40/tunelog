@@ -145,7 +145,7 @@ DEFAULT_CONFIG = {
         "username": "", 
         "treat_data_as": "partial",
         "pool_listen_brainz" : 1,
-        "last_synced" : "",
+        "last_synced" : 0,
         "for_users" : [],
         "enabled" : True,
         "dedup_window_seconds" : 30

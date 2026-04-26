@@ -447,6 +447,11 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
 
 
 def fuzzyMatchingSong():
+    fresh_lb_conf = tune_config.get("listenbrainz", {})
+    if not fresh_lb_conf.get("username"):
+        console.print("[bold red]Aborting: No ListenBrainz username configured.[/bold red]")
+        return
+    
     songs_list = getSongsFromDb()
     responseSongs = getListenBrainzResponse()
 
@@ -501,3 +506,4 @@ def fuzzyMatchingSong():
                 f"[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
             )
     batchSave(matched_records)
+    return True

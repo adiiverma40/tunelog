@@ -315,7 +315,7 @@ def main():
             ProxyThread = threading.Thread(
                 target=uvicorn.run,
                 args=("proxy.proxy:app",),
-                kwargs={"host": "0.0.0.0", "port": proxyPort},
+                kwargs={"host": "0.0.0.0", "port": proxyPort ,  "log_level": "warning"} ,
                 daemon=True,
             )
             uvicornThread.start()
@@ -426,7 +426,7 @@ def main():
                     scores = score_song(
                         user, history_dict=history, library_dict=library1
                     )
-                    unheard, unheard_ratio = get_unheard_songs(scores)
+                    unheard, unheard_ratio , all_time = get_unheard_songs(library1 , user)
                     wildcards = get_wildcard_songs(scores, user)
                     playlist, song_signals = build_playlist(
                         library1,
@@ -435,6 +435,7 @@ def main():
                         unheard,
                         wildcards,
                         unheard_ratio,
+                        all_time ,
                         user,
                         explicit_filter,
                         size,

@@ -735,7 +735,7 @@ def generatePlaylist(data: PlaylistOptions):
             # print("api signal weight " , data.weights)
         library, history = getDataFromDb()
         scores = score_song(username, history_dict=history, library_dict=library)
-        unheard, unheard_ratio = get_unheard_songs(scores)
+        unheard, unheard_ratio , all_time_heard = get_unheard_songs(library ,username)
         wildcards = get_wildcard_songs(scores, username)
         playlist, song_signals = build_playlist(
             library,
@@ -743,7 +743,8 @@ def generatePlaylist(data: PlaylistOptions):
             scores,
             unheard,
             wildcards,
-            unheard_ratio,
+            unheard_ratio, 
+            all_time_heard ,
             username,
             explicit_filter,
             size,
@@ -1314,7 +1315,7 @@ async def start_jam(sid, data):
         history_dict=history,
         library_dict=library,
     )
-    unheard, unheard_ratio = get_unheard_songs(scores)
+    unheard, unheard_ratio , all_time_heard = get_unheard_songs(library , username)
     wildcards = get_wildcard_songs(scores, username)
 
     playlist, song_signals = build_playlist(
@@ -1324,6 +1325,7 @@ async def start_jam(sid, data):
         unheard,
         wildcards,
         unheard_ratio,
+        all_time_heard,
         username,
         "all",
         10,

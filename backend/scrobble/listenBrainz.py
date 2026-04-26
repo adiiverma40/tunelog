@@ -170,12 +170,14 @@ def getListenBrainzResponse():
         console.print(
             f"[blue]Syncing since: {datetime.datetime.fromtimestamp(since)}[/blue]"
         )
-
+        LB_HEADERS = {
+    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
+}
         url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
         params = {"min_ts": since, "count": 100}
 
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params , headers=LB_HEADERS)
             response.raise_for_status()
             data = response.json()
             listens = data.get("payload", {}).get("listens", [])
@@ -196,11 +198,14 @@ def getListenBrainzResponse():
 def deep_history_sync(pagination=20):
     all_listens = []
     ceiling_ts = int(time.time())
+    LB_HEADERS = {
+    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
+}
     while True:
         params = {"max_ts": ceiling_ts, "count": pagination}
         url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
 
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params , headers=LB_HEADERS)
         data = response.json()
         listens = data.get("payload", {}).get("listens", [])
 

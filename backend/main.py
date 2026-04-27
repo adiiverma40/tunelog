@@ -240,7 +240,7 @@ def log_history(song):
             song["user_id"],
         ),
     )
-
+    
     conn.commit()
     conn.close()
     push_star(song, signal)
@@ -284,21 +284,21 @@ def autoSyncWithFallback():
 
 
 def main():
-    # print("trying to use logger")
-    # setup_logger()
     # Database
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
     with console.status("[bold green]Initializing Database ..."):
         try:
-            # print("Initializing databse")
             init_db()
             init_db_lib()
             init_db_usr()
             init_db_playlist()
             init_search_db()
             status_registry.update("Db", status="initialized")
-            # if CURRENT_VERSION =="0.001":
-            #     console.print("dropping the table and create new index")
+            console.print("[bold yellow]Freeing Up Database Size TuneLog")
+            conn = get_db_connection()
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.execute("VACUUM")
+            conn.close()
         except Exception as e:
             status_registry.update("Db", status="crashed", error=e)
             console.print("[bold red]Failed TO Initialize Database")

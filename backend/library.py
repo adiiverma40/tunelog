@@ -322,6 +322,8 @@ def populate_search_index(dbSongs):
             conn = get_db_connection_lib()
             cursor = conn.cursor()
             isDroppedSearchTable = True
+        else:
+            cursor.execute("DELETE FROM song_search_index")
         
         cursor.executemany(
             """INSERT INTO song_search_index 
@@ -659,6 +661,12 @@ def sync_library():
         f"Skipped: [blue]{skipped}[/blue]"
     )
     console.print(Panel(summary, border_style="bright_blue", expand=False))
+    
+    console.print("[bold red]Freeing Up Database Size")
+    conn = get_db_connection_lib()
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn.execute("VACUUM")
+    conn.close()
 
 
 if __name__ == "__main__":

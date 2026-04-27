@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useParams} from "react-router";
+import { useLocation, useParams } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { Modal } from "../components/ui/modal";
@@ -860,7 +860,11 @@ export default function UserProfilePage() {
                         (h) => (
                           <th
                             key={h}
-                            className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 first:pl-6 whitespace-nowrap"
+                            className={`text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 first:pl-6 whitespace-nowrap ${
+                              ["#", "Genre", "Listened At"].includes(h)
+                                ? "hidden sm:table-cell"
+                                : ""
+                            }`}
                           >
                             {h}
                           </th>
@@ -877,7 +881,7 @@ export default function UserProfilePage() {
                         //   navigate(`/song/${h.id}`, { state: { song: h } })
                         // }
                       >
-                        <td className="pl-6 pr-2 py-3 text-xs text-gray-300 dark:text-gray-600 tabular-nums">
+                        <td className="hidden sm:table-cell pl-6 pr-2 py-3 text-xs text-gray-300 dark:text-gray-600 tabular-nums">
                           {i + 1}
                         </td>
                         <td className="px-3 py-2.5">
@@ -897,13 +901,13 @@ export default function UserProfilePage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 capitalize">
+                        <td className="hidden sm:table-cell px-4 py-3 text-xs text-gray-500 dark:text-gray-400 capitalize">
                           {h.genre || "—"}
                         </td>
                         <td className="px-4 py-3">
                           <SignalPill signal={h.signal} dark={dark} />
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap tabular-nums">
+                        <td className="hidden sm:table-cell px-4 py-3 text-xs text-gray-400 whitespace-nowrap tabular-nums">
                           {formatDate(h.listened_at)}
                         </td>
                       </tr>

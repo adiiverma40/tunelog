@@ -110,6 +110,7 @@ DEFAULT_CONFIG = {
         "injection_breakdown": {"signal": 0.57, "unheard": 0.35, "wildcard": 0.08},
     },
     "behavioral_scoring": {
+        "long_song_duration" : 300,
         "skip_threshold_pct": 30,
         "positive_threshold_pct": 80,
         "repeat_time_window_min": 30,

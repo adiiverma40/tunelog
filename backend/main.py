@@ -213,37 +213,110 @@ def signal_system(percent_played, song_id, user_id):
     return base
 
 
+
 def log_history(song):
     played = min(song["actual_played"], song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
     signal = signal_system(percent_played, song["song_id"], song["user_id"])
 
+    behavioralScoring = tune_config["behavioral_scoring"]
+    long_song = behavioralScoring["long_song_duration"]
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-                INSERT INTO listens(
-                song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
-                )
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+
+    if song["duration"] >= long_song:
+        console.print("[bold red]Long song detected — merging listen history.")
+
+        window_count = max(1, round(song["duration"] / long_song))
+
+        prior_rows = cursor.execute(
+            """
+            SELECT id, played, signal FROM listens
+            WHERE song_id = ? AND user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
             """,
-        (
-            song["song_id"],
-            song["title"],
-            song["artist"],
-            song["album"],
-            song["genre"],
-            song["duration"],
-            played,
-            percent_played,
-            signal,
-            song["user_id"],
-        ),
-    )
-    
-    conn.commit()
-    conn.close()
-    push_star(song, signal)
+            (song["song_id"], song["user_id"], window_count),
+        ).fetchall()
+
+        prior_ids = [row[0] for row in prior_rows]
+        prior_played_total = sum(row[1] for row in prior_rows)
+        most_recent_prior_signal = prior_rows[0][2] if prior_rows else None
+
+        combined_played = prior_played_total + played
+        combined_played = min(combined_played, song["duration"])
+        combined_percent = min(round((combined_played / song["duration"]) * 100), 100)
+
+        scoring = tune_config["behavioral_scoring"]
+        if combined_percent <= scoring["skip_threshold_pct"]:
+            merged_signal = "skip"
+        elif combined_percent < scoring["positive_threshold_pct"]:
+            merged_signal = "partial"
+        else:
+            merged_signal = "positive"
+        if prior_rows and most_recent_prior_signal != "skip" and merged_signal == "positive":
+            merged_signal = "repeat"
+
+        if prior_ids:
+            placeholders = ",".join("?" * len(prior_ids))
+            cursor.execute(f"DELETE FROM listens WHERE id IN ({placeholders})", prior_ids)
+            console.print(f"[yellow]Deleted {len(prior_ids)} prior row(s) for merge.")
+
+        cursor.execute(
+            """
+            INSERT INTO listens(
+                song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
+            )
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                song["song_id"],
+                song["title"],
+                song["artist"],
+                song["album"],
+                song["genre"],
+                song["duration"],
+                combined_played,
+                combined_percent,
+                merged_signal,
+                song["user_id"],
+            ),
+        )
+
+        console.print(
+            f"[green]Merged row inserted — played: {combined_played}s ({combined_percent}%), signal: {merged_signal}"
+        )
+
+        conn.commit()
+        conn.close()
+        push_star(song, merged_signal)
+
+    else:
+        cursor.execute(
+            """
+            INSERT INTO listens(
+                song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
+            )
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                song["song_id"],
+                song["title"],
+                song["artist"],
+                song["album"],
+                song["genre"],
+                song["duration"],
+                played,
+                percent_played,
+                signal,
+                song["user_id"],
+            ),
+        )
+
+        conn.commit()
+        conn.close()
+        push_star(song, signal)
 
 
 def autoSyncWithFallback():
@@ -315,7 +388,7 @@ def main():
             ProxyThread = threading.Thread(
                 target=uvicorn.run,
                 args=("proxy.proxy:app",),
-                kwargs={"host": "0.0.0.0", "port": proxyPort ,  "log_level": "warning"} ,
+                kwargs={"host": "0.0.0.0", "port": proxyPort, "log_level": "warning"},
                 daemon=True,
             )
             uvicornThread.start()
@@ -381,7 +454,7 @@ def main():
 
     last_auto_sync_day = None
     isGenerated = False
-    
+
     is_lb_syncing = False
     while True:
         if library._startSyncSong and not library._isSyncing:
@@ -426,7 +499,7 @@ def main():
                     scores = score_song(
                         user, history_dict=history, library_dict=library1
                     )
-                    unheard, unheard_ratio , all_time = get_unheard_songs(library1 , user)
+                    unheard, unheard_ratio, all_time = get_unheard_songs(library1, user)
                     wildcards = get_wildcard_songs(scores, user)
                     playlist, song_signals = build_playlist(
                         library1,
@@ -435,7 +508,7 @@ def main():
                         unheard,
                         wildcards,
                         unheard_ratio,
-                        all_time ,
+                        all_time,
                         user,
                         explicit_filter,
                         size,
@@ -448,7 +521,7 @@ def main():
             save_config(conf)
             isGenerated = False
         listenBrainzconf = tune_config["listenbrainz"]
-        
+
         if listenBrainzconf.get("enabled", False) and not is_lb_syncing:
             pool_time_hours = float(listenBrainzconf.get("pool_listen_brainz", 6))
             last_time_synced = listenBrainzconf.get("last_synced")
@@ -463,27 +536,33 @@ def main():
                     f"\n[bold magenta]ListenBrainz Auto-Sync Triggered[/bold magenta] (Interval: {pool_time_hours}h)"
                 )
                 is_lb_syncing = True
+
                 def run_lb_sync():
                     try:
 
                         lb_conf = tune_config.get("listenbrainz", {})
                         if not lb_conf.get("username") or not lb_conf.get("enabled"):
-                            console.print("[yellow]LB Sync skipped: username not set or disabled[/yellow]")
+                            console.print(
+                                "[yellow]LB Sync skipped: username not set or disabled[/yellow]"
+                            )
                             return
 
                         isFuzz = fuzzyMatchingSong()
                         print(isFuzz)
                         # if isFuzz:
-                        
+
                         tune_config["listenbrainz"]["last_synced"] = int(time.time())
                         save_config(tune_config)
-                        console.print("[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]")
+                        console.print(
+                            "[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]"
+                        )
                     except Exception as e:
-                        console.print(f"[bold red]ListenBrainz Auto-Sync Failed:[/bold red] {e}")
+                        console.print(
+                            f"[bold red]ListenBrainz Auto-Sync Failed:[/bold red] {e}"
+                        )
                     finally:
                         nonlocal is_lb_syncing
                         is_lb_syncing = False
-
 
                 lbSyncThread = threading.Thread(target=run_lb_sync, daemon=True)
                 lbSyncThread.start()

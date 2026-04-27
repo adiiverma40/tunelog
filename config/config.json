@@ -29,6 +29,7 @@
         }
     },
     "behavioral_scoring": {
+        "long_song_duration": 300,
         "skip_threshold_pct": 30,
         "positive_threshold_pct": 80,
         "repeat_time_window_min": 30,
@@ -65,8 +66,7 @@
         "username": "",
         "treat_data_as": "partial",
         "pool_listen_brainz": 1,
-        "for_users": [
-        ],
+        "for_users": [],
         "dedup_window_seconds": 30,
         "last_synced": 0
     }

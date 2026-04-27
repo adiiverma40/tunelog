@@ -338,6 +338,7 @@ export interface PlaylistGenerationConfig {
 }
 
 export interface BehavioralScoringConfig {
+  long_song_duration : number;
   skip_threshold_pct: number;
   positive_threshold_pct: number;
   repeat_time_window_min: number;

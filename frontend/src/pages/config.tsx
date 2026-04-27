@@ -62,6 +62,8 @@ interface Config {
   lb_for_users: string[];
   lb_dedup_window: number;
   lb_last_synced: number;
+
+  long_song_duration: number;
 }
 
 const DEFAULTS: Config = {
@@ -114,10 +116,12 @@ const DEFAULTS: Config = {
   lb_pool_interval: 1,
   lb_for_users: [],
   lb_dedup_window: 30,
-  lb_last_synced: 0, 
+  lb_last_synced: 0,
+  long_song_duration: 300,
 };
 
 const mapApiToState = (api: TuneConfig): Config => ({
+  long_song_duration: api.behavioral_scoring.long_song_duration,
   playlist_size: api.playlist_generation.playlist_size,
   wildcard_day: api.playlist_generation.wildcard_day,
   auto_generate_playlist: api.playlist_generation.auto_generate_playlist,
@@ -205,6 +209,7 @@ const mapStateToApi = (state: Config): TuneConfig => ({
     },
   },
   behavioral_scoring: {
+    long_song_duration: 300,
     skip_threshold_pct: state.skip_thresh,
     positive_threshold_pct: state.pos_thresh,
     repeat_time_window_min: state.repeat_window,
@@ -1130,6 +1135,17 @@ export default function Config() {
           desc="Thresholds and decay that determine how interactions become signals"
           icon={IconScoring}
         >
+          <ConfigRow
+            label="Long song duration"
+            desc="Songs at or above this length use the merge-based listen tracking"
+          >
+            <NumInput
+              value={cfg.long_song_duration}
+              onChange={(v) => set("long_song_duration", v)}
+              min={1}
+              unit="sec"
+            />
+          </ConfigRow>
           <ConfigRow
             label="Skip threshold"
             desc="Max % listened before branding the play as a skip"

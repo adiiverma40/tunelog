@@ -9,7 +9,7 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 
 
 ### Wiki: 
-- [Playlist Generation](https://github.com/adiiverma40/tunelog/wiki/Playlist-Generation) : guide on playlist generation and tweaks
+- [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks
 - [ListenBrainz Integration](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz) : guide on Listenbrainz integration in tunelog and dev info
 > **Note** Navidrome/subsonic client like `symfonium` scrobble data to navidrome and navidrome reports that to `listenbrainz`, So Do not add those apps in `pano app` scrobble list or it will create two list of same song 
 

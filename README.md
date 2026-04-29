@@ -6,6 +6,7 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - AI were used in some `sql Query`
 - Some part in debuggin and some assistance in building frontend like `socketio`
 - Assistance in some of the `research` like which python module to use and stuff
+- `Playlist` Page was re written using claude ai
 
 
 ### Wiki: 

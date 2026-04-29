@@ -37,6 +37,38 @@ export interface UpdateProfileResponse {
   };
 }
 
+export interface DiscoveryQueueParams {
+  username: string;
+  size: number;
+  date_from?: string | null;
+  date_to?: string | null;
+  days_from?: number;
+  days_to?: number;
+  backtrack: boolean;
+  explicit_filter: "strict" | "allow_cleaned" | "all";
+}
+
+export interface DiscoveryQueueSong {
+  song_id: string;
+  title: string;
+  artist: string;
+  genre: string | null;
+  explicit: string | null;
+  date_added: string;
+}
+
+export interface DiscoveryQueueResponse {
+  status: "ok" | "error";
+  songs?: DiscoveryQueueSong[];
+  songs_added?: number;
+  total?: number;
+  effective_date_from?: string;
+  effective_date_to?: string;
+  backtracked?: boolean;
+  backtrack_days?: number;
+  reason?: string;
+}
+
 export interface Stats {
   total_songs: number;
   total_listens: number;
@@ -338,7 +370,7 @@ export interface PlaylistGenerationConfig {
 }
 
 export interface BehavioralScoringConfig {
-  long_song_duration : number;
+  long_song_duration: number;
   skip_threshold_pct: number;
   positive_threshold_pct: number;
   repeat_time_window_min: number;
@@ -374,7 +406,7 @@ export interface ListenBrainzConfig {
   pool_listen_brainz: number;
   for_users: string[];
   dedup_window_seconds: number;
-  last_synced: number; 
+  last_synced: number;
 }
 
 export interface TuneConfig {
@@ -773,6 +805,7 @@ export interface NavidromeSong {
   artistId?: string;
   bitRate?: number;
   path?: string;
+  created?: string;
 }
 
 export async function getSong(songId: string): Promise<NavidromeSong | null> {
@@ -822,4 +855,62 @@ export function getCoverArtUrl(coverArtId: string): string {
   const url = `${baseUrl}/rest/getCoverArt?${params}`;
   console.log(url);
   return url;
+}
+
+export async function generateDiscoveryQueue(
+  params: DiscoveryQueueParams,
+): Promise<DiscoveryQueueResponse> {
+  const token =
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    "";
+
+  const res = await fetch(`${BASE_URL}/generateDiscoveryQueue`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Discovery Queue request failed: HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<DiscoveryQueueResponse>;
+}
+
+interface PlaylistResponse {
+  status: "success" | "error";
+  id: string | null;
+}
+
+export async function fetchDiscoveryPlaylistId(
+  username: string,
+): Promise<PlaylistResponse> {
+  const endpoint = "playlist/discoveryid";
+  const url = `${BASE_URL}/${endpoint}?username=${encodeURIComponent(username)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: PlaylistResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch discovery playlist ID:", error);
+    return {
+      status: "error",
+      id: null,
+    };
+  }
 }

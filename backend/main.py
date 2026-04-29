@@ -64,6 +64,8 @@ from db import (
     init_db_playlist,
     init_search_db,
     get_db_connection_lib,
+    # migrate_playlist_ids
+    migrate_playlist_primary_key,
 )
 from itunesFuzzy import useFallBackMethods
 import library
@@ -213,7 +215,6 @@ def signal_system(percent_played, song_id, user_id):
     return base
 
 
-
 def log_history(song):
     played = min(song["actual_played"], song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
@@ -255,12 +256,18 @@ def log_history(song):
             merged_signal = "partial"
         else:
             merged_signal = "positive"
-        if prior_rows and most_recent_prior_signal != "skip" and merged_signal == "positive":
+        if (
+            prior_rows
+            and most_recent_prior_signal != "skip"
+            and merged_signal == "positive"
+        ):
             merged_signal = "repeat"
 
         if prior_ids:
             placeholders = ",".join("?" * len(prior_ids))
-            cursor.execute(f"DELETE FROM listens WHERE id IN ({placeholders})", prior_ids)
+            cursor.execute(
+                f"DELETE FROM listens WHERE id IN ({placeholders})", prior_ids
+            )
             console.print(f"[yellow]Deleted {len(prior_ids)} prior row(s) for merge.")
 
         cursor.execute(
@@ -372,6 +379,9 @@ def main():
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             conn.execute("VACUUM")
             conn.close()
+            console.print("[bold yellow]Migrating from old user database")
+            migrate_playlist_primary_key()
+
         except Exception as e:
             status_registry.update("Db", status="crashed", error=e)
             console.print("[bold red]Failed TO Initialize Database")
@@ -525,7 +535,6 @@ def main():
         if listenBrainzconf.get("enabled", False) and not is_lb_syncing:
             pool_time_hours = float(listenBrainzconf.get("pool_listen_brainz", 6))
             last_time_synced = listenBrainzconf.get("last_synced")
-            # print("last sync should be zero : " , last_time_synced)
             current_unix_time = int(time.time())
             seconds_threshold = pool_time_hours * 3600
             if not last_time_synced or (
@@ -549,7 +558,6 @@ def main():
 
                         isFuzz = fuzzyMatchingSong()
                         print(isFuzz)
-                        # if isFuzz:
 
                         tune_config["listenbrainz"]["last_synced"] = int(time.time())
                         save_config(tune_config)

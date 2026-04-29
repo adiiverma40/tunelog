@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, datetime, timedelta, timezone
 import requests
 import random
 import heapq
@@ -18,6 +18,8 @@ from misc import (
     log_summary,
 )
 
+
+import json
 from db import (
     get_db_connection,
     get_db_connection_lib,
@@ -74,7 +76,8 @@ def getDataFromDb():
             "artist": row[2],
             "album": row[3],
             "genre": row[4],
-            "explict": row[7],
+            "explicit": row[10],
+            "created": row[11],
         }
         for row in libraryData
     }
@@ -349,18 +352,24 @@ def fill_artist_slots(artist_ratios, library_dict, heard_ids, playlist_ids, limi
     return artist_playlist
 
 
-def get_unheard_songs(library_dict, user_id):
+def get_unheard_songs(library_dict, user_id, type="blend"):
     conn_hist = get_db_connection()
     heard_rows = conn_hist.execute(
         "SELECT DISTINCT song_id FROM listens WHERE user_id = ?", (user_id,)
     ).fetchall()
     conn_hist.close()
-
-    all_ids = set(library_dict.keys())
+    all_ids_set = set(library_dict.keys())
     heard_ids = {row[0] for row in heard_rows}
-    unheard = list(all_ids - heard_ids)
-    unheard_ratio = len(unheard) / len(all_ids) if all_ids else 0
-    random.shuffle(unheard)
+    unheard_set = all_ids_set - heard_ids
+    unheard_ratio = len(unheard_set) / len(all_ids_set) if all_ids_set else 0
+    unheard = list(unheard_set)
+    if type == "discovery":
+        unheard.sort(
+            key=lambda sid: library_dict[sid].get("created") or "", reverse=True
+        )
+    else:
+        random.shuffle(unheard)
+
     return unheard, unheard_ratio, heard_ids
 
 
@@ -810,18 +819,86 @@ def appendPlaylist(user_id, password, explicit_filter, size, injection=True):
     return True
 
 
-def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=False):
+def getPlaylistIds(username: str) -> dict:
+    conn = get_db_connection_usr()
+    row = conn.execute(
+        "SELECT playlistIds FROM user WHERE username = ?", (username,)
+    ).fetchone()
+    conn.close()
+    if row and row[0]:
+        try:
+            return json.loads(row[0])
+        except Exception:
+            return {}
+    return {}
+
+
+def getPlaylistIdForType(username: str, playlist_type: str) -> str | None:
+    ids = getPlaylistIds(username)
+    return ids.get(playlist_type)
+
+
+def setPlaylistIdForType(username: str, playlist_type: str, playlist_id: str):
+    conn = get_db_connection_usr()
+    row = conn.execute(
+        "SELECT playlistIds FROM user WHERE username = ?", (username,)
+    ).fetchone()
+    current = {}
+    if row and row[0]:
+        try:
+            current = json.loads(row[0])
+        except Exception:
+            current = {}
+    current[playlist_type] = playlist_id
+    conn.execute(
+        "UPDATE user SET playlistIds = ? WHERE username = ?",
+        (json.dumps(current), username),
+    )
+    conn.commit()
+    conn.close()
+
+
+def push_playlist(
+    song_ids,
+    user_id,
+    song_signals,
+    playname=None,
+    newPlaylist=False,
+    playlist_type="blend",
+):
     USER_CREDENTIALS = getAllUser()
     password = USER_CREDENTIALS.get(user_id)
     if not password:
         return
 
-    stored_playlist_id = None if newPlaylist else getPlaylistId(user_id)
     name = playname if playname else PLAYLIST_NAME.format(user_id)
+    stored_id = None
+    if not newPlaylist:
+        stored_id = getPlaylistIdForType(user_id, playlist_type)
+        if not stored_id:
+            try:
+                fetch_url = build_url_for_user("getPlaylists", user_id, password)
+                r_lists = requests.get(fetch_url).json()
+                playlists = (
+                    r_lists.get("subsonic-response", {})
+                    .get("playlists", {})
+                    .get("playlist", [])
+                )
+                for pl in playlists:
+                    if pl.get("name") == name:
+                        stored_id = pl["id"]
+                        setPlaylistIdForType(user_id, playlist_type, stored_id)
+                        console.print(
+                            f"[yellow]Recovered playlist ID for {user_id}/{playlist_type} via name match[/yellow]"
+                        )
+                        break
+            except Exception as e:
+                console.print(f"[red]Name fallback lookup failed: {e}[/red]")
+
     base_url = build_url_for_user("createPlaylist", user_id, password)
 
-    if stored_playlist_id and stored_playlist_id != "no users/playlist id":
-        url = f"{base_url}&playlistId={stored_playlist_id}"
+    if stored_id:
+        url = f"{base_url}&playlistId={stored_id}"
     else:
         url = f"{base_url}&name={name}"
 
@@ -846,19 +923,13 @@ def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=Fa
             )
             return
 
-        final_playlist_id = r["subsonic-response"]["playlist"]["id"]
-        if not newPlaylist and final_playlist_id != stored_playlist_id:
-            conn_usr = get_db_connection_usr()
-            conn_usr.execute(
-                "UPDATE user SET playlistId = ? WHERE username = ?",
-                (final_playlist_id, user_id),
-            )
-            conn_usr.commit()
-            conn_usr.close()
+        final_id = r["subsonic-response"]["playlist"]["id"]
+
+        setPlaylistIdForType(user_id, playlist_type, final_id)
 
         requests.get(
             build_url_for_user("updatePlaylist", user_id, password)
-            + f"&playlistId={final_playlist_id}&public=false"
+            + f"&playlistId={final_id}&public=false"
         )
 
     except Exception as e:
@@ -882,7 +953,10 @@ def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=Fa
     lib_data = {row[0]: row for row in rows}
     conn = get_db_connection_playlist()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM playlist WHERE username = ?", (user_id,))
+    cursor.execute(
+        "DELETE FROM playlist WHERE username = ? AND type = ?",
+        (user_id, playlist_type),
+    )
 
     insert_data = []
     for sid in song_ids:
@@ -895,13 +969,18 @@ def push_playlist(song_ids, user_id, song_signals, playname=None, newPlaylist=Fa
                     row[1],
                     row[2],
                     row[3],
-                    song_signals.get(sid, "unheard"),
+                    (
+                        song_signals.get(sid, "unheard")
+                        if isinstance(song_signals, dict)
+                        else song_signals
+                    ),
                     row[4],
+                    playlist_type,
                 )
             )
 
     cursor.executemany(
-        "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         insert_data,
     )
     conn.commit()
@@ -950,3 +1029,241 @@ def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
         return False
     except Exception:
         return False
+
+
+def resolve_date_window(
+    date_from, date_to, days_from, days_to
+) -> tuple[datetime, datetime]:
+    both_provided = (date_from is not None or date_to is not None) and (
+        days_from is not None or days_to is not None
+    )
+    if both_provided:
+        raise ValueError(
+            "Provide either date_from/date_to OR days_from/days_to, not both."
+        )
+
+    today = datetime.now(timezone.utc).replace(
+        hour=23, minute=59, second=59, microsecond=0
+    )
+    epoch = datetime.min.replace(tzinfo=timezone.utc)
+
+    if days_from is not None or days_to is not None:
+        start = today - timedelta(days=days_from or 0)
+        end = today - timedelta(days=days_to or 0)
+        return start, end
+
+    if date_from is not None or date_to is not None:
+        start = (
+            datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+            if date_from
+            else epoch
+        )
+        end = (
+            datetime.fromisoformat(date_to).replace(tzinfo=timezone.utc)
+            if date_to
+            else today
+        )
+        return start, end
+
+    return epoch, today
+
+
+def get_discovery_pool(
+    library_dict: dict,
+    heard_ids: set,
+    window_start: datetime,
+    window_end: datetime,
+    size: int,
+    backtrack: bool,
+) -> tuple[list, bool, int]:
+
+    def query_pool(start: datetime, end: datetime) -> list:
+        results = []
+        for sid, info in library_dict.items():
+            if sid in heard_ids:
+                continue
+            raw = info.get("created")
+            if not raw:
+                continue
+            try:
+                created = datetime.fromisoformat(raw)
+            except (ValueError, TypeError):
+                continue
+            if start <= created <= end:
+                results.append((sid, created))
+        results.sort(key=lambda x: x[1], reverse=True)
+        return [sid for sid, _ in results]
+
+    pool = query_pool(window_start, window_end)
+    if not backtrack or len(pool) >= size:
+        return pool, False, 0
+
+    days_back = 0
+    current_start = window_start
+    while len(pool) < size:
+        days_back += 1
+        current_start = window_start - timedelta(days=days_back)
+        pool = query_pool(current_start, window_end)
+
+    return pool, True, days_back
+
+
+def build_discovery_playlist(
+    library_dict: dict,
+    history_dict: dict,
+    heard_ids: set,
+    pool: list,
+    user_id: str,
+    size: int,
+    explicit_filter: str,
+    alias_to_cat: dict,
+) -> tuple[list, dict]:
+    allowed_songs = get_allowed_songs(explicit_filter)
+    song_signals: dict = {}
+    final_ids: list = []
+    seen: set = set()
+    allowed_pool = [sid for sid in pool if sid in allowed_songs]
+    cat_counts, _ = analyze_user_ratios(user_id, history_dict, alias_to_cat)
+    total_listens = sum(cat_counts.values())
+
+    if total_listens > 0 and allowed_pool:
+        target_counts = {
+            cat: max(1, round((count / total_listens) * size))
+            for cat, count in cat_counts.items()
+        }
+        pool_set = set(allowed_pool)
+        for sid in allowed_pool:
+            if len(final_ids) >= size:
+                break
+            if sid in seen:
+                continue
+
+            info = library_dict.get(sid, {})
+            raw_genre = info.get("genre", "")
+            genres = (
+                [g.strip().lower() for g in raw_genre.split(",") if g.strip()]
+                if raw_genre
+                else []
+            )
+            mapped = {alias_to_cat.get(g, g) for g in genres} or {"unknown"}
+
+            matches = [c for c in mapped if target_counts.get(c, 0) > 0]
+            if matches:
+                final_ids.append(sid)
+                seen.add(sid)
+                song_signals[sid] = "unheard"
+                for m in matches:
+                    target_counts[m] = max(0, target_counts[m] - 1)
+                log_pool(
+                    user_id,
+                    "discovery_genre_match",
+                    sid,
+                    allowed_songs.get(sid, "Unknown"),
+                    "unheard",
+                )
+        if len(final_ids) < size:
+            for sid in allowed_pool:
+                if len(final_ids) >= size:
+                    break
+                if sid not in seen:
+                    final_ids.append(sid)
+                    seen.add(sid)
+                    song_signals[sid] = "unheard"
+                    log_pool(
+                        user_id,
+                        "discovery_pool_nongenre",
+                        sid,
+                        allowed_songs.get(sid, "Unknown"),
+                        "unheard",
+                    )
+
+    else:
+        for sid in allowed_pool[:size]:
+            final_ids.append(sid)
+            seen.add(sid)
+            song_signals[sid] = "unheard"
+            log_pool(
+                user_id,
+                "discovery_pool_nohistory",
+                sid,
+                allowed_songs.get(sid, "Unknown"),
+                "unheard",
+            )
+    if len(final_ids) < size:
+        needed = size - len(final_ids)
+        outside_unheard = [
+            sid
+            for sid in library_dict
+            if sid not in heard_ids and sid in allowed_songs and sid not in seen
+        ]
+        if total_listens > 0:
+            fallback_target = {
+                cat: max(1, round((count / total_listens) * needed))
+                for cat, count in cat_counts.items()
+            }
+            genre_matched_fallback = []
+            non_genre_fallback = []
+
+            for sid in outside_unheard:
+                info = library_dict.get(sid, {})
+                raw_genre = info.get("genre", "")
+                genres = (
+                    [g.strip().lower() for g in raw_genre.split(",") if g.strip()]
+                    if raw_genre
+                    else []
+                )
+                mapped = {alias_to_cat.get(g, g) for g in genres} or {"unknown"}
+                matches = [c for c in mapped if fallback_target.get(c, 0) > 0]
+
+                if matches:
+                    genre_matched_fallback.append((sid, matches))
+                else:
+                    non_genre_fallback.append(sid)
+
+            for sid, matches in genre_matched_fallback:
+                if len(final_ids) >= size:
+                    break
+                final_ids.append(sid)
+                seen.add(sid)
+                song_signals[sid] = "unheard"
+                for m in matches:
+                    fallback_target[m] = max(0, fallback_target[m] - 1)
+                log_pool(
+                    user_id,
+                    "discovery_fallback_genre",
+                    sid,
+                    allowed_songs.get(sid, "Unknown"),
+                    "unheard",
+                )
+            random.shuffle(non_genre_fallback)
+            for sid in non_genre_fallback:
+                if len(final_ids) >= size:
+                    break
+                final_ids.append(sid)
+                seen.add(sid)
+                song_signals[sid] = "unheard"
+                log_pool(
+                    user_id,
+                    "discovery_fallback_random",
+                    sid,
+                    allowed_songs.get(sid, "Unknown"),
+                    "unheard",
+                )
+
+        else:
+            random.shuffle(outside_unheard)
+            for sid in outside_unheard:
+                if len(final_ids) >= size:
+                    break
+                final_ids.append(sid)
+                seen.add(sid)
+                song_signals[sid] = "unheard"
+                log_pool(
+                    user_id,
+                    "discovery_fallback_nohistory",
+                    sid,
+                    allowed_songs.get(sid, "Unknown"),
+                    "unheard",
+                )
+
+    return final_ids[:size], song_signals

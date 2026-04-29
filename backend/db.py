@@ -82,14 +82,13 @@ def init_db_usr():
         )
     """
     )
-    try :
+    try:
         console.print("[bold green]Trying to create name column")
         cursor.execute("ALTER TABLE user ADD COLUMN name TEXT")
         console.print("[bold green]Trying to create Avatar column")
         cursor.execute("ALTER TABLE user ADD COLUMN avatar TEXT")
-    except Exception as e :
-        console.print("[bold Red]COLUMN MAY ALREADY EXIST" , e)
-        # cursor.execute("ALTER TABLE user ADD COLUMN name TEXT")
+    except Exception as e:
+        console.print("[bold Red]COLUMN MAY ALREADY EXIST", e)
     conn.commit()
     conn.close()
 
@@ -118,9 +117,15 @@ def init_db():
         )
         """
     )
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_song_id ON listens(song_id);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_user_song ON listens(user_id, song_id);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_listens_timestamp ON listens(timestamp);")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_listens_song_id ON listens(song_id);"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_listens_user_song ON listens(user_id, song_id);"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_listens_timestamp ON listens(timestamp);"
+    )
     conn.commit()
     conn.close()
 
@@ -142,10 +147,17 @@ def init_db_lib():
             genre       TEXT,
             duration    INTEGER,
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created     TIMESTAMP,
             explicit    TEXT
         )
     """
     )
+    try:
+        console.print("[bold green]Trying to create 'Created' column in Library table")
+        cursor.execute("ALTER TABLE library ADD COLUMN created TIMESTAMP")
+
+    except Exception as e:
+        console.print(f"[bold red]Error in altering db : {e}")
 
     conn.commit()
     conn.close()
@@ -154,23 +166,22 @@ def init_db_lib():
 def init_db_playlist():
     conn = get_db_connection_playlist()
     cursor = conn.cursor()
-
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS playlist (
-            username  TEXT NOT NULL,
-            title     TEXT,
-            artist    TEXT,
-            genre     TEXT,
-            signal    TEXT,
-            explicit  TEXT,
-            song_id   TEXT NOT NULL,
+            username     TEXT NOT NULL,
+            song_id      TEXT NOT NULL,
+            title        TEXT,
+            artist       TEXT,
+            genre        TEXT,
+            signal       TEXT,
+            explicit     TEXT,
+            type         TEXT NOT NULL DEFAULT 'blend',
             generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (username, song_id)
+            PRIMARY KEY (username, song_id, type)
         )
-        """
+    """
     )
-
     conn.commit()
     conn.close()
 
@@ -249,9 +260,46 @@ def init_search_db():
     conn.close()
 
 
+def migrate_playlist_primary_key():
+    conn = get_db_connection_playlist()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS playlist_new (
+                username     TEXT NOT NULL,
+                song_id      TEXT NOT NULL,
+                title        TEXT,
+                artist       TEXT,
+                genre        TEXT,
+                signal       TEXT,
+                explicit     TEXT,
+                type         TEXT NOT NULL DEFAULT 'blend',
+                generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (username, song_id, type)
+            )
+        """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO playlist_new 
+            SELECT username, song_id, title, artist, genre, signal, explicit, 
+                   COALESCE(type, 'blend'), generated_at 
+            FROM playlist
+        """
+        )
+        conn.execute("DROP TABLE playlist")
+        conn.execute("ALTER TABLE playlist_new RENAME TO playlist")
+        console.print(
+            "[bold green]Migrated playlist table primary key to (username, song_id, type)[/bold green]"
+        )
+    except Exception as e:
+        console.print(f"[red]Playlist migration error: {e}[/red]")
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
     init_db()
     init_db_lib()
-    # print("asdasd")
     init_db_usr()
     init_db_playlist()

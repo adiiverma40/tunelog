@@ -35,8 +35,7 @@ def batchSave(matched_records):
     percent_map = {
         "skip": 15.0,     
         "partial": 55.0,   
-        "complete": 100.0, 
-        "scrobble": 100.0  
+        "positive": 100.0
     }
     
     base_percent = percent_map.get(default_signal, 100.0)

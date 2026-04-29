@@ -62,12 +62,14 @@
         "only_host_add_queue": false
     },
     "listenbrainz": {
-        "enabled": false,
-        "username": "",
+        "enabled": true,
+        "username": "adiiverma40",
         "treat_data_as": "partial",
-        "pool_listen_brainz": 1,
-        "for_users": [],
+        "pool_listen_brainz": 5,
+        "for_users": [
+            "adii"
+        ],
         "dedup_window_seconds": 30,
-        "last_synced": 0
+        "last_synced": 1777438746
     }
 }

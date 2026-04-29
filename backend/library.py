@@ -41,9 +41,8 @@ import json  # ADDED
 import requests
 import time
 from config import build_url, itunesApi
-from db import init_db_lib, get_db_connection_lib , init_search_db
+from db import init_db_lib, get_db_connection_lib, init_search_db
 
-# from genre import autoGenre, sync_database_to_json
 import re
 from rich.console import Console
 from rich.progress import (
@@ -60,7 +59,6 @@ from misc import crossCheckDatabase
 from state import tune_config
 import asyncio
 import httpx
-# from db import get_db_connection_lib
 
 SEMAPHORE_LIMIT = 10
 
@@ -188,7 +186,7 @@ def fetchSongFromDB():
         query = """
             SELECT 
                 l.song_id, l.title, l.artist, l.album, l.genre, l.explicit, l.duration,
-                l.artistId, l.artistJSON, l.albumId,
+                l.artistId, l.artistJSON, l.albumId, l.created,
                 m.lyrics
             FROM library l
             LEFT JOIN search_metadata m ON l.song_id = m.song_id
@@ -212,7 +210,8 @@ def fetchSongFromDB():
                 "artistId": row[7],
                 "artistJSON": row[8],
                 "albumId": row[9],
-                "lyrics": row[10],
+                "created": row[10],
+                "lyrics": row[11],
             }
             for row in rows
         }
@@ -243,30 +242,37 @@ def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
     finally:
         conn.close()
 
-       
 
 def normalize_text(text: str) -> str:
     if not text:
         return ""
     text = text.lower()
-    text = re.sub(r"[^\w\s]", " ", text) 
+    text = re.sub(r"[^\w\s]", " ", text)
     text = re.sub(r"([a-z])\1{1,}", r"\1", text)
     text = re.sub(r"\s+", " ", text).strip()
-   
+
     return text
 
 
 def normalize_dbSongs(dbSongs: dict) -> dict:
     normalized = {}
-    SKIP_KEYS = {"song_id", "artistId", "albumId", "artistJSON" , "actualArtist" , "actualAlbum", "actualTitle"}
-    
+    SKIP_KEYS = {
+        "song_id",
+        "artistId",
+        "albumId",
+        "artistJSON",
+        "actualArtist",
+        "actualAlbum",
+        "actualTitle",
+    }
+
     console.print("[bold purple]Normalizing DB list[/bold purple]")
     for sid, song in dbSongs.items():
         new_song = {}
         new_song["actualArtist"] = song.get("artist", "")
         new_song["actualAlbum"] = song.get("album", "")
         # new_song["actualTitle"] = song.get("title", "")
-        
+
         for key, value in song.items():
             if key in SKIP_KEYS:
                 new_song[key] = value
@@ -274,10 +280,11 @@ def normalize_dbSongs(dbSongs: dict) -> dict:
                 new_song[key] = normalize_text(value)
             else:
                 new_song[key] = value
-                
+
         normalized[sid] = new_song
-        
+
     return normalized
+
 
 def populate_search_index(dbSongs):
     global isDroppedSearchTable
@@ -296,12 +303,12 @@ def populate_search_index(dbSongs):
                 (
                     sid,
                     song.get("title", ""),
-                    song.get("artist", ""),         
-                    song.get("actualArtist", ""),    
+                    song.get("artist", ""),
+                    song.get("actualArtist", ""),
                     song.get("artistId", ""),
                     song.get("artistJSON", ""),
-                    song.get("album", ""),           
-                    song.get("actualAlbum", ""),     
+                    song.get("album", ""),
+                    song.get("actualAlbum", ""),
                     song.get("albumId", ""),
                     current_lyrics,
                 )
@@ -324,7 +331,7 @@ def populate_search_index(dbSongs):
             isDroppedSearchTable = True
         else:
             cursor.execute("DELETE FROM song_search_index")
-        
+
         cursor.executemany(
             """INSERT INTO song_search_index 
                (song_id, title, artist, actualArtist, artistId, artistJSON, album, actualAlbum, albumId, lyrics) 
@@ -344,8 +351,8 @@ def populate_search_index(dbSongs):
         conn.rollback()
     finally:
         conn.close()
-        
-        
+
+
 async def fetch_lyrics_task(client, song_id, semaphore):
     async with semaphore:
         url = build_url("getLyricsBySongId") + f"&id={song_id}&f=json"
@@ -446,8 +453,8 @@ def sync_library():
         if insert_batch:
             cursor.executemany(
                 """INSERT INTO library 
-                   (song_id, title, artist, album, genre, duration, explicit, artistId, artistJSON, albumId)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (song_id, title, artist, album, genre, duration, explicit, artistId, artistJSON, albumId, created)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 insert_batch,
             )
             crossCheckDatabase(
@@ -459,13 +466,16 @@ def sync_library():
             cursor.executemany(
                 """UPDATE library
                    SET title=?, artist=?, album=?, genre=?, duration=?, explicit=?,
-                       artistId=?, artistJSON=?, albumId=?,
+                       artistId=?, artistJSON=?, albumId=?, created=?,
                        last_synced=CURRENT_TIMESTAMP
                    WHERE song_id=?""",
                 update_batch,
             )
             crossCheckDatabase(
-                [(item[0], item[1], item[2], item[3], item[9]) for item in update_batch]
+                [
+                    (item[0], item[1], item[2], item[3], item[10])
+                    for item in update_batch
+                ]
             )
             update_batch.clear()
 
@@ -493,6 +503,7 @@ def sync_library():
             nav_album = song.get("album", "")
             nav_duration = song.get("duration", 0)
             nav_genre = normalise_genre(song.get("genre"))
+            created = song.get("created", "")
 
             raw_artists = song.get("artists", [])
             nav_artistId = raw_artists[0]["id"] if raw_artists else ""
@@ -507,6 +518,7 @@ def sync_library():
                     or existing["artist"] != song_artist
                     or existing["album"] != nav_album
                     or existing["duration"] != nav_duration
+                    or existing.get("created") != created
                 )
 
                 if fast_sync:
@@ -522,6 +534,7 @@ def sync_library():
                                 nav_artistId,
                                 nav_artistJSON,
                                 nav_albumId,
+                                created,
                                 song_id,
                             )
                         )
@@ -545,6 +558,7 @@ def sync_library():
                                     nav_artistId,
                                     nav_artistJSON,
                                     nav_albumId,
+                                    created,
                                     song_id,
                                 )
                             )
@@ -580,6 +594,7 @@ def sync_library():
                                     nav_artistId,
                                     nav_artistJSON,
                                     nav_albumId,
+                                    created,
                                     song_id,
                                 )
                             )
@@ -621,6 +636,7 @@ def sync_library():
                         nav_artistId,
                         nav_artistJSON,
                         nav_albumId,
+                        created,
                     )
                 )
                 inserted += 1
@@ -661,7 +677,7 @@ def sync_library():
         f"Skipped: [blue]{skipped}[/blue]"
     )
     console.print(Panel(summary, border_style="bright_blue", expand=False))
-    
+
     console.print("[bold red]Freeing Up Database Size")
     conn = get_db_connection_lib()
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")

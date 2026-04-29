@@ -20,6 +20,13 @@ from db import (
     init_db_lib,
     init_db_usr,
 )
+
+
+# from playlist import
+
+
+from genre import readJson as readJSON
+
 from playlist import (
     score_song,
     get_unheard_songs,
@@ -31,7 +38,14 @@ from playlist import (
     signalWeights,
     API_push_playlist,
     getDataFromDb,
+    resolve_date_window,
+    get_discovery_pool,
+    get_translation_maps,
+    build_discovery_playlist,
+    # timedelta
 )
+
+from datetime import timedelta
 
 from state import app_state, tune_config, save_config
 import library
@@ -140,8 +154,19 @@ class configData(BaseModel):
     behavioral_scoring: dict
     sync_and_automation: dict
     api_and_performance: dict
-    jam : dict
-    listenbrainz : dict
+    jam: dict
+    listenbrainz: dict
+
+
+class DiscoveryQueueModel(BaseModel):
+    username: str
+    size: int = 50
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    days_from: Optional[int] = None
+    days_to: Optional[int] = None
+    backtrack: bool = False
+    explicit_filter: str
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
@@ -677,7 +702,7 @@ def getSongsFromPlaylist(username: str):
 
     conn = get_db_connection_playlist()
     rows = conn.execute(
-        "SELECT song_id, title, artist, genre, signal, explicit, generated_at FROM playlist WHERE username = ?",
+        "SELECT song_id, title, artist, genre, signal, explicit, generated_at FROM playlist WHERE username = ? and type = 'blend'",
         (username,),
     ).fetchall()
     conn.close()
@@ -735,7 +760,7 @@ def generatePlaylist(data: PlaylistOptions):
             # print("api signal weight " , data.weights)
         library, history = getDataFromDb()
         scores = score_song(username, history_dict=history, library_dict=library)
-        unheard, unheard_ratio , all_time_heard = get_unheard_songs(library ,username)
+        unheard, unheard_ratio, all_time_heard = get_unheard_songs(library, username)
         wildcards = get_wildcard_songs(scores, username)
         playlist, song_signals = build_playlist(
             library,
@@ -743,8 +768,8 @@ def generatePlaylist(data: PlaylistOptions):
             scores,
             unheard,
             wildcards,
-            unheard_ratio, 
-            all_time_heard ,
+            unheard_ratio,
+            all_time_heard,
             username,
             explicit_filter,
             size,
@@ -797,6 +822,85 @@ def appendPlaylist_api(data: PlaylistOptions):
 
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
+
+@app.get("/playlist/discoveryid")
+def discoveryPlaylistId(username: str):
+    console.print(
+        "[bold green]Fetching Discovery Playlist Id for[/bold green]", username
+    )
+    conn = get_db_connection_usr()
+    row = (
+        conn.cursor()
+        .execute("SELECT playlistIds FROM user WHERE username = ?", (username,))
+        .fetchone()
+    )
+    conn.close()
+
+    if not row or not row[0]:
+        return {"status": "error", "id": None}
+
+    try:
+        ids = json.loads(row[0])
+        print(ids)
+        print(ids.get("blend"))
+        return {"status": "success", "id": ids.get("discovery")}
+    except Exception:
+        return {"status": "error", "id": None}
+
+
+@app.post("/generateDiscoveryQueue")
+def generateDiscoveryQueue(data: DiscoveryQueueModel):
+    console.print(
+        f"[bold blue]Generating Discovery Queue for {data.username}[/bold blue]"
+    )
+
+    try:
+        window_start, window_end = resolve_date_window(
+            data.date_from, data.date_to, data.days_from, data.days_to
+        )
+    except ValueError as e:
+        return {"status": "error", "reason": str(e), "songs": [], "total": 0}
+
+    library, history = getDataFromDb()
+    _, _, heard_ids = get_unheard_songs(library, data.username)
+    pool, did_backtrack, days_backtracked = get_discovery_pool(
+        library, heard_ids, window_start, window_end, data.size, data.backtrack
+    )
+
+    alias_to_cat = get_translation_maps(readJSON())
+    final_ids, song_signals = build_discovery_playlist(
+        library,
+        history,
+        heard_ids,
+        pool,
+        data.username,
+        data.size,
+        data.explicit_filter,
+        alias_to_cat,
+    )
+
+    push_playlist(
+        final_ids,
+        data.username,
+        song_signals,
+        playname="Discovery Pool",
+        newPlaylist=False,
+        playlist_type="discovery",
+    )
+    effective_start = window_start - timedelta(days=days_backtracked)
+    effective_end = window_end
+
+    return {
+        "status": "ok",
+        "songs": final_ids,
+        "total": len(final_ids),
+        "effective_date_from": effective_start.isoformat(),
+        "effective_date_to": effective_end.isoformat(),
+        "backtracked": did_backtrack,
+        "backtrack_days": days_backtracked,
+        "reason": "discovery_genre_ratio" if final_ids else "no_songs_found",
+    }
 
 
 @app.get("/api/user/profile")
@@ -852,8 +956,8 @@ def getUserProfile(username: str, password: str):
             (username, song_id),
         ).fetchone()
         top_songs.append(
-            {   
-                "id" : song_id,
+            {
+                "id": song_id,
                 "title": meta[0],
                 "artist": meta[1],
                 "count": count,
@@ -919,8 +1023,8 @@ def getUserProfile(username: str, password: str):
             "SELECT title, artist, genre FROM library WHERE song_id = ?", (song_id,)
         ).fetchone()
         recent_history.append(
-            {   
-                "id" : song_id,
+            {
+                "id": song_id,
                 "title": meta[0] if meta else "Unknown",
                 "artist": meta[1] if meta else "Unknown",
                 "genre": meta[2] if meta else "—",
@@ -1315,7 +1419,7 @@ async def start_jam(sid, data):
         history_dict=history,
         library_dict=library,
     )
-    unheard, unheard_ratio , all_time_heard = get_unheard_songs(library , username)
+    unheard, unheard_ratio, all_time_heard = get_unheard_songs(library, username)
     wildcards = get_wildcard_songs(scores, username)
 
     playlist, song_signals = build_playlist(
@@ -1418,7 +1522,7 @@ async def reorder_queue(sid, data):
             item["song_id"],
             item.get("title"),
             item.get("artist", "Unknown"),
-            item.get("user", "unknown")
+            item.get("user", "unknown"),
         )
     await sio.emit("queue_update", currentQueue(), room="jam")
 
@@ -1454,7 +1558,7 @@ async def stop_jam(sid):
     await sio.emit("queue_update", [], room="jam")
 
     await sio.close_room("jam")
-    
+
     await broadcast_users()
     console.print("[bold yellow]Jam stopped by host")
 

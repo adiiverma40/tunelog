@@ -67,21 +67,30 @@ def init_db_usr():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user (
             username     TEXT PRIMARY KEY,
-            name    Text,
-            avatar Text,
-            password       TEXT,
-            isAdmin     BOOLEAN,
-            playlistId  TEXT
-            
+            name         TEXT,
+            avatar       TEXT,
+            password     TEXT,
+            isAdmin      BOOLEAN,
+            playlistId   TEXT,
+            playlistIds  TEXT  
         )
     """)
-    try:
-        console.print("[bold green]Trying to create name column")
-        cursor.execute("ALTER TABLE user ADD COLUMN name TEXT")
-        console.print("[bold green]Trying to create Avatar column")
-        cursor.execute("ALTER TABLE user ADD COLUMN avatar TEXT")
-    except Exception as e:
-        console.print("[bold Red]COLUMN MAY ALREADY EXIST", e)
+    
+    cursor.execute("PRAGMA table_info(user)")
+    existing_columns = [row[1] for row in cursor.fetchall()]
+    columns_to_ensure = {
+        "name": "TEXT",
+        "avatar": "TEXT",
+        "playlistIds": "TEXT" 
+    }
+    for col_name, col_type in columns_to_ensure.items():
+        if col_name not in existing_columns:
+            try:
+                console.print(f"[bold green]Adding missing column: {col_name}...[/bold green]")
+                cursor.execute(f"ALTER TABLE user ADD COLUMN {col_name} {col_type}")
+            except Exception as e:
+                console.print(f"[bold red]Error adding {col_name}: {e}[/bold red]")
+
     conn.commit()
     conn.close()
 

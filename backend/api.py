@@ -21,7 +21,6 @@ from db import (
     init_db_usr,
 )
 
-
 # from playlist import
 
 
@@ -364,15 +363,13 @@ def stats():
     ).fetchall()
     mostPlayedArtists = {row[0]: row[1] for row in mostPlayedArtists_row}
 
-    mostPlayedSongs_row = conn_log.execute(
-        """
+    mostPlayedSongs_row = conn_log.execute("""
         SELECT title, artist, COUNT(*) as play_count 
         FROM listens 
         GROUP BY title
         ORDER BY play_count DESC
         LIMIT 10
-        """
-    ).fetchall()
+        """).fetchall()
 
     mostPlayedSongs = [
         {"title": row[0], "artist": row[1], "play_count": row[2]}
@@ -808,7 +805,6 @@ def appendPlaylist_api(data: PlaylistOptions):
             return {"status": "error", "reason": "User not found in TuneLog database"}
 
         password = row[0]
-        # success = appendPlaylist(username, password, explicit_filter, size)
         success = appendPlaylist(username, password, explicit_filter, size, injection)
 
         if success:
@@ -856,41 +852,41 @@ def generateDiscoveryQueue(data: DiscoveryQueueModel):
     )
 
     try:
+        print(data.date_from, data.date_to, data.days_from, data.days_to)
         window_start, window_end = resolve_date_window(
             data.date_from, data.date_to, data.days_from, data.days_to
         )
     except ValueError as e:
         return {"status": "error", "reason": str(e), "songs": [], "total": 0}
-
     library, history = getDataFromDb()
-    _, _, heard_ids = get_unheard_songs(library, data.username)
     pool, did_backtrack, days_backtracked = get_discovery_pool(
-        library, heard_ids, window_start, window_end, data.size, data.backtrack
+        window_start, window_end, data.size, data.backtrack
     )
-
     alias_to_cat = get_translation_maps(readJSON())
     final_ids, song_signals = build_discovery_playlist(
-        library,
-        history,
-        heard_ids,
         pool,
+        history,
         data.username,
         data.size,
-        data.explicit_filter,
         alias_to_cat,
     )
-
-    push_playlist(
-        final_ids,
-        data.username,
-        song_signals,
-        playname="Discovery Pool",
-        newPlaylist=False,
-        playlist_type="discovery",
-    )
+    if final_ids and len(final_ids) > 0:
+        push_playlist(
+            final_ids,
+            data.username,
+            song_signals,
+            playname="Discovery Pool",
+            newPlaylist=False,
+            playlist_type="discovery",
+        )
+        console.print("[bold yellow]Successfully pushed song")
+    else:
+        console.print("[bold red]No song to Push")
+    print("API : 906")
     effective_start = window_start - timedelta(days=days_backtracked)
     effective_end = window_end
 
+    print("API : 910")
     return {
         "status": "ok",
         "songs": final_ids,
@@ -1295,7 +1291,6 @@ from jam import (
     future_queue_ids,
     past_queue_ids,
 )
-
 
 HOST_RECONNECT_GRACE = 20
 host_reconnect_task = None

@@ -84,8 +84,12 @@ from playlist import (
     get_wildcard_songs,
     build_playlist,
     push_playlist,
+    resolve_date_window,
+    get_translation_maps,
+    readJSON,
+    get_discovery_pool,
+    build_discovery_playlist,
 )
-
 from scrobble.listenBrainz import fuzzyMatchingSong
 
 # from misc import setup_logger
@@ -491,7 +495,9 @@ def main():
         playlistConf = tune_config["playlist_generation"]
 
         conf = tune_config
-
+        
+# --------------------------------------------------------------------------------------
+        
         if playlistConf["auto_generate_playlist"] and playlistConf[
             "last_auto_generate"
         ] != str(current_day):
@@ -505,31 +511,82 @@ def main():
                 explicit_filter = playlistConf["auto_generate_explicit"]
                 injection = playlistConf["auto_generate_injection"]
                 library1, history = getDataFromDb()
-                for user in playlistConf["auto_generate_for"]:
-                    scores = score_song(
-                        user, history_dict=history, library_dict=library1
-                    )
-                    unheard, unheard_ratio, all_time = get_unheard_songs(library1, user)
-                    wildcards = get_wildcard_songs(scores, user)
-                    playlist, song_signals = build_playlist(
-                        library1,
-                        history,
-                        scores,
-                        unheard,
-                        wildcards,
-                        unheard_ratio,
-                        all_time,
-                        user,
-                        explicit_filter,
-                        size,
-                        injection,
-                    )
-                    push_playlist(playlist, user, song_signals)
-                    isGenerated = True
+                users = playlistConf["auto_generate_for"]
+                if len(users) > 0 : 
+                    for user in users :
+                        scores = score_song(
+                            user, history_dict=history, library_dict=library1
+                        )
+                        unheard, unheard_ratio, all_time = get_unheard_songs(library1, user)
+                        wildcards = get_wildcard_songs(scores, user)
+                        playlist, song_signals = build_playlist(
+                            library1,
+                            history,
+                            scores,
+                            unheard,
+                            wildcards,
+                            unheard_ratio,
+                            all_time,
+                            user,
+                            explicit_filter,
+                            size,
+                            injection,
+                        )
+                        push_playlist(playlist, user, song_signals, playlist_type="blend")
+                        console.print(f"[bold yellow]Pushed Playlist : {user} , Type : blend")
+                        try:
+                            window_start, window_end = resolve_date_window(
+                                date_from=None,
+                                date_to=None,
+                                days_from=50,  # look back up to 50 days
+                                days_to=0,  # up to today
+                            )
+                            alias_to_cat = get_translation_maps(readJSON())
+                            pool, did_backtrack, days_backtracked = get_discovery_pool(
+                                window_start=window_start,
+                                window_end=window_end,
+                                size=size,  # same size as blend
+                                backtrack=True,  # always on for auto-gen
+                            )
+                            final_ids, disc_signals = build_discovery_playlist(
+                                pool,
+                                history,
+                                user,
+                                size,
+                                alias_to_cat,
+                            )
+                            if final_ids and len(final_ids) != 0 :
+                                push_playlist(
+                                    final_ids,
+                                    user,
+                                    disc_signals,
+                                    playname="Discovery Pool",
+                                    newPlaylist=False,
+                                    playlist_type="discovery",
+                                )
+                                console.print(
+                                    f"[bold green]Auto Discovery Queue pushed for {user} "
+                                    f"({len(final_ids)} songs, backtracked={did_backtrack})"
+                                )
+                            else:
+                                console.print(
+                                    f"[bold red]Auto Discovery Queue: no songs found for {user}"
+                                )
+                        except Exception as e:
+                            console.print(
+                                f"[bold red]Auto Discovery Queue failed for {user}: {e}"
+                            )
+                else : 
+                    console.print('[bold red]No users to generate playlists')
+
+            isGenerated = True
+
         if isGenerated:
             conf["playlist_generation"]["last_auto_generate"] = str(current_day)
             save_config(conf)
             isGenerated = False
+            print("saved Auto generation")
+
         listenBrainzconf = tune_config["listenbrainz"]
 
         if listenBrainzconf.get("enabled", False) and not is_lb_syncing:

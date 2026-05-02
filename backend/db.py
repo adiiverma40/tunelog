@@ -1,7 +1,3 @@
-# Database initalization for recording history of played song
-# NOTE : DOCKER MARK THE TUNELOG/DATA AS ROOT SO IF ONCE DONE DOCKER COMPOSE UP --BUILD, YOU CAN NOT RUN IT WITH PYTHON MAIN.PY
-# SO CHOOSE ONE
-
 import sqlite3
 import os
 import time
@@ -13,7 +9,6 @@ console = Console()
 
 # import sqlite3
 from state import status_registry
-
 
 if os.path.exists("/app/data"):
     DATA_DIR = "/app/data"
@@ -69,8 +64,7 @@ def init_db_usr():
     conn = get_db_connection_usr()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS user (
             username     TEXT PRIMARY KEY,
             name    Text,
@@ -80,8 +74,7 @@ def init_db_usr():
             playlistId  TEXT
             
         )
-    """
-    )
+    """)
     try:
         console.print("[bold green]Trying to create name column")
         cursor.execute("ALTER TABLE user ADD COLUMN name TEXT")
@@ -97,8 +90,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS listens (
         id      INTEGER PRIMARY KEY AUTOINCREMENT,
         song_id TEXT NOT NULL,
@@ -115,8 +107,7 @@ def init_db():
         
         
         )
-        """
-    )
+        """)
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_listens_song_id ON listens(song_id);"
     )
@@ -134,8 +125,7 @@ def init_db_lib():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS library (
             song_id     TEXT PRIMARY KEY,
             title       TEXT,
@@ -150,8 +140,7 @@ def init_db_lib():
             created     TIMESTAMP,
             explicit    TEXT
         )
-    """
-    )
+    """)
     try:
         console.print("[bold green]Trying to create 'Created' column in Library table")
         cursor.execute("ALTER TABLE library ADD COLUMN created TIMESTAMP")
@@ -166,8 +155,7 @@ def init_db_lib():
 def init_db_playlist():
     conn = get_db_connection_playlist()
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS playlist (
             username     TEXT NOT NULL,
             song_id      TEXT NOT NULL,
@@ -180,8 +168,7 @@ def init_db_playlist():
             generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (username, song_id, type)
         )
-    """
-    )
+    """)
     conn.commit()
     conn.close()
 
@@ -227,19 +214,16 @@ def init_search_db():
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS search_metadata (
             song_id       TEXT PRIMARY KEY,
             lyrics        TEXT,
             last_updated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (song_id) REFERENCES library (song_id) ON DELETE CASCADE
         )
-    """
-    )
+    """)
 
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS song_search_index USING fts5(
             song_id UNINDEXED, 
             title, 
@@ -253,8 +237,7 @@ def init_search_db():
             lyrics,
             tokenize='unicode61 remove_diacritics 1'
         )
-    """
-    )
+    """)
 
     conn.commit()
     conn.close()
@@ -263,8 +246,7 @@ def init_search_db():
 def migrate_playlist_primary_key():
     conn = get_db_connection_playlist()
     try:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS playlist_new (
                 username     TEXT NOT NULL,
                 song_id      TEXT NOT NULL,
@@ -277,16 +259,13 @@ def migrate_playlist_primary_key():
                 generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (username, song_id, type)
             )
-        """
-        )
-        conn.execute(
-            """
+        """)
+        conn.execute("""
             INSERT OR IGNORE INTO playlist_new 
             SELECT username, song_id, title, artist, genre, signal, explicit, 
                    COALESCE(type, 'blend'), generated_at 
             FROM playlist
-        """
-        )
+        """)
         conn.execute("DROP TABLE playlist")
         conn.execute("ALTER TABLE playlist_new RENAME TO playlist")
         console.print(

@@ -1,15 +1,17 @@
 {
     "playlist_generation": {
-        "playlist_size": 40,
+        "playlist_size": 50,
         "wildcard_day": 60,
         "auto_generate_playlist": true,
-        "auto_generate_time": 4,
+        "auto_generate_time": 12,
         "auto_generate_when_complete": true,
         "auto_generate_completion_percent": 80,
         "auto_generate_explicit": "all",
-        "auto_generate_for": [],
+        "auto_generate_for": [
+            "adii"
+        ],
         "auto_generate_injection": true,
-        "last_auto_generate": "0",
+        "last_auto_generate": "2026-05-02",
         "signal_weights": {
             "repeat": 3,
             "positive": 2,
@@ -70,6 +72,6 @@
             "adii"
         ],
         "dedup_window_seconds": 30,
-        "last_synced": 1777438746
+        "last_synced": 1777696528
     }
 }

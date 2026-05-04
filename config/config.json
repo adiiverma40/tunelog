@@ -2,7 +2,7 @@
     "playlist_generation": {
         "playlist_size": 50,
         "wildcard_day": 60,
-        "auto_generate_playlist": true,
+        "auto_generate_playlist": false,
         "auto_generate_time": 12,
         "auto_generate_when_complete": true,
         "auto_generate_completion_percent": 80,
@@ -11,7 +11,7 @@
             "adii"
         ],
         "auto_generate_injection": true,
-        "last_auto_generate": "2026-05-02",
+        "last_auto_generate": "0",
         "signal_weights": {
             "repeat": 3,
             "positive": 2,
@@ -66,12 +66,12 @@
     "listenbrainz": {
         "enabled": true,
         "username": "adiiverma40",
-        "treat_data_as": "partial",
-        "pool_listen_brainz": 5,
+        "treat_data_as": "complete",
+        "pool_listen_brainz": 1,
         "for_users": [
             "adii"
         ],
         "dedup_window_seconds": 30,
-        "last_synced": 1777696528
+        "last_synced": 1777874573
     }
 }

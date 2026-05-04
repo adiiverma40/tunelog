@@ -2,27 +2,24 @@ import { Routes, Route, useNavigate } from "react-router";
 import { useEffect } from "react";
 import SignIn from "./pages/AuthPages/SignIn";
 import NotFound from "./pages/OtherPage/NotFound";
-import UserProfiles from "./pages/users";
-import LibrarySync from "./pages/librarySync";
+import UserProfiles from "./pages/users/users";
+import LibrarySync from "./pages/librarySync/librarySync";
+import Playlist from "./pages/playlist/playlist";
 import AppLayout from "./layout/AppLayout";
-import Playlist from "./pages/playlist";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
-import UserProfilePage from "./pages/userProfile";
-import ManualMarking from "./pages/manualMark";
-import GenreMatch from "./pages/genreMatching";
-import Import from "./pages/import";
-import Notifications from "./pages/notification";
-import Config from "./pages/config";
+import UserProfilePage from "./pages/users/userProfile";
+import ManualMarking from "./pages/tweaks/manualMark";
+import GenreMatch from "./pages/tweaks/genreMatching";
+import Import from "./pages/librarySync/import";
+import Notifications from "./pages/tweaks/notification";
+import Config from "./pages/tweaks/config";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
 import JamUsers from "./pages/Jam/JamUsers";
-// import SongPage from "./pages/songHistory";
-
 import { fetchLogin, fetchGetUsers } from "./API/API";
-
 import { useNotificationStream } from "./hooks/Usenotificationstream";
-
+import ListenBrainzImport from "./pages/scrobble/listenbrainz";
 export default function App() {
   const navigate = useNavigate();
 
@@ -75,6 +72,11 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
           <Route path="/jamuser" element={<JamUsers />} />
+
+          <Route
+            path="/scrobble/listenbrainz"
+            element={<ListenBrainzImport />}
+          />
 
           {/* <Route path="/song/:songId" element={<SongPage />} /> */}
         </Route>

@@ -7,7 +7,7 @@ import json
 from db import get_db_connection, get_db_connection_lib
 from rich.console import Console
 from state import tune_config
-import sqlite3 
+import sqlite3
 
 console = Console()
 
@@ -15,34 +15,51 @@ listenBrainzConf = tune_config.get("listenbrainz", {})
 behaviour = tune_config.get("behavioral_scoring", {})
 
 
+def _execute_with_retry(cursor, conn, sql, data, retries=5, delay=2):
+    for attempt in range(retries):
+        try:
+            cursor.executemany(sql, data)
+            conn.commit()
+            return True
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower():
+                console.print(
+                    f"[yellow]DB locked, retry {attempt + 1}/{retries}...[/yellow]"
+                )
+                time.sleep(delay)
+                continue
+            conn.rollback()
+            raise
+    conn.rollback()
+    return False
 
-def batchSave(matched_records):
-    if not matched_records:
+
+def batchSave(matched_records, unmatched_records=None):
+    if not matched_records and not unmatched_records:
         console.print("[yellow]No records to save.[/yellow]")
         return
 
     allowed_users = listenBrainzConf.get("for_users", [])
     if not allowed_users:
-        console.print("[bold red]ABORT: No users defined in config ('for_users' is empty).[/bold red]")
+        console.print(
+            "[bold red]ABORT: No users defined in config ('for_users' is empty).[/bold red]"
+        )
         return
 
-    console.print(f"[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]")
-
+    console.print(
+        f"[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]"
+    )
     default_signal = str(listenBrainzConf.get("treat_data_as", "complete")).lower()
+    default_signal = "positive" if default_signal == "complete" else default_signal
     repeat_window_seconds = behaviour.get("repeat_time_window_min", 30) * 60
-    dedup_window_seconds = 30 * 60  
+    dedup_window_seconds = 30 * 60
 
-    percent_map = {
-        "skip": 15.0,     
-        "partial": 55.0,   
-        "positive": 100.0
-    }
-    
+    percent_map = {"skip": 15.0, "partial": 55.0, "positive": 100.0}
     base_percent = percent_map.get(default_signal, 100.0)
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     matched_records.sort(key=lambda x: x["listen"]["listened_at"])
     song_ids = list({r["song"]["songId"] for r in matched_records})
 
@@ -51,9 +68,8 @@ def batchSave(matched_records):
 
     console.print("[cyan]Querying database for recent history...[/cyan]")
     for i in range(0, len(song_ids), chunk_size):
-        chunk = song_ids[i:i + chunk_size]
+        chunk = song_ids[i : i + chunk_size]
         placeholders = ",".join(["?"] * len(chunk))
-        
         query = f"""
             SELECT song_id, timestamp
             FROM (
@@ -64,18 +80,17 @@ def batchSave(matched_records):
             )
             WHERE rn <= 10
         """
-        
         cursor.execute(query, chunk)
-        
         for row in cursor.fetchall():
             dt_obj = datetime.datetime.strptime(row[1], "%Y-%m-%d %H:%M:%S")
             existing_history[row[0]].append(int(dt_obj.timestamp()))
 
     insert_data = []
+    lb_log_data = []
     duplicates_ignored = 0
 
     console.print("[cyan]Processing and Deduplicating records...[/cyan]")
-    
+
     for record in matched_records:
         listen = record["listen"]
         song = record["song"]
@@ -84,38 +99,54 @@ def batchSave(matched_records):
         listened_at = listen["listened_at"]
         title = song.get("title", "Unknown")
         artist = song.get("artist", "Unknown")
-        human_time = datetime.datetime.utcfromtimestamp(listened_at).strftime('%Y-%m-%d %H:%M:%S')
+        album = song.get("album", "")
+        human_time = datetime.datetime.utcfromtimestamp(listened_at).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
         console.print(f"[dim]Analyzing: '{title}' by {artist} ({human_time})[/dim]")
 
         history = existing_history[song_id]
 
-        is_duplicate = False
-        for past_ts in history:
-            if abs(listened_at - past_ts) <= dedup_window_seconds:
-                is_duplicate = True
-                break
+        is_duplicate = any(
+            abs(listened_at - ts) <= dedup_window_seconds for ts in history
+        )
 
         if is_duplicate:
             duplicates_ignored += 1
             console.print(f"[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
+            lb_log_data.append(
+                (
+                    song_id,
+                    title,
+                    artist,
+                    album,
+                    default_signal,
+                    "duplicate",
+                    None,
+                    human_time,
+                )
+            )
             continue
 
         current_signal = default_signal
         current_percent = base_percent
 
         past_plays_before = [ts for ts in history if ts < listened_at]
-        
         if past_plays_before:
             last_played_ts = max(past_plays_before)
             time_diff = listened_at - last_played_ts
-            
             if time_diff <= repeat_window_seconds:
                 current_signal = "repeat"
-                current_percent = 100.0  
-                console.print(f"[bold blue] ↳ ↻ Flagged as Repeat (Gap: {int(time_diff/60)}m)[/bold blue]")
+                current_percent = 100.0
+                console.print(
+                    f"[bold blue] ↳ ↻ Flagged as Repeat (Gap: {int(time_diff/60)}m)[/bold blue]"
+                )
 
         existing_history[song_id].append(listened_at)
-        dt_string = datetime.datetime.utcfromtimestamp(listened_at).strftime("%Y-%m-%d %H:%M:%S")
+        dt_string = datetime.datetime.utcfromtimestamp(listened_at).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
         metadata = listen.get("track_metadata", {}).get("additional_info", {})
         duration_ms = metadata.get("duration_ms", 0)
@@ -123,36 +154,116 @@ def batchSave(matched_records):
 
         for username in allowed_users:
             insert_data.append(
-                (song_id, title, artist, song.get("album", ""), song.get("genre", ""), duration_sec, 1, current_percent, current_signal, dt_string, username)
+                (
+                    song_id,
+                    title,
+                    artist,
+                    album,
+                    song.get("genre", ""),
+                    duration_sec,
+                    1,
+                    current_percent,
+                    current_signal,
+                    dt_string,
+                    username,
+                )
             )
-            
-        console.print(f"[bold green] ↳ ✔ Queued for insertion ({current_signal})[/bold green]")
+
+        lb_log_data.append(
+            (song_id, title, artist, album, current_signal, "matched", None, dt_string)
+        )
+        console.print(
+            f"[bold green] ↳ ✔ Queued for insertion ({current_signal})[/bold green]"
+        )
+
+    if unmatched_records:
+        console.print(
+            f"[bold red]Logging {len(unmatched_records)} unmatched tracks to listenbrainz table...[/bold red]"
+        )
+        for listen in unmatched_records:
+            metadata = listen.get("track_metadata", {})
+            raw_title = metadata.get("track_name", "")
+            raw_artist = metadata.get("artist_name", "")
+            raw_album = metadata.get("release_name", "")
+            listened_at = listen.get("listened_at", 0)
+            dt_string = datetime.datetime.utcfromtimestamp(listened_at).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+            if raw_title and raw_artist:
+                lb_log_data.append(
+                    (
+                        None,
+                        raw_title,
+                        raw_artist,
+                        raw_album,
+                        None,
+                        "unmatched",
+                        None,
+                        dt_string,
+                    )
+                )
+            else:
+                fallback_label = raw_title or raw_artist or "unknown"
+                lb_log_data.append(
+                    (
+                        None,
+                        fallback_label,
+                        None,
+                        None,
+                        None,
+                        "unmatched",
+                        None,
+                        dt_string,
+                    )
+                )
+
     console.print("[cyan]Attempting to write to database...[/cyan]")
     if insert_data:
-        try:
-            cursor.executemany(
-                """
-                INSERT INTO listens (song_id, title, artist, album, genre, duration, played, percent_played, signal, timestamp, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                insert_data,
-            )
-            conn.commit()
-            
+        ok = _execute_with_retry(
+            cursor,
+            conn,
+            """
+            INSERT INTO listens (song_id, title, artist, album, genre, duration, played, percent_played, signal, timestamp, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            insert_data,
+        )
+        if ok:
             unique_tracks = len(insert_data) // len(allowed_users)
-            console.print(f"[bold green]✔ Successfully saved {unique_tracks} unique tracks ({len(insert_data)} total plays)![/bold green]\n")
-            
-        except sqlite3.OperationalError as e:
-            conn.rollback()
-            console.print(f"[bold red]✖ Database Save Failed: {e}[/bold red]")
-            console.print("[bold red]The database was locked by another process (likely a websocket or API call). The sync will retry next cycle.[/bold red]")
+            console.print(
+                f"[bold green]✔ Successfully saved {unique_tracks} unique tracks ({len(insert_data)} total plays)![/bold green]"
+            )
+        else:
+            console.print("[bold red]✖ Database Save Failed after retries.[/bold red]")
     else:
-        console.print(f"[bold yellow]Total Duplicates Ignored: {duplicates_ignored}[/bold yellow]")
-        console.print("[bold red]No new unique tracks to save to the database.[/bold red]")
+        console.print(
+            f"[bold yellow]Total Duplicates Ignored: {duplicates_ignored}[/bold yellow]"
+        )
+        console.print(
+            "[bold red]No new unique tracks to save to the database.[/bold red]"
+        )
+
+    if lb_log_data:
+        ok = _execute_with_retry(
+            cursor,
+            conn,
+            """
+            INSERT INTO listenbrainz (song_id, title, artist, album, signal, tag, comment, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            lb_log_data,
+        )
+        if ok:
+            console.print(
+                f"[bold cyan]✔ Logged {len(lb_log_data)} entries to listenbrainz table.[/bold cyan]"
+            )
+        else:
+            console.print(
+                "[bold red]✖ ListenBrainz log write failed after retries.[/bold red]"
+            )
 
     conn.close()
-
-
 
 
 def getListenBrainzResponse():
@@ -170,13 +281,13 @@ def getListenBrainzResponse():
             f"[blue]Syncing since: {datetime.datetime.fromtimestamp(since)}[/blue]"
         )
         LB_HEADERS = {
-    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-}
+            "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
+        }
         url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
         params = {"min_ts": since, "count": 100}
 
         try:
-            response = requests.get(url, params=params , headers=LB_HEADERS)
+            response = requests.get(url, params=params, headers=LB_HEADERS)
             response.raise_for_status()
             data = response.json()
             listens = data.get("payload", {}).get("listens", [])
@@ -198,13 +309,12 @@ def deep_history_sync(pagination=20):
     all_listens = []
     ceiling_ts = int(time.time())
     LB_HEADERS = {
-    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-}
+        "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
+    }
     while True:
         params = {"max_ts": ceiling_ts, "count": pagination}
         url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
-
-        response = requests.get(url, params=params , headers=LB_HEADERS)
+        response = requests.get(url, params=params, headers=LB_HEADERS)
         data = response.json()
         listens = data.get("payload", {}).get("listens", [])
 
@@ -230,8 +340,9 @@ def getSongsFromDb():
     songs = cursor.execute(
         "select song_id, title, artist, album, artistJSON, genre from library"
     ).fetchall()
-    songDict = []
+    conn.close()
 
+    songDict = []
     for row in songs:
         parsed_artists = [row[2]] if row[2] else []
         try:
@@ -251,13 +362,10 @@ def getSongsFromDb():
                 "artist": row[2],
                 "album": row[3],
                 "all_artists": clean_artists,
-                "genre": (
-                    str(row[5]) if len(row) > 5 and row[5] else ""
-                ),  
+                "genre": (str(row[5]) if len(row) > 5 and row[5] else ""),
             }
         )
     return songDict
-
 
 
 def fallback_stage_1(unmatched_listens, songs_list, matched_records):
@@ -349,8 +457,7 @@ def fallback_stage_2(unmatched_listens, artist_dict, matched_records):
 
         for match in artist_matches:
             if match[1] >= 80.0:
-                matched_db_artist = match[0]
-                for song in artist_dict[matched_db_artist]:
+                for song in artist_dict[match[0]]:
                     title_pool[song["songId"]] = str(song["title"]).lower().strip()
                     full_songs_pool.append(song)
 
@@ -403,8 +510,7 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
         matched = False
 
         if um_title in title_dict:
-            candidates = title_dict[um_title]
-            for candidate in candidates:
+            for candidate in title_dict[um_title]:
                 artist_match = process.extractOne(
                     um_artist, candidate["all_artists"], scorer=fuzz.token_set_ratio
                 )
@@ -429,7 +535,6 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
                 artist_match = process.extractOne(
                     um_artist, candidate["all_artists"], scorer=fuzz.token_set_ratio
                 )
-
                 if artist_match and artist_match[1] >= 80.0:
                     matched_records.append({"listen": unmatched, "song": candidate})
                     console.print(
@@ -444,13 +549,14 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
     return absolute_misses
 
 
-
 def fuzzyMatchingSong():
     fresh_lb_conf = tune_config.get("listenbrainz", {})
     if not fresh_lb_conf.get("username"):
-        console.print("[bold red]Aborting: No ListenBrainz username configured.[/bold red]")
+        console.print(
+            "[bold red]Aborting: No ListenBrainz username configured.[/bold red]"
+        )
         return
-    
+
     songs_list = getSongsFromDb()
     responseSongs = getListenBrainzResponse()
 
@@ -468,7 +574,7 @@ def fuzzyMatchingSong():
         exact_match_dict[lookup_key] = s
 
     unmatched_listens = []
-    matched_records = []  
+    matched_records = []
 
     console.print(f"[cyan]Processing {len(responseSongs)} listens...[/cyan]")
 
@@ -477,9 +583,7 @@ def fuzzyMatchingSong():
         lb_title = str(metadata.get("track_name", "")).lower().strip()
         lb_artist = str(metadata.get("artist_name", "")).lower().strip()
 
-        search_key = f"{lb_artist} - {lb_title}"
-        matched_song = exact_match_dict.get(search_key)
-
+        matched_song = exact_match_dict.get(f"{lb_artist} - {lb_title}")
         if matched_song:
             matched_records.append({"listen": listen, "song": matched_song})
         else:
@@ -489,20 +593,20 @@ def fuzzyMatchingSong():
         f"[bold green]Direct Matches Found: {len(matched_records)}/{len(responseSongs)}[/bold green]"
     )
 
+    final_garbage = []
     if unmatched_listens:
         console.print(
             f"[bold yellow]Sending {len(unmatched_listens)} tracks to Fallback Pipeline...[/bold yellow]"
         )
-
         remaining_1, artist_index = fallback_stage_1(
             unmatched_listens, songs_list, matched_records
         )
         remaining_2 = fallback_stage_2(remaining_1, artist_index, matched_records)
-
         if remaining_2:
             final_garbage = fallback_stage_3(remaining_2, songs_list, matched_records)
             console.print(
                 f"[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
             )
-    batchSave(matched_records)
+
+    batchSave(matched_records, unmatched_records=final_garbage)
     return True

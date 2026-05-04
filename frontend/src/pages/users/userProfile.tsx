@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "react-router";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
-import { Modal } from "../components/ui/modal";
-import Button from "../components/ui/button/Button";
-import Input from "../components/form/input/InputField";
-import Label from "../components/form/Label";
+import Label from "../../components/form/Label";
+import { Modal } from "../../components/ui/modal";
+import Input from "../../components/form/input/InputField";
+
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import Button from "../../components/ui/button/Button";
 import {
   fetchUserProfile,
   fetchUpdateProfile,
   UserProfileResponse,
   getSong,
   getCoverArtUrl,
-} from "../API/API";
+} from "../../API/API";
 
 const formatDate = (raw: string | undefined) => {
   if (!raw || raw === "never") return "No activity";

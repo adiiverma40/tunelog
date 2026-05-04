@@ -1,15 +1,22 @@
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
+// import PageBreadcrumb from "../components/common/PageBreadCrumb";
+// import PageMeta from "../components/common/PageMeta";
 import { useState, useEffect } from "react";
-import { fetchGetUsers, fetchCreateUser, User } from "../API/API";
-import Button from "../components/ui/button/Button";
-import { Modal } from "../components/ui/modal";
-import { useModal } from "../hooks/useModal";
-import Input from "../components/form/input/InputField";
-import Label from "../components/form/Label";
-import Switch from "../components/form/switch/Switch";
-import UserMetaCard from "../components/UserProfile/UserMetaCard";
+import { fetchGetUsers, fetchCreateUser, User } from "../../API/API";
+// import Button from "../components/ui/button/Button";
+// import { Modal } from "../components/ui/modal";
+import { Modal } from "../../components/ui/modal";
+import { useModal } from "../../hooks/useModal";
+import Input from "../../components/form/input/InputField";
+import Label from "../../components/form/Label";
+// import Switch from "../components/form/switch/Switch";
+import UserMetaCard from "../../components/UserProfile/UserMetaCard";
 
+
+
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import Button from "../../components/ui/button/Button";
+import Switch from "../../components/form/switch/Switch";
 const USERS_CACHE_KEY = "tunelog_users_cache";
 
 export default function UserProfiles() {

@@ -5,9 +5,9 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
-import Switch from "../components/form/switch/Switch";
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import Switch from "../../components/form/switch/Switch";
 import {
   fetchPlaylistSongs,
   fetchPlaylistGenerate,
@@ -21,7 +21,7 @@ import {
   getCoverArtUrl,
   generateDiscoveryQueue,
   fetchDiscoveryPlaylistId,
-} from "../API/API";
+} from "../../API/API";
 import { useNavigate } from "react-router";
 
 type ExplicitFilter = "strict" | "allow_cleaned" | "all";

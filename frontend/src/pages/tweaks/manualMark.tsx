@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
+
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
 import {
   fetchManualMarkingSongs,
   updateExplicitTag,
   ManualMarkingSong,
   ExplicitTag,
-} from "../API/API";
+} from "../../API/API";
 
 const TAG_STYLE: Record<string, string> = {
   explicit: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",

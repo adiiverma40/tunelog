@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
-import Switch from "../components/form/switch/Switch";
-import Button from "../components/ui/button/Button";
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import Button from "../../components/ui/button/Button";
+import Switch from "../../components/form/switch/Switch";
 import {
   fetchGetConfig,
   fetchUpdateConfig,
   TuneConfig,
   AutoGenerateExplicit,
   TreatDataAs,
-} from "../API/API";
+} from "../../API/API";
 
 interface Config {
   playlist_size: number;

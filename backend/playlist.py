@@ -30,6 +30,7 @@ from db import (
 from config import build_url, build_url_for_user, getAllUser
 from state import notification_status, tune_config
 import re
+
 pat = DB_PATH_LOG
 
 console = Console(log_path=False, log_time=False)
@@ -960,10 +961,18 @@ def push_playlist(
     USER_CREDENTIALS = getAllUser()
     password = USER_CREDENTIALS.get(user_id)
     if not password:
+        log(
+            "error",
+            f"No credentials found for user",
+            source="playlist",
+            user_id=user_id,
+            event="error",
+        )
         return
 
     name = playname if playname else PLAYLIST_NAME.format(user_id)
     stored_id = None
+
     if not newPlaylist:
         stored_id = getPlaylistIdForType(user_id, playlist_type)
         if not stored_id:
@@ -987,35 +996,71 @@ def push_playlist(
                 console.print(f"[red]Name fallback lookup failed: {e}[/red]")
 
     base_url = build_url_for_user("createPlaylist", user_id, password)
+    data = [("songId", sid) for sid in song_ids]
+
+    def _do_create_fresh() -> dict | None:
+        try:
+            r = requests.post(f"{base_url}&name={name}", data=data).json()
+            return r
+        except Exception as e:
+            log(
+                "error",
+                f"Failed to create fresh playlist: {e}",
+                source="playlist",
+                user_id=user_id,
+                event="error",
+            )
+            return None
 
     if stored_id:
         url = f"{base_url}&playlistId={stored_id}"
     else:
         url = f"{base_url}&name={name}"
 
-    data = [("songId", sid) for sid in song_ids]
     try:
         r = requests.post(url, data=data).json()
         notification_status.playlist.append(
             {"username": user_id, "size": len(data), "type": "regenerate"}
         )
+
         if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
             error = (
                 r.get("subsonic-response", {})
                 .get("error", {})
                 .get("message", "Unknown error")
             )
-            log(
-                "error",
-                f"Navidrome API failed: {error}",
-                source="playlist",
-                user_id=user_id,
-                event="error",
-            )
-            return
+
+            if stored_id and "not found" in error.lower():
+                console.print(
+                    f"[yellow]Stale playlist ID '{stored_id}' for {user_id}/{playlist_type}. Recreating...[/yellow]"
+                )
+                setPlaylistIdForType(user_id, playlist_type, "")
+                r = _do_create_fresh()
+                if r is None:
+                    return
+                if (
+                    "subsonic-response" not in r
+                    or r["subsonic-response"]["status"] == "failed"
+                ):
+                    log(
+                        "error",
+                        f"Navidrome API failed even after recreate",
+                        source="playlist",
+                        user_id=user_id,
+                        event="error",
+                    )
+                    return
+            else:
+                log(
+                    "error",
+                    f"Navidrome API failed: {error}",
+                    source="playlist",
+                    user_id=user_id,
+                    event="error",
+                )
+                return
 
         final_id = r["subsonic-response"]["playlist"]["id"]
-
         setPlaylistIdForType(user_id, playlist_type, final_id)
 
         requests.get(
@@ -1120,7 +1165,6 @@ def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
         return False
     except Exception:
         return False
-
 
 
 def _to_utc_dt(iso_str: str) -> datetime:

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
-import Switch from "../components/form/switch/Switch";
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import Switch from "../../components/form/switch/Switch";
 import { useNavigate } from "react-router";
 import {
   fetchSyncStatus,
@@ -12,7 +12,7 @@ import {
   fetchFallbackSyncStatus,
   stopFallbackSync,
   SyncStatus,
-} from "../API/API";
+} from "../../API/API";
 
 const SYNC_HOURS = Array.from({ length: 24 }, (_, i) => {
   const h = i % 12 === 0 ? 12 : i % 12;

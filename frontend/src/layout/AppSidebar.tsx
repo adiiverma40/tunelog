@@ -9,6 +9,7 @@ import {
   PageIcon,
   AudioIcon,
   ListIcon,
+  TimeIcon
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -59,6 +60,14 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Sync", path: "/librarySync" },
       { name: "Import", path: "/import" },
+    ],
+  },
+
+  {
+    icon: <TimeIcon />,
+    name: "Scrobble",
+    subItems: [
+      { name: "Listenbrainz", path: "/scrobble/listenbrainz" },
     ],
   },
   {

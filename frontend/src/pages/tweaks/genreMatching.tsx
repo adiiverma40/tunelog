@@ -1,13 +1,16 @@
 
 import { useState, useEffect, useRef } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
+
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+// import PageBreadcrumb from "../components/common/PageBreadCrumb";
+// import PageMeta from "../components/common/PageMeta";
 import {
   fetchGenresFromDb,
   fetchGenres,
   writeGenre,
   autoMatchGenres,
-} from "../API/API";
+} from "../../API/API";
 
 interface GenreListResponse {
   status: string;

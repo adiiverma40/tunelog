@@ -6,8 +6,6 @@ from rich.console import Console
 
 console = Console()
 
-
-# import sqlite3
 from state import status_registry
 
 if os.path.exists("/app/data"):
@@ -22,10 +20,6 @@ DB_PATH_USR = os.path.join(DATA_DIR, "users.db")
 DB_PATH_PLTS = os.path.join(DATA_DIR, "playlist.db")
 
 
-# db connection
-
-
-# for song listen history
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_PATH_LOG), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_LOG, timeout=30)
@@ -34,7 +28,6 @@ def get_db_connection():
     return conn
 
 
-# for library sync
 def get_db_connection_lib():
     os.makedirs(os.path.dirname(DB_PATH_LIB), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_LIB, timeout=30)
@@ -44,7 +37,6 @@ def get_db_connection_lib():
     return conn
 
 
-# for users
 def get_db_connection_usr():
     os.makedirs(os.path.dirname(DB_PATH_USR), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_USR, timeout=30)
@@ -52,7 +44,6 @@ def get_db_connection_usr():
     return conn
 
 
-# for playlist
 def get_db_connection_playlist():
     os.makedirs(os.path.dirname(DB_PATH_PLTS), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_PLTS, timeout=30)
@@ -60,39 +51,21 @@ def get_db_connection_playlist():
     return conn
 
 
-def init_db_usr():
-    conn = get_db_connection_usr()
-    cursor = conn.cursor()
+def _ensure_columns(cursor, table: str, expected: dict):
+    cursor.execute(f"PRAGMA table_info({table})")
+    existing = {row[1] for row in cursor.fetchall()}
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user (
-            username     TEXT PRIMARY KEY,
-            name         TEXT,
-            avatar       TEXT,
-            password     TEXT,
-            isAdmin      BOOLEAN,
-            playlistId   TEXT,
-            playlistIds  TEXT  
-        )
-    """)
-    
-    cursor.execute("PRAGMA table_info(user)")
-    existing_columns = [row[1] for row in cursor.fetchall()]
-    columns_to_ensure = {
-        "name": "TEXT",
-        "avatar": "TEXT",
-        "playlistIds": "TEXT" 
-    }
-    for col_name, col_type in columns_to_ensure.items():
-        if col_name not in existing_columns:
+    for col_name, col_def in expected.items():
+        if col_name not in existing:
             try:
-                console.print(f"[bold green]Adding missing column: {col_name}...[/bold green]")
-                cursor.execute(f"ALTER TABLE user ADD COLUMN {col_name} {col_type}")
+                console.print(
+                    f"[bold green]Adding missing column '{col_name}' to '{table}'...[/bold green]"
+                )
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
             except Exception as e:
-                console.print(f"[bold red]Error adding {col_name}: {e}[/bold red]")
-
-    conn.commit()
-    conn.close()
+                console.print(
+                    f"[bold red]Error adding '{col_name}' to '{table}': {e}[/bold red]"
+                )
 
 
 def init_db():
@@ -101,31 +74,78 @@ def init_db():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS listens (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        song_id TEXT NOT NULL,
-        title TEXT,
-        artist TEXT,
-        album TEXT,
-        genre TEXT,
-        duration   INTEGER,
-        played  INTEGER,
-        percent_played  REAL,
-        signal TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        user_id     TEXT DEFAULT "default"
-        
-        
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            song_id        TEXT NOT NULL,
+            title          TEXT,
+            artist         TEXT,
+            album          TEXT,
+            genre          TEXT,
+            duration       INTEGER,
+            played         INTEGER,
+            percent_played REAL,
+            signal         TEXT,
+            timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id        TEXT DEFAULT 'default'
         )
-        """)
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS listenbrainz (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            song_id        TEXT,
+            title          TEXT,
+            artist         TEXT,
+            album          TEXT,
+            tag          TEXT,
+            signal         TEXT,
+            comment         TEXT,
+            timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    _ensure_columns(
+        cursor,
+        "listenbrainz",
+        {
+            "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+            "song_id": "TEXT",
+            "title": "TEXT",
+            "artist": "TEXT",
+            "album": "TEXT",
+            "tag": "TEXT",
+            "signal": "TEXT",
+            "comment": "TEXT",
+            "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP",
+        },
+    )
+
+    _ensure_columns(
+        cursor,
+        "listens",
+        {
+            "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+            "song_id": "TEXT NOT NULL",
+            "title": "TEXT",
+            "artist": "TEXT",
+            "album": "TEXT",
+            "genre": "TEXT",
+            "duration": "INTEGER",
+            "played": "INTEGER",
+            "percent_played": "REAL",
+            "signal": "TEXT",
+            "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP",
+            "user_id": "TEXT DEFAULT 'default'",
+        },
+    )
+
     cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_listens_song_id ON listens(song_id);"
+        "CREATE INDEX IF NOT EXISTS idx_listens_song_id   ON listens(song_id)"
     )
     cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_listens_user_song ON listens(user_id, song_id);"
+        "CREATE INDEX IF NOT EXISTS idx_listens_user_song ON listens(user_id, song_id)"
     )
     cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_listens_timestamp ON listens(timestamp);"
+        "CREATE INDEX IF NOT EXISTS idx_listens_timestamp ON listens(timestamp)"
     )
+
     conn.commit()
     conn.close()
 
@@ -142,7 +162,7 @@ def init_db_lib():
             artistId    TEXT,
             artistJSON  TEXT,
             album       TEXT,
-            albumId     TEXT, 
+            albumId     TEXT,
             genre       TEXT,
             duration    INTEGER,
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -150,12 +170,59 @@ def init_db_lib():
             explicit    TEXT
         )
     """)
-    try:
-        console.print("[bold green]Trying to create 'Created' column in Library table")
-        cursor.execute("ALTER TABLE library ADD COLUMN created TIMESTAMP")
 
-    except Exception as e:
-        console.print(f"[bold red]Error in altering db : {e}")
+    _ensure_columns(
+        cursor,
+        "library",
+        {
+            "song_id": "TEXT PRIMARY KEY",
+            "title": "TEXT",
+            "artist": "TEXT",
+            "artistId": "TEXT",
+            "artistJSON": "TEXT",
+            "album": "TEXT",
+            "albumId": "TEXT",
+            "genre": "TEXT",
+            "duration": "INTEGER",
+            "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "created": "TIMESTAMP",
+            "explicit": "TEXT",
+        },
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def init_db_usr():
+    conn = get_db_connection_usr()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user (
+            username    TEXT PRIMARY KEY,
+            name        TEXT,
+            avatar      TEXT,
+            password    TEXT,
+            isAdmin     BOOLEAN,
+            playlistId  TEXT,
+            playlistIds TEXT
+        )
+    """)
+
+    _ensure_columns(
+        cursor,
+        "user",
+        {
+            "username": "TEXT PRIMARY KEY",
+            "name": "TEXT",
+            "avatar": "TEXT",
+            "password": "TEXT",
+            "isAdmin": "BOOLEAN",
+            "playlistId": "TEXT",
+            "playlistIds": "TEXT",
+        },
+    )
 
     conn.commit()
     conn.close()
@@ -164,6 +231,7 @@ def init_db_lib():
 def init_db_playlist():
     conn = get_db_connection_playlist()
     cursor = conn.cursor()
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS playlist (
             username     TEXT NOT NULL,
@@ -178,6 +246,67 @@ def init_db_playlist():
             PRIMARY KEY (username, song_id, type)
         )
     """)
+
+    _ensure_columns(
+        cursor,
+        "playlist",
+        {
+            "username": "TEXT NOT NULL",
+            "song_id": "TEXT NOT NULL",
+            "title": "TEXT",
+            "artist": "TEXT",
+            "genre": "TEXT",
+            "signal": "TEXT",
+            "explicit": "TEXT",
+            "type": "TEXT NOT NULL DEFAULT 'blend'",
+            "generated_at": "DATETIME DEFAULT CURRENT_TIMESTAMP",
+        },
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def init_search_db():
+    conn = get_db_connection_lib()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS search_metadata (
+            song_id      TEXT PRIMARY KEY,
+            lyrics       TEXT,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (song_id) REFERENCES library (song_id) ON DELETE CASCADE
+        )
+    """)
+
+    _ensure_columns(
+        cursor,
+        "search_metadata",
+        {
+            "song_id": "TEXT PRIMARY KEY",
+            "lyrics": "TEXT",
+            "last_updated": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+    )
+
+    cursor.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS song_search_index USING fts5(
+            song_id      UNINDEXED,
+            title,
+            artist,
+            actualArtist,
+            artistId     UNINDEXED,
+            artistJSON   UNINDEXED,
+            album,
+            actualAlbum,
+            albumId      UNINDEXED,
+            lyrics,
+            tokenize='unicode61 remove_diacritics 1'
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -200,7 +329,7 @@ def db_supervisor(func):
                     status_registry.update(
                         "Db",
                         status="warning",
-                        error=f"Lock detected, retry {attempt+1}",
+                        error=f"Lock detected, retry {attempt + 1}",
                     )
                     time.sleep(1)
                     continue
@@ -216,40 +345,6 @@ def db_supervisor(func):
         return None
 
     return wrapper
-
-
-def init_search_db():
-    conn = get_db_connection_lib()
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS search_metadata (
-            song_id       TEXT PRIMARY KEY,
-            lyrics        TEXT,
-            last_updated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (song_id) REFERENCES library (song_id) ON DELETE CASCADE
-        )
-    """)
-
-    cursor.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS song_search_index USING fts5(
-            song_id UNINDEXED, 
-            title, 
-            artist,
-            actualArtist, 
-            artistId UNINDEXED,
-            artistJSON UNINDEXED, 
-            album,
-            actualAlbum, 
-            albumId UNINDEXED, 
-            lyrics,
-            tokenize='unicode61 remove_diacritics 1'
-        )
-    """)
-
-    conn.commit()
-    conn.close()
 
 
 def migrate_playlist_primary_key():
@@ -270,9 +365,9 @@ def migrate_playlist_primary_key():
             )
         """)
         conn.execute("""
-            INSERT OR IGNORE INTO playlist_new 
-            SELECT username, song_id, title, artist, genre, signal, explicit, 
-                   COALESCE(type, 'blend'), generated_at 
+            INSERT OR IGNORE INTO playlist_new
+            SELECT username, song_id, title, artist, genre, signal, explicit,
+                   COALESCE(type, 'blend'), generated_at
             FROM playlist
         """)
         conn.execute("DROP TABLE playlist")
@@ -291,3 +386,4 @@ if __name__ == "__main__":
     init_db_lib()
     init_db_usr()
     init_db_playlist()
+    init_search_db()

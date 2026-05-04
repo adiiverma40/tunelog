@@ -1,14 +1,14 @@
 
 import { useState, useEffect } from "react";
-import PageBreadcrumb from "../components/common/PageBreadCrumb";
-import PageMeta from "../components/common/PageMeta";
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
 import {
   readNotifications,
   markAsRead,
   type StoredSongState,
   type StoredPlaylist,
   type StoredStarredSong,
-} from "../hooks/Usenotificationstream";
+} from "../../hooks/Usenotificationstream";
 
 const formatTime = (iso: string) => {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);

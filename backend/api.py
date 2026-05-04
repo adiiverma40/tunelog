@@ -1275,6 +1275,17 @@ def update_config(payload: configData):
     return {"status": "success", "message": "config.json updated"}
 
 
+@app.get("/api/listenbrainz")
+def getListenbrainz():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    rows = cursor.execute("SELECT * FROM listenbrainz ORDER BY id DESC").fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
 # ====================================================================
 # JAM
 # ========================================================

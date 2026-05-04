@@ -914,3 +914,21 @@ export async function fetchDiscoveryPlaylistId(
     };
   }
 }
+
+export interface ListenBrainzEntry {
+  id: number;
+  song_id: string | null;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  signal: string | null;
+  tag: string | null;
+  comment: string | null;
+  timestamp: string;
+}
+
+export async function getListenbrainzLog(): Promise<ListenBrainzEntry[]> {
+  const res = await fetch(`${BASE_URL}/api/listenbrainz`);
+  if (!res.ok) throw new Error("Failed to fetch listenbrainz log");
+  return res.json();
+}

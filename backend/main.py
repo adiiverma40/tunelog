@@ -1,52 +1,3 @@
-# Tunelog, A light weight script to create a playlist recommendation system.
-# It tracks how user react to certain music and on that it create a playlist for that user
-
-
-# features implemented till now :
-# 1. Watcher : watches every user and stores it in active dictornary
-# 2. log_history : logs history to the database :
-#         if song is new, uses inster to create a new line
-#         if song is prexisting, uses update to change played, percentage,
-# 3.
-
-
-# UPDATE :
-#     1. updated the logic to check repeat, instead of every two signal count as repeate,
-#         if and only if last intreaction was positive or repeat it will count as repeat
-
-
-# TODO:
-
-# implement a better system to signal positive and stuff
-#     -can be done by , when song change detected, update database, by subtracting start and end time of the song to log the played time, - done
-
-# implement QUEUE
-# url_queue = navidrome_url("getPlayQueue")
-# print("queue:" ,url_queue)
-# stop from going 200%
-
-# existing 509
-# [UPDATE] adii | Pal Bhar | 104%
-# existing 510
-# [UPDATE] adii_mobile | Soch Na Sake | 238%    done
-
-# implement loging when song changes done
-
-
-# ISSUES AND FIXS
-
-
-## CHANGING APPROACH, INSTEAD OF CHECKING EVERY 5 SEC, WE WILL USE SSE
-## SSE will return events, when the event is playingnow, use watcher to get the details
-# use threading
-
-
-##ISSUE: when using mobile client for navidrom, Tempo, it reports twice for the nowplayingcount event in sse
-#           - this issue causes to run watcher multiple times,
-
-
-# print("main")
-
 import sys
 import requests
 import threading
@@ -367,6 +318,141 @@ def autoSyncWithFallback():
         )
 
 
+MIN_SCORE: float = tune_config["api_and_performance"]["sync_confidence"][
+    "min_match_score"
+]
+TRIES: int = 500
+
+
+def _get_unprocessed_entries() -> list[dict]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute("""
+        SELECT DISTINCT title, artist, album
+        FROM   listenbrainz
+        WHERE  tag = 'unmatched'
+          AND  (comment IS NULL OR comment = '')
+        """).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def _update_entry(
+    raw_title: str,
+    raw_artist: str,
+    tag: str,
+    comment: str,
+    new_title: str = None,
+    new_artist: str = None,
+    new_album: str = None,
+) -> None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    base_where_clause = """
+        WHERE COALESCE(title, '') = ? 
+          AND COALESCE(artist, '') = ?
+          AND tag = 'unmatched' 
+          AND (comment IS NULL OR comment = '')
+    """
+
+    if new_title and new_artist:
+        cursor.execute(
+            f"""
+            UPDATE listenbrainz
+            SET    tag = ?, comment = ?, title = ?, artist = ?, album = ?
+            {base_where_clause}
+            """,
+            (
+                tag,
+                comment,
+                new_title,
+                new_artist,
+                new_album or "",
+                raw_title,
+                raw_artist,
+            ),
+        )
+    else:
+        cursor.execute(
+            f"""
+            UPDATE listenbrainz 
+            SET    tag = ?, comment = ? 
+            {base_where_clause}
+            """,
+            (tag, comment, raw_title, raw_artist),
+        )
+    conn.commit()
+    conn.close()
+
+
+def run_lb_fuzzy_matching() -> None:
+
+    entries = _get_unprocessed_entries()
+
+    if not entries:
+        console.print("[dim]LB Fuzzy: No unmatched entries to process.[/dim]")
+        return
+
+    console.print(
+        f"[bold magenta]LB Fuzzy:[/bold magenta] Processing {len(entries)} distinct unmatched entries..."
+    )
+
+    for entry in entries:
+        raw_title = entry.get("title") or ""
+        raw_artist = entry.get("artist") or ""
+        raw_album = entry.get("album") or ""
+
+        song_stub = {
+            "song_id": "",
+            "title": raw_title,
+            "artist": raw_artist,
+            "album": raw_album,
+        }
+
+        console.print(f"[cyan]LB Fuzzy:[/cyan] {raw_title[:50]} | {raw_artist[:30]}")
+
+        result = useFallBackMethods(song=song_stub, tries=TRIES, returnData=True)
+
+        if result is not None:
+            sc = result.get("score", 0)
+            if sc >= MIN_SCORE:
+                _update_entry(
+                    raw_title=raw_title,
+                    raw_artist=raw_artist,
+                    tag="itunes",
+                    comment=str(round(sc, 2)),
+                    new_title=result.get("title") or raw_title,
+                    new_artist=result.get("artist") or raw_artist,
+                    new_album=result.get("album") or raw_album,
+                )
+                console.log(
+                    f"[green]LB Fuzzy: Matched[/green] (score={sc}) → {result.get('title')}"
+                )
+            else:
+                _update_entry(
+                    raw_title=raw_title,
+                    raw_artist=raw_artist,
+                    tag="unmatched",
+                    comment=str(round(sc, 2)),
+                )
+                console.log(
+                    f"[yellow]LB Fuzzy: Low score[/yellow] ({sc}) → kept unmatched"
+                )
+        else:
+            _update_entry(
+                raw_title=raw_title,
+                raw_artist=raw_artist,
+                tag="unmatched",
+                comment="no_match",
+            )
+            console.log("[yellow]LB Fuzzy: No match found → kept unmatched[/yellow]")
+
+    console.print(
+        f"[bold green]LB Fuzzy: Done.[/bold green] Processed {len(entries)} distinct entries."
+    )
+
+
 def main():
     # Database
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
@@ -495,9 +581,9 @@ def main():
         playlistConf = tune_config["playlist_generation"]
 
         conf = tune_config
-        
-# --------------------------------------------------------------------------------------
-        
+
+        # --------------------------------------------------------------------------------------
+
         if playlistConf["auto_generate_playlist"] and playlistConf[
             "last_auto_generate"
         ] != str(current_day):
@@ -512,12 +598,14 @@ def main():
                 injection = playlistConf["auto_generate_injection"]
                 library1, history = getDataFromDb()
                 users = playlistConf["auto_generate_for"]
-                if len(users) > 0 : 
-                    for user in users :
+                if len(users) > 0:
+                    for user in users:
                         scores = score_song(
                             user, history_dict=history, library_dict=library1
                         )
-                        unheard, unheard_ratio, all_time = get_unheard_songs(library1, user)
+                        unheard, unheard_ratio, all_time = get_unheard_songs(
+                            library1, user
+                        )
                         wildcards = get_wildcard_songs(scores, user)
                         playlist, song_signals = build_playlist(
                             library1,
@@ -532,8 +620,12 @@ def main():
                             size,
                             injection,
                         )
-                        push_playlist(playlist, user, song_signals, playlist_type="blend")
-                        console.print(f"[bold yellow]Pushed Playlist : {user} , Type : blend")
+                        push_playlist(
+                            playlist, user, song_signals, playlist_type="blend"
+                        )
+                        console.print(
+                            f"[bold yellow]Pushed Playlist : {user} , Type : blend"
+                        )
                         try:
                             window_start, window_end = resolve_date_window(
                                 date_from=None,
@@ -555,7 +647,7 @@ def main():
                                 size,
                                 alias_to_cat,
                             )
-                            if final_ids and len(final_ids) != 0 :
+                            if final_ids and len(final_ids) != 0:
                                 push_playlist(
                                     final_ids,
                                     user,
@@ -576,8 +668,8 @@ def main():
                             console.print(
                                 f"[bold red]Auto Discovery Queue failed for {user}: {e}"
                             )
-                else : 
-                    console.print('[bold red]No users to generate playlists')
+                else:
+                    console.print("[bold red]No users to generate playlists")
 
             isGenerated = True
 
@@ -591,7 +683,7 @@ def main():
 
         if listenBrainzconf.get("enabled", False) and not is_lb_syncing:
             pool_time_hours = float(listenBrainzconf.get("pool_listen_brainz", 6))
-            last_time_synced = listenBrainzconf.get("last_synced")
+            last_time_synced = listenBrainzconf.get("last_synced") or 0
             current_unix_time = int(time.time())
             seconds_threshold = pool_time_hours * 3600
             if not last_time_synced or (
@@ -613,14 +705,22 @@ def main():
                             )
                             return
 
-                        isFuzz = fuzzyMatchingSong()
-                        print(isFuzz)
+                        LatestTimeStamp = fuzzyMatchingSong()
+                        print(LatestTimeStamp)
 
-                        tune_config["listenbrainz"]["last_synced"] = int(time.time())
+                        if LatestTimeStamp:
+                            tune_config["listenbrainz"]["last_synced"] = int(
+                                LatestTimeStamp
+                            )
+                        else:
+                            tune_config["listenbrainz"]["last_synced"] = int(
+                                last_time_synced
+                            )
                         save_config(tune_config)
                         console.print(
                             "[bold green]ListenBrainz Sync Completed and Timestamp Updated[/bold green]"
                         )
+                        run_lb_fuzzy_matching()
                     except Exception as e:
                         console.print(
                             f"[bold red]ListenBrainz Auto-Sync Failed:[/bold red] {e}"

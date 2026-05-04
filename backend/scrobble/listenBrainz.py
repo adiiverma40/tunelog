@@ -50,6 +50,7 @@ def batchSave(matched_records, unmatched_records=None):
         f"[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]"
     )
     default_signal = str(listenBrainzConf.get("treat_data_as", "complete")).lower()
+    # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
     default_signal = "positive" if default_signal == "complete" else default_signal
     repeat_window_seconds = behaviour.get("repeat_time_window_min", 30) * 60
     dedup_window_seconds = 30 * 60
@@ -115,6 +116,7 @@ def batchSave(matched_records, unmatched_records=None):
         if is_duplicate:
             duplicates_ignored += 1
             console.print(f"[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
+            # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
             lb_log_data.append(
                 (
                     song_id,
@@ -175,7 +177,7 @@ def batchSave(matched_records, unmatched_records=None):
         console.print(
             f"[bold green] ↳ ✔ Queued for insertion ({current_signal})[/bold green]"
         )
-
+        # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
     if unmatched_records:
         console.print(
             f"[bold red]Logging {len(unmatched_records)} unmatched tracks to listenbrainz table...[/bold red]"
@@ -219,6 +221,7 @@ def batchSave(matched_records, unmatched_records=None):
                 )
 
     console.print("[cyan]Attempting to write to database...[/cyan]")
+    # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
     if insert_data:
         ok = _execute_with_retry(
             cursor,
@@ -270,7 +273,7 @@ def getListenBrainzResponse():
     console.print("[bold yellow]Getting data from ListenBrainz[/bold yellow]")
     last_synced_ts = listenBrainzConf.get("last_synced")
 
-    if not last_synced_ts:
+    if not last_synced_ts or 0:
         console.print(
             "[bold red]No last synced Found, trying deep history sync[/bold red]"
         )
@@ -307,29 +310,61 @@ def getListenBrainzResponse():
 
 def deep_history_sync(pagination=20):
     all_listens = []
-    ceiling_ts = int(time.time())
+
+    ceiling_ts = None
+
+    fresh_lb_conf = tune_config.get("listenbrainz", {})
+    username = fresh_lb_conf.get("username")
+
+    if not username:
+        console.print(
+            "[bold red]deep_history_sync aborted: No username found.[/bold red]"
+        )
+        return []
+
     LB_HEADERS = {
         "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
     }
+
     while True:
-        params = {"max_ts": ceiling_ts, "count": pagination}
-        url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
-        response = requests.get(url, params=params, headers=LB_HEADERS)
-        data = response.json()
-        listens = data.get("payload", {}).get("listens", [])
+        params = {"count": pagination}
+        if ceiling_ts is not None:
+            params["max_ts"] = ceiling_ts
 
-        if not listens:
-            console.print("[yellow]No more history found.[/yellow]")
+        url = f"https://api.listenbrainz.org/1/user/{username}/listens"
+
+        try:
+            response = requests.get(url, params=params, headers=LB_HEADERS)
+            response.raise_for_status()
+
+            data = response.json()
+            listens = data.get("payload", {}).get("listens", [])
+
+            if not listens:
+                console.print("[yellow]No more history found.[/yellow]")
+                break
+
+            all_listens.extend(listens)
+            console.print(
+                f"[bold green]Fetched {len(all_listens)} total...[/bold green]"
+            )
+
+            ceiling_ts = listens[-1]["listened_at"] - 1
+
+            time.sleep(0.5)
+            if len(listens) < pagination:
+                console.print(
+                    "[bold green]All History from ListenBrainz fetched[/bold green]"
+                )
+                return all_listens
+
+        except Exception as e:
+            console.print(f"[bold red]Deep Sync API Error:[/bold red] {e}")
+            if hasattr(e, "response") and e.response is not None:
+                console.print(
+                    f"[bold red]ListenBrainz says:[/bold red] {e.response.text}"
+                )
             break
-
-        all_listens.extend(listens)
-        console.print(f"[bold green]Fetched {len(all_listens)} total...[/bold green]")
-        ceiling_ts = listens[-1]["listened_at"] - 1
-
-        time.sleep(0.5)
-        if len(listens) < pagination:
-            console.print("[bold red]History from ListenBrainz fetched[/bold red]")
-            return all_listens
 
     return all_listens
 
@@ -555,14 +590,16 @@ def fuzzyMatchingSong():
         console.print(
             "[bold red]Aborting: No ListenBrainz username configured.[/bold red]"
         )
-        return
+        return None
 
     songs_list = getSongsFromDb()
     responseSongs = getListenBrainzResponse()
 
     if not responseSongs:
         console.print("[yellow]No ListenBrainz data to process.[/yellow]")
-        return
+        return None
+
+    newest_ts = responseSongs[0].get("listened_at")
 
     console.print("[cyan]Building local library exact-match index...[/cyan]")
 
@@ -609,4 +646,5 @@ def fuzzyMatchingSong():
             )
 
     batchSave(matched_records, unmatched_records=final_garbage)
-    return True
+
+    return newest_ts

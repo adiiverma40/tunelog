@@ -4,6 +4,7 @@ import asyncio
 import json
 from rich.console import Console
 import os
+from typing import Tuple
 
 console = Console()
 
@@ -110,7 +111,7 @@ DEFAULT_CONFIG = {
         "injection_breakdown": {"signal": 0.57, "unheard": 0.35, "wildcard": 0.08},
     },
     "behavioral_scoring": {
-        "long_song_duration" : 300,
+        "long_song_duration": 300,
         "skip_threshold_pct": 30,
         "positive_threshold_pct": 80,
         "repeat_time_window_min": 30,
@@ -143,15 +144,14 @@ DEFAULT_CONFIG = {
         "only_host_add_queue": False,
     },
     "listenbrainz": {
-        "username": "", 
+        "username": "",
         "treat_data_as": "partial",
-        "pool_listen_brainz" : 1,
-        "last_synced" : 0,
-        "for_users" : [],
-        "enabled" : True,
-        "dedup_window_seconds" : 30
-        
-        },
+        "pool_listen_brainz": 1,
+        "last_synced": 0,
+        "for_users": [],
+        "enabled": False,
+        "dedup_window_seconds": 30,
+    },
 }
 
 config_lock = threading.Lock()
@@ -185,11 +185,36 @@ def _write_default_config(data):
         console.print(f"[bold red]Failed to write default config.json:[/bold red] {e}")
 
 
+def deep_merge_defaults(defaults: dict, loaded: dict) -> Tuple[dict, bool]:
+
+    modified = False
+    for key, default_val in defaults.items():
+        if key not in loaded:
+            loaded[key] = default_val
+            modified = True
+            console.print(
+                f"[yellow]Config: missing key '{key}' restored to default.[/yellow]"
+            )
+        elif isinstance(default_val, dict) and isinstance(loaded[key], dict):
+            _, child_modified = deep_merge_defaults(default_val, loaded[key])
+            if child_modified:
+                modified = True
+    return loaded, modified
+
+
 def load_config():
     try:
         with open(CONFIG_FILE_PATH, "r") as file:
             data = json.load(file)
-            return data
+
+        data, modified = deep_merge_defaults(DEFAULT_CONFIG, data)
+
+        if modified:
+            console.print(
+                "[yellow]Config patched with missing defaults. Saving...[/yellow]"
+            )
+            _write_default_config(data)
+        return data
 
     except FileNotFoundError:
         console.print(

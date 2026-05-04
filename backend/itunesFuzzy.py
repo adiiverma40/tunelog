@@ -121,7 +121,7 @@ def clean_text(text: str) -> str:
 
 
 def generalItunesSearch(
-  title,
+    title,
     artist="",
     limit=5,
     entity="song",
@@ -183,7 +183,10 @@ def mb_to_itunes_format(mb_response):
 
 
 def musicbrainz_search(
-    query: str, entity: str = "recording", limit: int = 10, max_retries: int = tune_config["api_and_performance"]["api_max_retries"]
+    query: str,
+    entity: str = "recording",
+    limit: int = 10,
+    max_retries: int = tune_config["api_and_performance"]["api_max_retries"],
 ):
     base_url = f"https://musicbrainz.org/ws/2/{entity}"
     headers = {"User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog/)"}
@@ -260,6 +263,7 @@ def fuzzyScoreMatch(response, song, isAlbum=False, tryLimit: int = 500):
     min_score = tune_config["api_and_performance"]["sync_confidence"]["min_match_score"]
     return (bestMatch, bestScore) if bestScore >= min_score else (None, bestScore)
 
+
 def fallback1(song):
     title = clean_text(song["title"])
     return generalItunesSearch(title, "", 200)
@@ -330,20 +334,24 @@ def itunes_to_song_format(res):
     }
 
 
-def useFallBackMethods(song, tries):
+def useFallBackMethods(song, tries, data=None, returnData=False):
+
     global totalTries
     totalTries = 0
     if app_state.fallback_stop:
         console.log("[bold red]Sync Stopping Command Received (in Fuzzy)[/bold red]")
         return
 
-    song_id = song["song_id"]
+    if data is not None:
+        song = {**song, **data}
+
+    song_id = song.get("song_id", "")
     console.print(
-        f"[bold cyan]Processing:[/bold cyan] {song['title']} | {song['artist']}"
+        f"[bold cyan]Processing:[/bold cyan] {song.get('title', '?')} | {song.get('artist', '?')}"
     )
 
-    artist = clean_text(song["artist"])
-    title = clean_text(song["title"])
+    artist = clean_text(song.get("artist", ""))
+    title = clean_text(song.get("title", ""))
 
     match, sc = None, 0
 
@@ -379,11 +387,25 @@ def useFallBackMethods(song, tries):
         explicit = match.get("trackExplicitness", "notInItunes") or "notInItunes"
         itunes_artist = match.get("artistName")
         itunes_genre = match.get("primaryGenreName")
-        
-        overwrite_score = tune_config["api_and_performance"]["sync_confidence"]["metadata_overwrite_score"]
-        
+
+        overwrite_score = tune_config["api_and_performance"]["sync_confidence"][
+            "metadata_overwrite_score"
+        ]
+
+        if returnData:
+            matched_info = {
+                "title": match.get("trackName") or song.get("title"),
+                "artist": itunes_artist or song.get("artist"),
+                "album": match.get("collectionName") or song.get("album"),
+                "genre": itunes_genre or song.get("genre"),
+                "explicit": explicit,
+                "score": sc,
+            }
+            console.log(
+                f"[green]Matched (returnData)[/green] (Score: {sc}) -> explicit: {explicit}"
+            )
+            return matched_info
         if sc >= overwrite_score:
-            
             updateSong(
                 song_id=song_id,
                 explicit=explicit,
@@ -397,6 +419,10 @@ def useFallBackMethods(song, tries):
             console.log(f"[green]Matched[/green] (Score: {sc}) -> explicit: {explicit}")
             return f"Song matched with a score of : {sc}"
     else:
+        if returnData:
+            console.log("[yellow]Skipped[/yellow] No match found. Returning None.")
+            return None
+
         updateSong(song_id=song_id, explicit="manual")
         console.log("[yellow]Skipped[/yellow] No match found. Flagged as manual.")
         return "false"

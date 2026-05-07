@@ -8,6 +8,7 @@ from db import get_db_connection, get_db_connection_lib
 from rich.console import Console
 from state import tune_config
 import sqlite3
+from typing import Optional, Dict, Any , List
 
 console = Console()
 
@@ -648,3 +649,77 @@ def fuzzyMatchingSong():
     batchSave(matched_records, unmatched_records=final_garbage)
 
     return newest_ts
+
+
+def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], int]:
+    songs_list = getSongsFromDb()
+    exact_match_dict = {}
+    for s in songs_list:
+        db_artist = str(s.get("artist", "")).lower().strip()
+        db_title = str(s.get("title", "")).lower().strip()
+        exact_match_dict[f"{db_artist} - {db_title}"] = s
+
+    matched_results = {}
+    unmatched_listens = []
+    for idx, track in enumerate(tracks):
+        um_title = str(track.title or "").strip()
+        um_artist = str(track.artist or "").strip()
+        um_album = str(track.album or "").strip()
+
+        lookup_key = f"{um_artist.lower()} - {um_title.lower()}"
+        exact = exact_match_dict.get(lookup_key)
+
+        if exact:
+            matched_results[idx] = {
+                "navidrome_id": exact["songId"],
+                "matched_name": f'{exact.get("artist", "")} - {exact.get("title", "")}',
+                "match_type": "exact",
+            }
+        else:
+            fake_listen = {
+                "_original_index": idx,
+                "track_metadata": {
+                    "track_name": um_title,
+                    "artist_name": um_artist,
+                    "release_name": um_album,
+                },
+            }
+            unmatched_listens.append(fake_listen)
+
+    matched_records = []
+
+    if unmatched_listens:
+        remaining_1, artist_index = fallback_stage_1(
+            unmatched_listens, songs_list, matched_records
+        )
+        remaining_2 = fallback_stage_2(remaining_1, artist_index, matched_records)
+        fallback_stage_3(remaining_2, songs_list, matched_records)
+
+    for record in matched_records:
+        listen = record["listen"]
+        song = record["song"]
+        idx = listen["_original_index"]
+        matched_results[idx] = {
+            "navidrome_id": song["songId"],
+            "matched_name": f'{song.get("artist", "")} - {song.get("title", "")}',
+            "match_type": "fallback",
+        }
+
+    output_tracks = []
+    matched_count = 0
+
+    for idx, track in enumerate(tracks):
+        track_data = track.model_dump()
+        match_info = matched_results.get(idx)
+
+        if match_info:
+            track_data["navidrome_id"] = match_info["navidrome_id"]
+            track_data["matched_name"] = match_info["matched_name"]
+            matched_count += 1
+            print(f"MATCHED [{match_info['match_type']}]: {match_info['matched_name']}")
+        else:
+            print(f"NO MATCH: {track.title} by {track.artist}")
+
+        output_tracks.append(track_data)
+
+    return output_tracks, matched_count

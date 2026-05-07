@@ -932,3 +932,71 @@ export async function getListenbrainzLog(): Promise<ListenBrainzEntry[]> {
   if (!res.ok) throw new Error("Failed to fetch listenbrainz log");
   return res.json();
 }
+
+export interface LBPlaylist {
+  id: string;
+  title: string;
+  creator: string;
+  track_count: number;
+  type: "user" | "created_for_you";
+}
+
+export interface LBTrack {
+  title: string;
+  artist: string;
+  album?: string;
+  mbid?: string;
+  navidrome_id?: string | null;
+  cover_art_url?: string; // Add this!
+}
+
+export interface LBMatchResponse {
+  status: "ok" | "error";
+  tracks: LBTrack[];
+  matched_count: number;
+  reason?: string;
+}
+
+export const fetchListenbrainzPlaylists = async (
+  username: string,
+): Promise<{ status: string; playlists: LBPlaylist[]; reason?: string }> => {
+  const url = `${BASE_URL}/api/listenbrainz/playlists?username=${encodeURIComponent(username)}`;
+  const res = await fetch(url);
+
+  const resJson = res.json();
+  console.log(resJson);
+  return resJson;
+};
+
+export const fetchListenbrainzPlaylistTracks = async (
+  playlistId: string,
+  username: string,
+): Promise<{ status: string; tracks: LBTrack[]; reason?: string }> => {
+  const url = `${BASE_URL}/api/listenbrainz/playlist/${playlistId}/tracks?username=${encodeURIComponent(username)}`;
+  console.log(url);
+  const res = await fetch(url);
+  return res.json();
+};
+
+export const matchTracksWithNavidrome = async (
+  tracks: LBTrack[],
+): Promise<LBMatchResponse> => {
+  const res = await fetch(`${BASE_URL}/api/listenbrainz/match`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tracks }),
+  });
+  return res.json();
+};
+
+export const createNavidromePlaylist = async (
+  name: string,
+  songIds: string[],
+): Promise<{ status: string; reason?: string }> => {
+  const res = await fetch(`${BASE_URL}/api/navidrome/playlist/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, song_ids: songIds }),
+  });
+  return res.json();
+};

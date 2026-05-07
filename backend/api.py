@@ -1,15 +1,14 @@
-# # This to give frontend api data
-
+# This to give frontend api data
 
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, Query, File, Form
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Optional, Literal
 import requests
 import os
 import shutil
 import tempfile
-from typing import Optional
 from config import Navidrome_url
 from db import (
     get_db_connection_lib,
@@ -20,12 +19,7 @@ from db import (
     init_db_lib,
     init_db_usr,
 )
-
-# from playlist import
-
-
 from genre import readJson as readJSON
-
 from playlist import (
     score_song,
     get_unheard_songs,
@@ -43,27 +37,25 @@ from playlist import (
     build_discovery_playlist,
     # timedelta
 )
-
 from datetime import timedelta
-
 from state import app_state, tune_config, save_config
 import library
 from itunesFuzzy import useFallBackMethods
 from genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
 from misc import UpdateDBgenre
 from importPlaylist import fuzzymatching
-
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from rich.console import Console
 from dotenv import load_dotenv
-
 import asyncio
 from fastapi.responses import StreamingResponse
 from state import _subscribers, notification_status
 import json
 import re
 import socketio
+
+from scrobble.listenBrainz import batchMatchNavidromeTracks
 
 load_dotenv()
 
@@ -166,6 +158,58 @@ class DiscoveryQueueModel(BaseModel):
     days_to: Optional[int] = None
     backtrack: bool = False
     explicit_filter: str
+
+
+class LBPlaylist(BaseModel):
+    id: str
+    title: str
+    creator: str
+    track_count: int
+    type: Literal["user", "created_for_you"]
+
+
+class LBTrack(BaseModel):
+    title: str
+    artist: str
+    album: Optional[str] = None
+    mbid: Optional[str] = None
+    navidrome_id: Optional[str] = None
+    cover_art_url: Optional[str] = None
+
+
+class PlaylistResponse(BaseModel):
+    status: Literal["ok", "error"]
+    playlists: List[LBPlaylist]
+    reason: Optional[str] = None
+
+
+class PlaylistTracksResponse(BaseModel):
+    status: Literal["ok", "error"]
+    tracks: List[LBTrack]
+    reason: Optional[str] = None
+
+
+class LBMatchRequest(BaseModel):
+    tracks: List[LBTrack]
+
+
+class LBMatchResponse(BaseModel):
+    status: Literal["ok", "error"]
+    tracks: List[LBTrack]
+    matched_count: int
+    reason: Optional[str] = None
+
+
+class CreatePlaylistRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    song_ids: List[str] = Field(default_factory=list)
+    user_id: Optional[str] = None
+
+
+class CreatePlaylistResponse(BaseModel):
+    status: Literal["ok", "error"]
+    reason: Optional[str] = None
+    playlist_id: Optional[str] = None
 
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
@@ -1691,7 +1735,179 @@ async def transfer_host(sid, data):
     await broadcast_users()
 
 
-if __name__ == "__main__":
-    init_db()
-    init_db_lib()
-    init_db_usr()
+# =========================================
+# LISTENBRAINZ APIS
+# =================================================
+
+ListenbrainzConfig = {"username": "adiiverma40"}
+
+LB_HEADERS = {
+    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)",
+    "Accept": "application/json",
+}
+
+
+@app.get("/api/listenbrainz/playlists", response_model=PlaylistResponse)
+def get_playlists(username: str = Query("")):
+    if not username:
+        username = ListenbrainzConfig.get("username", "")
+
+    if not username:
+        return PlaylistResponse(
+            status="error", playlists=[], reason="No username provided."
+        )
+
+    all_playlists = []
+
+    try:
+        user_url = f"https://api.listenbrainz.org/1/user/{username}/playlists"
+        user_res = requests.get(user_url, headers=LB_HEADERS)
+        print("playlist fetched")
+
+        if user_res.status_code == 200:
+            for item in user_res.json().get("playlists", []):
+                pl = item.get("playlist", {})
+                identifier_url = pl.get("identifier", "")
+
+                all_playlists.append(
+                    LBPlaylist(
+                        id=(
+                            identifier_url.split("/")[-1]
+                            if identifier_url
+                            else "unknown"
+                        ),
+                        title=pl.get("title", "Unknown Title"),
+                        creator=pl.get("creator", ""),
+                        track_count=len(pl.get("track", [])),
+                        type="user",
+                    )
+                )
+
+        created_for_url = (
+            f"https://api.listenbrainz.org/1/user/{username}/playlists/createdfor"
+        )
+        created_res = requests.get(created_for_url, headers=LB_HEADERS)
+
+        if created_res.status_code == 200:
+            for item in created_res.json().get("playlists", []):
+                pl = item.get("playlist", {})
+                identifier_url = pl.get("identifier", "")
+
+                all_playlists.append(
+                    LBPlaylist(
+                        id=(
+                            identifier_url.split("/")[-1]
+                            if identifier_url
+                            else "unknown"
+                        ),
+                        title=pl.get("title", "Unknown Title"),
+                        creator=pl.get("creator", ""),
+                        track_count=len(pl.get("track", [])),
+                        type="created_for_you",
+                    )
+                )
+
+        return PlaylistResponse(status="ok", playlists=all_playlists)
+
+    except Exception as e:
+        return PlaylistResponse(status="error", playlists=[], reason=str(e))
+
+
+@app.get(
+    "/api/listenbrainz/playlist/{playlist_id}/tracks",
+    response_model=PlaylistTracksResponse,
+)
+def get_playlist_tracks(playlist_id: str, username: str = Query("")):
+    url = f"https://api.listenbrainz.org/1/playlist/{playlist_id}?fetch_metadata=true"
+
+    try:
+        res = requests.get(url, headers=LB_HEADERS)
+
+        if res.status_code != 200:
+            return PlaylistTracksResponse(
+                status="error",
+                tracks=[],
+                reason=f"ListenBrainz API returned {res.status_code}",
+            )
+
+        data = res.json()
+        playlist_data = data.get("playlist", {})
+        raw_tracks = playlist_data.get("track", [])
+
+        parsed_tracks = []
+        for track in raw_tracks:
+            identifiers = track.get("identifier", [])
+            mbid = None
+            if identifiers and len(identifiers) > 0:
+                mbid = identifiers[0].split("/")[-1]
+
+            cover_art_url = None
+            try:
+                extensions = track.get("extension", {})
+                track_ext = extensions.get("https://musicbrainz.org/doc/jspf#track", {})
+                metadata = track_ext.get("additional_metadata", {})
+                caa_release_mbid = metadata.get("caa_release_mbid")
+
+                if caa_release_mbid:
+                    cover_art_url = (
+                        f"https://coverartarchive.org/release/{caa_release_mbid}/front"
+                    )
+                    print(cover_art_url)
+            except Exception:
+                pass
+
+            parsed_tracks.append(
+                LBTrack(
+                    title=track.get("title", "Unknown Title"),
+                    artist=track.get("creator", "Unknown Artist"),
+                    album=track.get("album"),
+                    mbid=mbid,
+                    navidrome_id=None,
+                    cover_art_url=cover_art_url,
+                )
+            )
+
+        return PlaylistTracksResponse(status="ok", tracks=parsed_tracks)
+
+    except Exception as e:
+        return PlaylistTracksResponse(status="error", tracks=[], reason=str(e))
+
+
+@app.post("/api/listenbrainz/match", response_model=LBMatchResponse)
+def match_tracks(payload: LBMatchRequest):
+    output_tracks, matched_count = batchMatchNavidromeTracks(payload.tracks)
+
+    return {
+        "status": "ok",
+        "tracks": output_tracks,
+        "matched_count": matched_count,
+    }
+
+
+@app.post("/api/navidrome/playlist/create", response_model=CreatePlaylistResponse)
+def create_navidrome_playlist(payload: CreatePlaylistRequest):
+
+    user_id = "adii"
+
+    if not user_id:
+        return CreatePlaylistResponse(
+            status="error",
+            reason="No user_id provided and no default user available.",
+        )
+
+    success = API_push_playlist(
+        song_ids=payload.song_ids,
+        user_id=user_id,
+        playname=payload.name,
+    )
+
+    if success:
+        return CreatePlaylistResponse(
+            status="ok",
+            reason=None,
+        )
+
+    return CreatePlaylistResponse(
+        status="error",
+        reason="Failed to create playlist in Navidrome.",
+    )

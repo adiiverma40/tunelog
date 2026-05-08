@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useThemeTokens } from "./components/playlistShared";
 import {
   fetchListenbrainzPlaylists,
@@ -15,6 +15,8 @@ type ListenbrainzPlaylistProps = {
   isMobile: boolean;
 };
 
+const PAGE_SIZE = 10;
+
 function SkeletonPlaylistCard({ dark }: { dark: boolean }) {
   const bg = dark ? "#1a1a1f" : "#f0f0ec";
   const shimmer = dark ? "#222228" : "#e4e4e0";
@@ -28,6 +30,7 @@ function SkeletonPlaylistCard({ dark }: { dark: boolean }) {
         display: "flex",
         flexDirection: "column",
         gap: 7,
+        flexShrink: 0,
       }}
     >
       <div
@@ -72,8 +75,21 @@ function SkeletonTrackRows({
   return (
     <>
       {Array.from({ length: 6 }).map((_, i) => (
-        <tr key={i} style={{ borderBottom: `1px solid ${rowBorder}` }}>
-          {/* Art */}
+        <tr
+          key={i}
+          style={{ borderBottom: `1px solid ${rowBorder}`, height: 58 }}
+        >
+          <td style={{ padding: "9px 6px 9px 10px", textAlign: "center" }}>
+            <div
+              style={{
+                width: 18,
+                height: 10,
+                borderRadius: 4,
+                background: bg,
+                margin: "0 auto",
+              }}
+            />
+          </td>
           <td style={{ padding: "9px 10px 9px 12px" }}>
             <div
               style={{
@@ -235,6 +251,7 @@ function PlaylistCard({
         display: "flex",
         flexDirection: "column",
         gap: 5,
+        flexShrink: 0,
       }}
     >
       <div
@@ -340,6 +357,195 @@ function Spin({ color, size = 14 }: { color: string; size?: number }) {
   );
 }
 
+function PaginationToggle({
+  enabled,
+  onChange,
+  dark,
+}: {
+  enabled: boolean;
+  onChange: (v: boolean) => void;
+  dark: boolean;
+}) {
+  const accent = "#EB743B";
+  const trackBg = enabled ? accent : dark ? "#2a2a30" : "#e0e0dc";
+  return (
+    <button
+      onClick={() => onChange(!enabled)}
+      title={enabled ? "Switch to infinite scroll" : "Switch to pagination"}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 7,
+        background: "transparent",
+        border: `1px solid ${dark ? "#2a2a30" : "#e0e0dc"}`,
+        borderRadius: 8,
+        padding: "5px 10px",
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 16,
+          borderRadius: 8,
+          background: trackBg,
+          position: "relative",
+          transition: "background 0.2s",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 2,
+            left: enabled ? 14 : 2,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: "#fff",
+            transition: "left 0.2s",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+          }}
+        />
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: dark ? "#888" : "#999",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {enabled ? "Pages" : "Scroll"}
+      </span>
+    </button>
+  );
+}
+
+function PaginationBar({
+  page,
+  totalPages,
+  onChange,
+  dark,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (p: number) => void;
+  dark: boolean;
+}) {
+  const accent = "#EB743B";
+  const txtMute = dark ? "#555552" : "#a0a09c";
+  const btnBase: React.CSSProperties = {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    border: `1px solid ${dark ? "#222228" : "#e8e8e4"}`,
+    background: "transparent",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 12,
+    fontWeight: 600,
+    transition: "all 0.15s",
+    color: dark ? "#ccc" : "#444",
+  };
+
+  const pages: (number | "…")[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push("…");
+    for (
+      let i = Math.max(2, page - 1);
+      i <= Math.min(totalPages - 1, page + 1);
+      i++
+    )
+      pages.push(i);
+    if (page < totalPages - 2) pages.push("…");
+    pages.push(totalPages);
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        padding: "10px 14px",
+        borderTop: `1px solid ${dark ? "#1e1e24" : "#efefeb"}`,
+        flexShrink: 0,
+      }}
+    >
+      <button
+        style={{ ...btnBase, opacity: page === 1 ? 0.35 : 1 }}
+        disabled={page === 1}
+        onClick={() => onChange(page - 1)}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+
+      {pages.map((p, i) =>
+        p === "…" ? (
+          <span
+            key={`dot-${i}`}
+            style={{
+              width: 24,
+              textAlign: "center",
+              color: txtMute,
+              fontSize: 12,
+            }}
+          >
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p as number)}
+            style={{
+              ...btnBase,
+              background: p === page ? accent : "transparent",
+              color: p === page ? "#fff" : dark ? "#ccc" : "#444",
+              border: `1px solid ${p === page ? accent : dark ? "#222228" : "#e8e8e4"}`,
+            }}
+          >
+            {p}
+          </button>
+        ),
+      )}
+
+      <button
+        style={{ ...btnBase, opacity: page === totalPages ? 0.35 : 1 }}
+        disabled={page === totalPages}
+        onClick={() => onChange(page + 1)}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function ListenbrainzPlaylist({
   dark,
   isMobile,
@@ -379,16 +585,59 @@ export default function ListenbrainzPlaylist({
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [hasFetched, setHasFetched] = useState(false);
 
+  const [paginationEnabled, setPaginationEnabled] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   const mobileShowTracks = isMobile && !!selectedPlaylist;
 
   const visiblePlaylists = useMemo(
     () => playlists.filter((p) => p.type === activeTab),
     [playlists, activeTab],
   );
+
+  const totalPages = Math.max(1, Math.ceil(tracks.length / PAGE_SIZE));
+
+  const displayedTracks = useMemo(() => {
+    if (paginationEnabled) {
+      const start = (currentPage - 1) * PAGE_SIZE;
+      return tracks.slice(start, start + PAGE_SIZE);
+    }
+    return tracks.slice(0, visibleCount);
+  }, [tracks, paginationEnabled, currentPage, visibleCount]);
+
   const matchedCount = useMemo(
     () => tracks.filter((t) => Boolean(t.navidrome_id)).length,
     [tracks],
   );
+
+  useEffect(() => {
+    if (paginationEnabled) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, tracks.length));
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [paginationEnabled, tracks.length]);
+
+  const handlePaginationToggle = (val: boolean) => {
+    setPaginationEnabled(val);
+    setCurrentPage(1);
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  const handlePageChange = (p: number) => {
+    setCurrentPage(p);
+  };
 
   const handleFetchPlaylists = async () => {
     setLoadingPlaylists(true);
@@ -419,6 +668,8 @@ export default function ListenbrainzPlaylist({
     setTracks([]);
     setHasMatched(false);
     setStatusMsg("");
+    setCurrentPage(1);
+    setVisibleCount(PAGE_SIZE);
     try {
       const res = await fetchListenbrainzPlaylistTracks(
         playlist.id,
@@ -489,23 +740,19 @@ export default function ListenbrainzPlaylist({
     setStatusMsg("");
   };
 
-  const panelMaxH: React.CSSProperties = {
-    maxHeight: "calc(100vh - 240px)",
-    minHeight: 400,
+  const panelStyle: React.CSSProperties = {
+    background: card,
+    border: `1px solid ${cardBorder}`,
+    borderRadius: 14,
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    ...(!isMobile ? { height: "calc(100vh - 240px)", minHeight: 440 } : {}),
   };
 
   const PlaylistPanel = (
-    <div
-      style={{
-        background: card,
-        border: `1px solid ${cardBorder}`,
-        borderRadius: 14,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        ...(!isMobile ? panelMaxH : {}),
-      }}
-    >
+    <div style={panelStyle}>
+      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -633,71 +880,61 @@ export default function ListenbrainzPlaylist({
   );
 
   const TrackPanel = (
-    <div
-      style={{
-        background: card,
-        border: `1px solid ${cardBorder}`,
-        borderRadius: 14,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        ...(!isMobile ? panelMaxH : {}),
-      }}
-    >
+    <div style={panelStyle}>
       <div
         style={{
-          padding: "13px 16px",
+          padding: "11px 14px",
           borderBottom: `1px solid ${cardBorder}`,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           gap: 10,
           flexShrink: 0,
           flexWrap: "wrap",
+          background: dark ? "#0f0f12" : "#f5f5f2",
         }}
       >
+        {isMobile && (
+          <button
+            onClick={handleBackToList}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              background: "transparent",
+              border: "none",
+              color: textSecondary,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        )}
+
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 2,
+            gap: 1,
             minWidth: 0,
             flex: 1,
           }}
         >
-          {isMobile && (
-            <button
-              onClick={handleBackToList}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                background: "transparent",
-                border: "none",
-                color: textSecondary,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 600,
-                padding: 0,
-                marginBottom: 6,
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-              All Playlists
-            </button>
-          )}
           <p
             style={{
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 700,
               color: textPrimary,
               margin: 0,
@@ -711,17 +948,23 @@ export default function ListenbrainzPlaylist({
           </p>
           <p style={{ fontSize: 11, color: textMuted, margin: 0 }}>
             {selectedPlaylist
-              ? `${selectedPlaylist.creator} · ${tracks.length} tracks${hasMatched ? ` · ${matchedCount} matched` : ""}`
+              ? `${selectedPlaylist.creator}${hasMatched ? ` · ${matchedCount} matched` : ""}`
               : "Click any playlist on the left to view tracks"}
           </p>
         </div>
+
+        <PaginationToggle
+          enabled={paginationEnabled}
+          onChange={handlePaginationToggle}
+          dark={dark}
+        />
 
         {selectedPlaylist && !loadingTracks && tracks.length > 0 && (
           <button
             onClick={handleMatchTracks}
             disabled={isMatching || hasMatched}
             style={{
-              padding: "7px 14px",
+              padding: "7px 13px",
               borderRadius: 8,
               border: "none",
               cursor: isMatching || hasMatched ? "not-allowed" : "pointer",
@@ -782,17 +1025,21 @@ export default function ListenbrainzPlaylist({
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                Match with Library
+                Match
               </>
             )}
           </button>
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
+      <div
+        style={{
+          overflowX: "auto",
+          overflowY: paginationEnabled ? "visible" : "auto",
+          flex: paginationEnabled ? "none" : 1,
+        }}
+      >
         {!selectedPlaylist ? (
-          // Empty state
           <div
             style={{
               display: "flex",
@@ -839,14 +1086,16 @@ export default function ListenbrainzPlaylist({
             }}
           >
             <colgroup>
+              <col style={{ width: 38 }} />
               <col style={{ width: 58 }} />
               <col />
               {!isMobile && <col style={{ width: "24%" }} />}
               {!isMobile && <col style={{ width: "22%" }} />}
-              {hasMatched && !isMobile && <col style={{ width: 110 }} />}{" "}
+              {hasMatched && !isMobile && <col style={{ width: 110 }} />}
             </colgroup>
             <thead>
               <tr style={{ background: dark ? "#0f0f12" : "#f5f5f2" }}>
+                <th style={{ ...thStyle, textAlign: "center" }}>#</th>
                 <th style={thStyle} />
                 <th style={thStyle}>Title</th>
                 {!isMobile && <th style={thStyle}>Artist</th>}
@@ -860,7 +1109,7 @@ export default function ListenbrainzPlaylist({
               ) : tracks.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isMobile ? 2 : hasMatched ? 5 : 4}
+                    colSpan={isMobile ? 3 : hasMatched ? 6 : 5}
                     style={{
                       padding: 32,
                       textAlign: "center",
@@ -872,68 +1121,111 @@ export default function ListenbrainzPlaylist({
                   </td>
                 </tr>
               ) : (
-                tracks.map((t, idx) => (
-                  <tr
-                    key={t.mbid || `${t.title}-${idx}`}
-                    style={{
-                      borderBottom: `1px solid ${dark ? "#18181c" : "#f0f0ec"}`,
-                      transition: "background 0.1s",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = dark
-                        ? "#18181f"
-                        : "#f8f8f5")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "transparent")
-                    }
-                  >
-                    <td
+                displayedTracks.map((t, idx) => {
+                  const globalIdx = paginationEnabled
+                    ? (currentPage - 1) * PAGE_SIZE + idx + 1
+                    : idx + 1;
+                  return (
+                    <tr
+                      key={t.mbid || `${t.title}-${idx}`}
                       style={{
-                        padding: "8px 10px 8px 12px",
-                        verticalAlign: "middle",
+                        borderBottom: `1px solid ${dark ? "#18181c" : "#f0f0ec"}`,
+                        transition: "background 0.1s",
                       }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = dark
+                          ? "#18181f"
+                          : "#f8f8f5")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
                     >
-                      <AlbumArt
-                        src={t.cover_art_url}
-                        alt={t.title}
-                        dark={dark}
-                        size={40}
-                      />
-                    </td>
-
-                    <td
-                      style={{
-                        padding: "8px 10px",
-                        verticalAlign: "middle",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
+                      <td
                         style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
+                          padding: "8px 6px 8px 10px",
+                          verticalAlign: "middle",
+                          textAlign: "center",
+                          color: textMuted,
+                          fontSize: 11,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {globalIdx}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px 8px 12px",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        <AlbumArt
+                          src={t.cover_art_url}
+                          alt={t.title}
+                          dark={dark}
+                          size={40}
+                        />
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          verticalAlign: "middle",
                           overflow: "hidden",
                         }}
                       >
-                        <span
+                        <div
                           style={{
-                            fontSize: 13,
-                            fontWeight: 500,
-                            color: textPrimary,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
                             overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            display: "block",
                           }}
                         >
-                          {t.title}
-                        </span>
-                        {isMobile && (
                           <span
                             style={{
-                              fontSize: 11,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: textPrimary,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              display: "block",
+                            }}
+                          >
+                            {t.title}
+                          </span>
+                          {isMobile && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: textSecondary,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                display: "block",
+                              }}
+                            >
+                              {t.artist}
+                            </span>
+                          )}
+                          {isMobile && hasMatched && (
+                            <div style={{ marginTop: 3 }}>
+                              <StatusBadge track={t} dark={dark} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      {!isMobile && (
+                        <td
+                          style={{
+                            padding: "8px 10px",
+                            verticalAlign: "middle",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
                               color: textSecondary,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -943,76 +1235,74 @@ export default function ListenbrainzPlaylist({
                           >
                             {t.artist}
                           </span>
-                        )}
-                        {isMobile && hasMatched && (
-                          <div style={{ marginTop: 3 }}>
-                            <StatusBadge track={t} dark={dark} />
-                          </div>
-                        )}
-                      </div>
-                    </td>
-
-                    {!isMobile && (
-                      <td
-                        style={{
-                          padding: "8px 10px",
-                          verticalAlign: "middle",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <span
+                        </td>
+                      )}
+                      {!isMobile && (
+                        <td
                           style={{
-                            fontSize: 12,
-                            color: textSecondary,
+                            padding: "8px 10px",
+                            verticalAlign: "middle",
                             overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            display: "block",
                           }}
                         >
-                          {t.artist}
-                        </span>
-                      </td>
-                    )}
-
-                    {!isMobile && (
-                      <td
-                        style={{
-                          padding: "8px 10px",
-                          verticalAlign: "middle",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <span
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: textMuted,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              display: "block",
+                              fontStyle: t.album ? "normal" : "italic",
+                            }}
+                          >
+                            {t.album || "—"}
+                          </span>
+                        </td>
+                      )}
+                      {hasMatched && !isMobile && (
+                        <td
                           style={{
-                            fontSize: 12,
-                            color: textMuted,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            display: "block",
-                            fontStyle: t.album ? "normal" : "italic",
+                            padding: "8px 10px",
+                            verticalAlign: "middle",
                           }}
                         >
-                          {t.album || "—"}
-                        </span>
-                      </td>
-                    )}
-
-                    {hasMatched && !isMobile && (
-                      <td
-                        style={{ padding: "8px 10px", verticalAlign: "middle" }}
-                      >
-                        <StatusBadge track={t} dark={dark} />
-                      </td>
-                    )}
-                  </tr>
-                ))
+                          <StatusBadge track={t} dark={dark} />
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         )}
+
+        {!paginationEnabled &&
+          !loadingTracks &&
+          visibleCount < tracks.length && (
+            <div
+              ref={sentinelRef}
+              style={{
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Spin color={accentColor} size={16} />
+            </div>
+          )}
       </div>
+
+      {paginationEnabled && !loadingTracks && tracks.length > PAGE_SIZE && (
+        <PaginationBar
+          page={currentPage}
+          totalPages={totalPages}
+          onChange={handlePageChange}
+          dark={dark}
+        />
+      )}
 
       {hasMatched && matchedCount > 0 && (
         <div
@@ -1148,7 +1438,7 @@ export default function ListenbrainzPlaylist({
           onClick={handleFetchPlaylists}
           disabled={loadingPlaylists}
           style={{
-            padding: "11px 24px",
+            padding: "10px 22px",
             borderRadius: 10,
             border: "none",
             cursor: loadingPlaylists ? "not-allowed" : "pointer",
@@ -1166,6 +1456,7 @@ export default function ListenbrainzPlaylist({
             whiteSpace: "nowrap",
             transition: "all 0.2s",
             alignSelf: "flex-end",
+            height: 42,
           }}
         >
           {loadingPlaylists ? (

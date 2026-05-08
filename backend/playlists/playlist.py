@@ -6,9 +6,9 @@ from rich.console import Console
 from rich.table import Table
 
 
-from genre import readJson as readJSON
+from metadata.genre import readJson as readJSON
 
-from misc import (
+from misc.misc import (
     log,
     log_scores,
     log_slot,
@@ -20,15 +20,15 @@ from misc import (
 
 
 import json
-from db import (
+from core.db import (
     get_db_connection,
     get_db_connection_lib,
     get_db_connection_usr,
     get_db_connection_playlist,
     DB_PATH_LOG,
 )
-from config import build_url, build_url_for_user, getAllUser
-from state import notification_status, tune_config
+from core.config import build_url, build_url_for_user, getAllUser
+from navidrome.state import notification_status, tune_config
 import re
 
 pat = DB_PATH_LOG

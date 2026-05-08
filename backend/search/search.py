@@ -1,6 +1,6 @@
 # search engine for the navidrome proxy
 
-from db import get_db_connection_lib, get_db_connection
+from core.db import get_db_connection_lib, get_db_connection
 import httpx
 import asyncio
 import os

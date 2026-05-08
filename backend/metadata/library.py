@@ -1,47 +1,8 @@
-# to fetch and create library database from navidrome
-# uses SEARCH3 api endpoint to build library database
-# works by runing a loop thourgh the api
-
-# TODO : ADD CHECKS FOR IF SONG ALDREADY EXISTS WITH DIFFRENT METADATA
-# artist name : arijit singh ,
-# artist name : arjeet singh may be recorded diffrently
-
-
-# ISSUES AND FIXES
-# Issue : Genre with slight diffrent name gets diffrent values, bollywood music and bollywood
-# fix : used genre aliases to make bollywood and bollywood music same
-
-# GITHUB ISSUE
-# 5 : better mapping of artist name from navidrome
-# Fixxes :
-# 1. implemented navidrome.toml for this tag
-# Tags.Artist.Aliases = ["artist", "artists"]
-# changed normalise_genre function to work like this
-# Added a refresh option, if the data in library.db differe from data from navidrome update the library.db
-
-
-## sync library rework
-## initially it works as the navidrome api returns every 100 song aka 1 batch gets prossed and then committed at every 5 song
-
-# the rework version will be better by
-# 1. adding normalise_artist to get the aritsit of the song              [DONE]
-# 2. Commiting at every 100 or 500 song for fast sync and 5 per song for slow sync [DONE - 100/5 via executemany]
-# 3. adding a check up for songs if there is less song aka 4535 if used 500 as check point, 35 songs will be left, [DONE - flush_batches() after loop]
-# 4. adding a clean up and comparison, loading the preexisting song and then matching for new or diffrenanc in the dict, if diff metadata , update it else create a new, [DONE]
-# 5. the deletion code will be as it is , it will check if deleted songs are in database and will cleaned up [DONE - fixed missing arg bug]
-
-
-# issue : using auto genre match the
-# fix, store the genre as it is, during genre injection in playlist ,
-# make it so before scoring genre it matches with genre.json for data on whcih messy or noisy genre
-# belog to which category
-
-
-import json  # ADDED
+import json
 import requests
 import time
-from config import build_url, itunesApi
-from db import init_db_lib, get_db_connection_lib, init_search_db
+from core.config import build_url, itunesApi
+from core.db import init_db_lib, get_db_connection_lib, init_search_db
 
 import re
 from rich.console import Console
@@ -55,8 +16,8 @@ from rich.progress import (
 )
 from rich.panel import Panel
 from rich.live import Live
-from misc import crossCheckDatabase
-from state import tune_config
+from misc.misc import crossCheckDatabase
+from navidrome.state import tune_config
 import asyncio
 import httpx
 
@@ -378,12 +339,10 @@ async def enrich_search_engine_async():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
 
-    missing = cursor.execute(
-        """
+    missing = cursor.execute("""
         SELECT song_id FROM library 
         WHERE song_id NOT IN (SELECT song_id FROM search_metadata WHERE lyrics IS NOT NULL)
-    """
-    ).fetchall()
+    """).fetchall()
 
     conn.commit()
     if not missing:

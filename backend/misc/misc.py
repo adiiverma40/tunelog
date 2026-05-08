@@ -1,50 +1,7 @@
-# for things i dont know where to put
-
-
-# ISSUES : if user skip a song and then listen it once complete, one the 1st listen it will mark as 1 star but then he listen again so it will marked as repeated song and hence getting 5 star
-# fix :  to use a percentage and priority system, lets say 1st listen was 1 star and 2nd time is 4 instead of giving it 5 stars get it avg of 1 and 4 star , also by prioriting when the song was listened,
-# if song was listend 4 days ago get it less percentage,
-
-# TODO : Add an option to update playlist from stars , plan is to get the song, and there stars, and use value defined by user to mark them as skip partial, complete and repeat
-
-
-# # redo star sytem, lets instead of just writing the star on one intraction lets do in more intearactions like 2 or 3 and prioriting recent
-# - take 2 or more intreaction as minimum to star
-# - priorities recent interactions
-# - decay to deplete  0.1 ^ days
-# - add a buffer to check repeat, if a song is listen 2 times in 20 min then consider it a repeat
-# - dont take data if its older then 2 months,
-
-
-# Issues : the song's final score can be infinte, it will take ages to make it down,
-# fix : take the last 15 song intreaction, max score = +3 and min = -2
-
-# ISSUES : taking last 15 intreaction creates ineffiency if the user has listened to same song 15 times a day, the 1st intreaction and 15th has same weightage
-# fix :  transistiong from times decay to  index
-
-# tunelog-backend   | song :  Ranjha rating :  3.0 signal :  repeat     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  3.0 signal :  repeat     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  2.0 signal :  positive     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  2.0 signal :  positive     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-# tunelog-backend   | song :  Ranjha rating :  -2.0 signal :  skip     |   weightage :  1.0
-
-
-# ISSUES : DATABASE IS LOCKEd
-# FIX : executemany()
-from config import build_url_for_user, getAllUser
+from core.config import build_url_for_user, getAllUser
 import requests
-from db import get_db_connection, get_db_connection_lib, db_supervisor
-from state import status_registry
+from core.db import get_db_connection, get_db_connection_lib, db_supervisor
+from navidrome.state import status_registry
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -62,7 +19,7 @@ import os
 import sys
 import json
 from loguru import logger
-from state import notification_status , tune_config
+from navidrome.state import notification_status, tune_config
 
 console = Console()
 
@@ -133,7 +90,7 @@ def push_star(song, signal):
         return
 
     totalListens = len(rows)
-    minListen = tune_config['behavioral_scoring']["min_listens_for_star"]
+    minListen = tune_config["behavioral_scoring"]["min_listens_for_star"]
     if totalListens < minListen:
         console.print(
             f"[dim]push star: {song['title']} needs at least {minListen} listens (has {totalListens})[/dim]"
@@ -150,9 +107,9 @@ def push_star(song, signal):
 
     totalWeight = 0
     rowSongScore = 0
-    decay = tune_config['behavioral_scoring']['historical_decay_factor']
+    decay = tune_config["behavioral_scoring"]["historical_decay_factor"]
     for i, row in enumerate(rows):
-        
+
         weightage = decay**i
         rowSignal = row["signal"]
         rating = star_map.get(rowSignal, 0)
@@ -328,7 +285,6 @@ def UpdateDBgenre(data, connLib=None):
     }
 
 
-
 _initialized = False
 
 
@@ -395,7 +351,6 @@ def log(level: str, message: str, source: str = "main", **kwargs):
     if kwargs:
         target = target.bind(**kwargs)
     getattr(target, level.lower())(message)
-
 
 
 def log_scores(user_id, scores, signal_contributions, titles):

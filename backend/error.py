@@ -3,9 +3,9 @@ import sys
 import threading
 from rich.console import Console
 
-from misc import log, setup_logger
-from state import status_registry
-from main import main
+from misc.misc import log, setup_logger
+from navidrome.state import status_registry
+from core.main import main
 
 console = Console(log_path=False)
 

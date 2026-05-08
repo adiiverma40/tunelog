@@ -41,12 +41,12 @@
 
 import json
 from rapidfuzz import fuzz
-from misc import UpdateDBgenre
-from db import get_db_connection, get_db_connection_lib, db_supervisor
+from misc.misc import UpdateDBgenre
+from core.db import get_db_connection, get_db_connection_lib, db_supervisor
 from rich.console import Console
 
 # from config import status_registry
-from state import status_registry , tune_config
+from navidrome.state import status_registry , tune_config
 
 console = Console()
 

@@ -9,8 +9,8 @@ import requests
 import os
 import shutil
 import tempfile
-from config import Navidrome_url
-from db import (
+from core.config import Navidrome_url
+from core.db import (
     get_db_connection_lib,
     get_db_connection,
     get_db_connection_usr,
@@ -19,8 +19,8 @@ from db import (
     init_db_lib,
     init_db_usr,
 )
-from genre import readJson as readJSON
-from playlist import (
+from metadata.genre import readJson as readJSON
+from playlists.playlist import (
     score_song,
     get_unheard_songs,
     get_wildcard_songs,
@@ -38,19 +38,19 @@ from playlist import (
     # timedelta
 )
 from datetime import timedelta
-from state import app_state, tune_config, save_config
-import library
-from itunesFuzzy import useFallBackMethods
-from genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
-from misc import UpdateDBgenre
-from importPlaylist import fuzzymatching
+from navidrome.state import app_state, tune_config, save_config
+import metadata.library as library
+from metadata.itunesFuzzy import useFallBackMethods
+from metadata.genre import readJson, writeJson, DeleteDataJson, autoGenre, sync_database_to_json
+from misc.misc import UpdateDBgenre
+from playlists.importPlaylist import fuzzymatching
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from rich.console import Console
 from dotenv import load_dotenv
 import asyncio
 from fastapi.responses import StreamingResponse
-from state import _subscribers, notification_status
+from navidrome.state import _subscribers, notification_status
 import json
 import re
 import socketio

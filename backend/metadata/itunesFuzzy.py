@@ -22,10 +22,10 @@ import urllib.parse
 
 # import library
 
-from db import get_db_connection_lib
-from state import app_state
+from core.db import get_db_connection_lib
+from navidrome.state import app_state
 from rich.console import Console
-from state import tune_config
+from navidrome.state import tune_config
 
 console = Console(log_time=False, log_path=False)
 totalTries = 0

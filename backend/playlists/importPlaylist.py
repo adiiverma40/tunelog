@@ -1,6 +1,6 @@
 import pandas as pd
-from db import get_db_connection_lib, db_supervisor
-from state import status_registry
+from core.db import get_db_connection_lib, db_supervisor
+from navidrome.state import status_registry
 from rapidfuzz import fuzz
 from rich.console import Console
 import re

@@ -18,7 +18,7 @@ import requests
 import re
 from queue import Queue
 from pathlib import Path
-from db import get_db_connection_usr, db_supervisor
+from core.db import get_db_connection_usr, db_supervisor
 from time import sleep
 from rich.console import Console
 

@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import requests
 import time
-from state import tune_config
+from navidrome.state import tune_config
 from rich.console import Console
 
 console = Console()

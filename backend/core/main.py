@@ -5,9 +5,9 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from rich.console import Console
-from state import status_registry
-from config import build_url, event_queue
-from db import (
+from navidrome.state import status_registry
+from .config import build_url, event_queue
+from core.db import (
     get_db_connection,
     init_db,
     init_db_lib,
@@ -18,17 +18,17 @@ from db import (
     # migrate_playlist_ids
     migrate_playlist_primary_key,
 )
-from itunesFuzzy import useFallBackMethods
-import library
-from library import normalise_genre, normalise_artist, sync_library
-from watcher import start_sse
-from misc import push_star
+from metadata.itunesFuzzy import useFallBackMethods
+import metadata.library as library
+from metadata.library import normalise_genre, normalise_artist, sync_library
+from navidrome.watcher import start_sse
+from misc.misc import push_star
 import uvicorn
-from state import notification_status, tune_config, save_config
+from navidrome.state import notification_status, tune_config, save_config
 from dotenv import load_dotenv
 import os
 
-from playlist import (
+from playlists.playlist import (
     getDataFromDb,
     score_song,
     get_unheard_songs,
@@ -482,7 +482,7 @@ def main():
         try:
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
-                args=("api:socket_app",),
+                args=("api.api:socket_app",),
                 kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "warning"},
                 daemon=True,
             )

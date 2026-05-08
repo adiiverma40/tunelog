@@ -6,7 +6,7 @@ from rich.console import Console
 
 console = Console()
 
-from state import status_registry
+from navidrome.state import status_registry
 
 if os.path.exists("/app/data"):
     DATA_DIR = "/app/data"

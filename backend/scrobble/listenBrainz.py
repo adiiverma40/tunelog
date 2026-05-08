@@ -4,9 +4,9 @@ from collections import defaultdict
 import datetime
 import time
 import json
-from db import get_db_connection, get_db_connection_lib
+from core.db import get_db_connection, get_db_connection_lib
 from rich.console import Console
-from state import tune_config
+from navidrome.state import tune_config
 import sqlite3
 from typing import Optional, Dict, Any , List
 

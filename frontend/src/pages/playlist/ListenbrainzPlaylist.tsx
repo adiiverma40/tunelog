@@ -17,6 +17,25 @@ type ListenbrainzPlaylistProps = {
 
 const PAGE_SIZE = 10;
 
+function formatPlaylistName(title: string): string {
+  const dateMatch = title.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!dateMatch) return title;
+
+  const [, year, month, day] = dateMatch;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  const d = date.getDate();
+  const suffix =
+    d === 1 || d === 21 || d === 31
+      ? "st"
+      : d === 2 || d === 22
+        ? "nd"
+        : d === 3 || d === 23
+          ? "rd"
+          : "th";
+  const monthName = date.toLocaleString("en-US", { month: "long" });
+  return `${d}${suffix} ${monthName} ${year}`;
+}
+
 function SkeletonPlaylistCard({ dark }: { dark: boolean }) {
   const bg = dark ? "#1a1a1f" : "#f0f0ec";
   const shimmer = dark ? "#222228" : "#e4e4e0";
@@ -478,6 +497,7 @@ function PaginationBar({
         padding: "10px 14px",
         borderTop: `1px solid ${dark ? "#1e1e24" : "#efefeb"}`,
         flexShrink: 0,
+        background: dark ? "#0f0f12" : "#f9f9f6",
       }}
     >
       <button
@@ -496,7 +516,6 @@ function PaginationBar({
           <polyline points="15 18 9 12 15 6" />
         </svg>
       </button>
-
       {pages.map((p, i) =>
         p === "…" ? (
           <span
@@ -525,7 +544,6 @@ function PaginationBar({
           </button>
         ),
       )}
-
       <button
         style={{ ...btnBase, opacity: page === totalPages ? 0.35 : 1 }}
         disabled={page === totalPages}
@@ -597,7 +615,6 @@ export default function ListenbrainzPlaylist({
     () => playlists.filter((p) => p.type === activeTab),
     [playlists, activeTab],
   );
-
   const totalPages = Math.max(1, Math.ceil(tracks.length / PAGE_SIZE));
 
   const displayedTracks = useMemo(() => {
@@ -619,9 +636,8 @@ export default function ListenbrainzPlaylist({
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting)
           setVisibleCount((c) => Math.min(c + PAGE_SIZE, tracks.length));
-        }
       },
       { threshold: 0.1 },
     );
@@ -633,10 +649,6 @@ export default function ListenbrainzPlaylist({
     setPaginationEnabled(val);
     setCurrentPage(1);
     setVisibleCount(PAGE_SIZE);
-  };
-
-  const handlePageChange = (p: number) => {
-    setCurrentPage(p);
   };
 
   const handleFetchPlaylists = async () => {
@@ -663,7 +675,7 @@ export default function ListenbrainzPlaylist({
   const handleViewPlaylist = async (playlist: LBPlaylist) => {
     if (selectedPlaylist?.id === playlist.id) return;
     setSelectedPlaylist(playlist);
-    setNewPlaylistName(playlist.title ?? "");
+    setNewPlaylistName(formatPlaylistName(playlist.title ?? ""));
     setLoadingTracks(true);
     setTracks([]);
     setHasMatched(false);
@@ -744,15 +756,15 @@ export default function ListenbrainzPlaylist({
     background: card,
     border: `1px solid ${cardBorder}`,
     borderRadius: 14,
-    overflow: "hidden",
     display: "flex",
     flexDirection: "column",
-    ...(!isMobile ? { height: "calc(100vh - 240px)", minHeight: 440 } : {}),
+    ...(isMobile
+      ? { maxHeight: "calc(100vh - 200px)", minHeight: 400 }
+      : { height: "calc(100vh - 240px)", minHeight: 440 }),
   };
 
   const PlaylistPanel = (
     <div style={panelStyle}>
-      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -761,6 +773,7 @@ export default function ListenbrainzPlaylist({
           background: dark ? "#0f0f12" : "#f5f5f2",
           borderBottom: `1px solid ${cardBorder}`,
           flexShrink: 0,
+          borderRadius: "14px 14px 0 0",
         }}
       >
         {(
@@ -891,6 +904,7 @@ export default function ListenbrainzPlaylist({
           flexShrink: 0,
           flexWrap: "wrap",
           background: dark ? "#0f0f12" : "#f5f5f2",
+          borderRadius: "14px 14px 0 0",
         }}
       >
         {isMobile && (
@@ -1034,9 +1048,10 @@ export default function ListenbrainzPlaylist({
 
       <div
         style={{
+          overflowY: "auto",
           overflowX: "auto",
-          overflowY: paginationEnabled ? "visible" : "auto",
-          flex: paginationEnabled ? "none" : 1,
+          flex: 1,
+          minHeight: 0,
         }}
       >
         {!selectedPlaylist ? (
@@ -1299,7 +1314,7 @@ export default function ListenbrainzPlaylist({
         <PaginationBar
           page={currentPage}
           totalPages={totalPages}
-          onChange={handlePageChange}
+          onChange={setCurrentPage}
           dark={dark}
         />
       )}
@@ -1315,6 +1330,7 @@ export default function ListenbrainzPlaylist({
             alignItems: isMobile ? "stretch" : "center",
             gap: 10,
             flexShrink: 0,
+            borderRadius: "0 0 14px 14px",
           }}
         >
           <span
@@ -1433,7 +1449,6 @@ export default function ListenbrainzPlaylist({
             Falls back to the active Navidrome username when left empty.
           </p>
         </div>
-
         <button
           onClick={handleFetchPlaylists}
           disabled={loadingPlaylists}
@@ -1487,9 +1502,9 @@ export default function ListenbrainzPlaylist({
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: statusMsg.startsWith("✓") ? "#639922" : "#E24B4A",
             margin: 0,
             padding: "0 2px",
+            color: statusMsg.startsWith("✓") ? "#639922" : "#E24B4A",
           }}
         >
           {statusMsg}

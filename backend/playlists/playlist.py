@@ -4,10 +4,7 @@ import random
 import heapq
 from rich.console import Console
 from rich.table import Table
-
-
 from metadata.genre import readJson as readJSON
-
 from misc.misc import (
     log,
     log_scores,
@@ -17,8 +14,6 @@ from misc.misc import (
     log_pool,
     log_summary,
 )
-
-
 import json
 from core.db import (
     get_db_connection,

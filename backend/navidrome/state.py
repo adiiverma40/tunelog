@@ -83,11 +83,9 @@ notification_status = NotificationStatus()
 app_state = SyncState()
 
 
-# ALL VARIABLES
-
-
 CONFIG_DIR = "./config"
 CONFIG_FILE_PATH = f"{CONFIG_DIR}/config.json"
+AUTOMATION_CONFIG_FILE_PATH = f"{CONFIG_DIR}/Automation_config.json"
 
 DEFAULT_CONFIG = {
     "playlist_generation": {
@@ -123,7 +121,7 @@ DEFAULT_CONFIG = {
         "auto_sync_hour": 2,
         "timezone": "Asia/Kolkata",
         "use_itunes_fallback": False,
-        "auto_sync_after_navidrome": True,  ## for auto syncing after navidrome sync library
+        "auto_sync_after_navidrome": True,
     },
     "api_and_performance": {
         "max_fuzzy_iterations": 500,
@@ -154,39 +152,33 @@ DEFAULT_CONFIG = {
     },
 }
 
+true = True
+false = False
+
+DEFAULT_AUTO_CONFIG = {
+    "weekly_LB_fetch": {"last_synced": 0, "check_interval": 12},
+    "cf_playlist_config" : {
+        "size" : 50,
+        "heard" : 25,
+        "unheard" : 25,
+        "unheard_genre_injection": true,
+        "heard_genre_injection" : false,
+        "last_generated" : 0, 
+        "auto_generate_time" : 1,
+        "Name" : "Listenbrainz Playlist",
+        "backfill_unheard_song" : true,
+        "use_blend" : true,
+        "last_score" : 0,
+        "fallbackScore" : true,
+        "for_users" : []
+
+    }
+}
+
 config_lock = threading.Lock()
 
 
-def save_config(new_config_data):
-    global tune_config
-    with config_lock:
-        try:
-            with open(CONFIG_FILE_PATH, "w") as file:
-                json.dump(new_config_data, file, indent=4)
-
-            # tune_config.clear()
-            tune_config.update(new_config_data)
-
-            console.print("[bold green]Configuration saved successfully.[/bold green]")
-            return True, "Success"
-
-        except Exception as e:
-            error_msg = f"Failed to save config: {e}"
-            console.print(f"[bold red]{error_msg}[/bold red]")
-            return False, error_msg
-
-
-def _write_default_config(data):
-    try:
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-        with open(CONFIG_FILE_PATH, "w") as file:
-            json.dump(data, file, indent=4)
-    except OSError as e:
-        console.print(f"[bold red]Failed to write default config.json:[/bold red] {e}")
-
-
 def deep_merge_defaults(defaults: dict, loaded: dict) -> Tuple[dict, bool]:
-
     modified = False
     for key, default_val in defaults.items():
         if key not in loaded:
@@ -202,33 +194,83 @@ def deep_merge_defaults(defaults: dict, loaded: dict) -> Tuple[dict, bool]:
     return loaded, modified
 
 
-def load_config():
+def _write_default_config(filepath: str, data: dict):
     try:
-        with open(CONFIG_FILE_PATH, "r") as file:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(filepath, "w") as file:
+            json.dump(data, file, indent=4)
+    except OSError as e:
+        console.print(
+            f"[bold red]Failed to write default config to {filepath}:[/bold red] {e}"
+        )
+
+
+def load_generic_config(filepath: str, default_data: dict) -> dict:
+    try:
+        with open(filepath, "r") as file:
             data = json.load(file)
 
-        data, modified = deep_merge_defaults(DEFAULT_CONFIG, data)
+        data, modified = deep_merge_defaults(default_data, data)
 
         if modified:
             console.print(
-                "[yellow]Config patched with missing defaults. Saving...[/yellow]"
+                f"[yellow]Config {filepath} patched with missing defaults. Saving...[/yellow]"
             )
-            _write_default_config(data)
+            _write_default_config(filepath, data)
         return data
 
     except FileNotFoundError:
         console.print(
-            "[yellow]config.json missing. Creating fresh default file.[/yellow]"
+            f"[yellow]{filepath} missing. Creating fresh default file.[/yellow]"
         )
-        _write_default_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG
+        _write_default_config(filepath, default_data)
+        return dict(default_data)
 
     except json.JSONDecodeError as e:
         console.print(
-            f"[bold red]config.json is corrupted:[/bold red] {e}. Resetting to defaults."
+            f"[bold red]{filepath} is corrupted:[/bold red] {e}. Resetting to defaults."
         )
-        _write_default_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG
+        _write_default_config(filepath, default_data)
+        return dict(default_data)
 
 
-tune_config = load_config()
+def save_generic_config(
+    filepath: str, new_data: dict, target_dict: dict, label: str
+) -> Tuple[bool, str]:
+    with config_lock:
+        try:
+            with open(filepath, "w") as file:
+                json.dump(new_data, file, indent=4)
+
+            target_dict.update(new_data)
+
+            console.print(f"[bold green]{label} saved successfully.[/bold green]")
+            return True, "Success"
+
+        except Exception as e:
+            error_msg = f"Failed to save {label.lower()}: {e}"
+            console.print(f"[bold red]{error_msg}[/bold red]")
+            return False, error_msg
+
+
+tune_config = load_generic_config(CONFIG_FILE_PATH, DEFAULT_CONFIG)
+automation_config = load_generic_config(
+    AUTOMATION_CONFIG_FILE_PATH, DEFAULT_AUTO_CONFIG
+)
+
+
+def save_config(new_config_data: dict) -> Tuple[bool, str]:
+    global tune_config
+    return save_generic_config(
+        CONFIG_FILE_PATH, new_config_data, tune_config, "Configuration"
+    )
+
+
+def save_automation_config(new_config_data: dict) -> Tuple[bool, str]:
+    global automation_config
+    return save_generic_config(
+        AUTOMATION_CONFIG_FILE_PATH,
+        new_config_data,
+        automation_config,
+        "Automation Configuration",
+    )

@@ -947,7 +947,7 @@ export interface LBTrack {
   album?: string;
   mbid?: string;
   navidrome_id?: string | null;
-  cover_art_url?: string; // Add this!
+  cover_art_url?: string;
 }
 
 export interface LBMatchResponse {
@@ -956,27 +956,6 @@ export interface LBMatchResponse {
   matched_count: number;
   reason?: string;
 }
-
-export const fetchListenbrainzPlaylists = async (
-  username: string,
-): Promise<{ status: string; playlists: LBPlaylist[]; reason?: string }> => {
-  const url = `${BASE_URL}/api/listenbrainz/playlists?username=${encodeURIComponent(username)}`;
-  const res = await fetch(url);
-
-  const resJson = res.json();
-  console.log(resJson);
-  return resJson;
-};
-
-export const fetchListenbrainzPlaylistTracks = async (
-  playlistId: string,
-  username: string,
-): Promise<{ status: string; tracks: LBTrack[]; reason?: string }> => {
-  const url = `${BASE_URL}/api/listenbrainz/playlist/${playlistId}/tracks?username=${encodeURIComponent(username)}`;
-  console.log(url);
-  const res = await fetch(url);
-  return res.json();
-};
 
 export const matchTracksWithNavidrome = async (
   tracks: LBTrack[],
@@ -989,14 +968,38 @@ export const matchTracksWithNavidrome = async (
   return res.json();
 };
 
+const getDashboardUser = (): string => {
+  return localStorage.getItem("tunelog_user") || "";
+};
+
+export const fetchListenbrainzPlaylists = async (
+  lb_username: string,
+): Promise<{ status: string; playlists: LBPlaylist[]; reason?: string }> => {
+  const dashboard_user = getDashboardUser();
+  const url = `${BASE_URL}/api/listenbrainz/playlists?lb_username=${encodeURIComponent(lb_username)}&dashboard_user=${encodeURIComponent(dashboard_user)}`;
+  const res = await fetch(url);
+  return res.json();
+};
+
+export const fetchListenbrainzPlaylistTracks = async (
+  playlistId: string,
+  lb_username: string,
+): Promise<{ status: string; tracks: LBTrack[]; reason?: string }> => {
+  const dashboard_user = getDashboardUser();
+  const url = `${BASE_URL}/api/listenbrainz/playlist/${playlistId}/tracks?lb_username=${encodeURIComponent(lb_username)}&dashboard_user=${encodeURIComponent(dashboard_user)}`;
+  const res = await fetch(url);
+  return res.json();
+};
+
 export const createNavidromePlaylist = async (
   name: string,
   songIds: string[],
 ): Promise<{ status: string; reason?: string }> => {
+  const dashboard_user = getDashboardUser();
   const res = await fetch(`${BASE_URL}/api/navidrome/playlist/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, song_ids: songIds }),
+    body: JSON.stringify({ name, song_ids: songIds, dashboard_user }),
   });
   return res.json();
 };

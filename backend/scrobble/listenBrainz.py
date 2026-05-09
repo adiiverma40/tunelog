@@ -4,16 +4,107 @@ from collections import defaultdict
 import datetime
 import time
 import json
-from core.db import get_db_connection, get_db_connection_lib
+from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+from core.crypto import decrypt_token
 from rich.console import Console
+from rich.panel import Panel
+from rich.rule import Rule
+from rich import box
 from navidrome.state import tune_config
 import sqlite3
-from typing import Optional, Dict, Any , List
+from typing import Optional, Dict, Any, List
 
 console = Console()
 
 listenBrainzConf = tune_config.get("listenbrainz", {})
 behaviour = tune_config.get("behavioral_scoring", {})
+
+LB_HEADERS = {
+    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
+}
+LB_BASE = "https://api.listenbrainz.org"
+
+
+def resolve_lb_username(decrypted_token: str) -> str | None:
+    url = f"{LB_BASE}/1/validate-token"
+    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("valid"):
+                return data.get("user_name")
+            console.print(
+                f"    [red]✗ Token invalid: {data.get('message', 'unknown')}[/red]"
+            )
+        else:
+            console.print(f"    [red]✗ validate-token HTTP {r.status_code}[/red]")
+    except Exception as e:
+        console.print(f"    [red]✗ validate-token failed: {e}[/red]")
+    return None
+
+
+def _get_authed_headers(decrypted_token: str) -> dict:
+    return {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+
+
+def _load_lb_users() -> List[Dict[str, str]]:
+    usr_conn = get_db_connection_usr()
+    cursor = usr_conn.cursor()
+    cursor.execute(
+        "SELECT username, LB_token, LB_username FROM user "
+        "WHERE LB_token IS NOT NULL AND LB_token != ''"
+    )
+    rows = cursor.fetchall()
+    usr_conn.close()
+
+    if not rows:
+        console.print("[yellow]⚠ No users with LB_token found in users.db.[/yellow]")
+        return []
+
+    resolved = []
+    for row in rows:
+        db_username = row["username"]
+        raw_token = row["LB_token"]
+        stored_lb_un = row["LB_username"]
+
+        console.print(
+            f"  [dim]→ Resolving LB identity for DB user '{db_username}'...[/dim]"
+        )
+
+        try:
+            decrypted = decrypt_token(raw_token)
+        except Exception as e:
+            console.print(f"  [red]✗ Decrypt failed for '{db_username}': {e}[/red]")
+            continue
+
+        lb_username = resolve_lb_username(decrypted)
+
+        if not lb_username:
+            if stored_lb_un:
+                console.print(
+                    f"  [yellow]⚠ validate-token gave nothing; "
+                    f"falling back to stored LB_username '{stored_lb_un}'[/yellow]"
+                )
+                lb_username = stored_lb_un
+            else:
+                console.print(
+                    f"  [red]✗ Cannot determine LB username for '{db_username}'. Skipping.[/red]"
+                )
+                continue
+
+        console.print(
+            f"  [green]✓ '{db_username}' → LB: [bold]{lb_username}[/bold][/green]"
+        )
+        resolved.append(
+            {
+                "db_username": db_username,
+                "decrypted_token": decrypted,
+                "lb_username": lb_username,
+            }
+        )
+
+    return resolved
 
 
 def _execute_with_retry(cursor, conn, sql, data, retries=5, delay=2):
@@ -48,10 +139,10 @@ def batchSave(matched_records, unmatched_records=None):
         return
 
     console.print(
-        f"[bold green]Preparing {len(matched_records)} tracks to save for users: {', '.join(allowed_users)}...[/bold green]"
+        f"[bold green]Preparing {len(matched_records)} tracks to save "
+        f"for users: {', '.join(allowed_users)}...[/bold green]"
     )
     default_signal = str(listenBrainzConf.get("treat_data_as", "complete")).lower()
-    # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
     default_signal = "positive" if default_signal == "complete" else default_signal
     repeat_window_seconds = behaviour.get("repeat_time_window_min", 30) * 60
     dedup_window_seconds = 30 * 60
@@ -64,10 +155,9 @@ def batchSave(matched_records, unmatched_records=None):
 
     matched_records.sort(key=lambda x: x["listen"]["listened_at"])
     song_ids = list({r["song"]["songId"] for r in matched_records})
-
-    existing_history = defaultdict(list)
     chunk_size = 900
 
+    existing_history = defaultdict(list)
     console.print("[cyan]Querying database for recent history...[/cyan]")
     for i in range(0, len(song_ids), chunk_size):
         chunk = song_ids[i : i + chunk_size]
@@ -109,7 +199,6 @@ def batchSave(matched_records, unmatched_records=None):
         console.print(f"[dim]Analyzing: '{title}' by {artist} ({human_time})[/dim]")
 
         history = existing_history[song_id]
-
         is_duplicate = any(
             abs(listened_at - ts) <= dedup_window_seconds for ts in history
         )
@@ -117,7 +206,6 @@ def batchSave(matched_records, unmatched_records=None):
         if is_duplicate:
             duplicates_ignored += 1
             console.print(f"[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
-            # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
             lb_log_data.append(
                 (
                     song_id,
@@ -178,10 +266,11 @@ def batchSave(matched_records, unmatched_records=None):
         console.print(
             f"[bold green] ↳ ✔ Queued for insertion ({current_signal})[/bold green]"
         )
-        # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
+
     if unmatched_records:
         console.print(
-            f"[bold red]Logging {len(unmatched_records)} unmatched tracks to listenbrainz table...[/bold red]"
+            f"[bold red]Logging {len(unmatched_records)} unmatched tracks "
+            f"to listenbrainz table...[/bold red]"
         )
         for listen in unmatched_records:
             metadata = listen.get("track_metadata", {})
@@ -192,7 +281,6 @@ def batchSave(matched_records, unmatched_records=None):
             dt_string = datetime.datetime.utcfromtimestamp(listened_at).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-
             if raw_title and raw_artist:
                 lb_log_data.append(
                     (
@@ -222,21 +310,24 @@ def batchSave(matched_records, unmatched_records=None):
                 )
 
     console.print("[cyan]Attempting to write to database...[/cyan]")
-    # print("treat data as : " , listenBrainzConf.get("treat_data_as", "complete"))
+
     if insert_data:
         ok = _execute_with_retry(
             cursor,
             conn,
             """
-            INSERT INTO listens (song_id, title, artist, album, genre, duration, played, percent_played, signal, timestamp, user_id)
+            INSERT INTO listens
+                (song_id, title, artist, album, genre, duration, played,
+                 percent_played, signal, timestamp, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
+            """,
             insert_data,
         )
         if ok:
             unique_tracks = len(insert_data) // len(allowed_users)
             console.print(
-                f"[bold green]✔ Successfully saved {unique_tracks} unique tracks ({len(insert_data)} total plays)![/bold green]"
+                f"[bold green]✔ Successfully saved {unique_tracks} unique tracks "
+                f"({len(insert_data)} total plays)![/bold green]"
             )
         else:
             console.print("[bold red]✖ Database Save Failed after retries.[/bold red]")
@@ -253,9 +344,10 @@ def batchSave(matched_records, unmatched_records=None):
             cursor,
             conn,
             """
-            INSERT INTO listenbrainz (song_id, title, artist, album, signal, tag, comment, timestamp)
+            INSERT INTO listenbrainz
+                (song_id, title, artist, album, signal, tag, comment, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
+            """,
             lb_log_data,
         )
         if ok:
@@ -270,76 +362,98 @@ def batchSave(matched_records, unmatched_records=None):
     conn.close()
 
 
-def getListenBrainzResponse():
-    console.print("[bold yellow]Getting data from ListenBrainz[/bold yellow]")
+def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
+    lb_username = lb_user["lb_username"]
+    decrypted_token = lb_user["decrypted_token"]
+
+    console.print(
+        f"[bold yellow]Getting listens for LB user '{lb_username}' "
+        f"(DB: '{lb_user['db_username']}')[/bold yellow]"
+    )
+
     last_synced_ts = listenBrainzConf.get("last_synced")
 
-    if not last_synced_ts or 0:
+    if not last_synced_ts:
         console.print(
-            "[bold red]No last synced Found, trying deep history sync[/bold red]"
+            "[bold red]No last_synced found — running deep history sync[/bold red]"
         )
-        return deep_history_sync(100)
-    else:
-        since = int(last_synced_ts)
-        console.print(
-            f"[blue]Syncing since: {datetime.datetime.fromtimestamp(since)}[/blue]"
+        return deep_history_sync(100, lb_user)
+
+    since = int(last_synced_ts)
+    console.print(
+        f"[blue]Syncing since: {datetime.datetime.fromtimestamp(since)}[/blue]"
+    )
+
+    url = f"{LB_BASE}/1/user/{lb_username}/listens"
+    params = {"min_ts": since, "count": 100}
+
+    try:
+        r = requests.get(
+            url,
+            params=params,
+            headers=_get_authed_headers(decrypted_token),
+            timeout=15,
         )
-        LB_HEADERS = {
-            "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-        }
-        url = f"https://api.listenbrainz.org/1/user/{listenBrainzConf['username']}/listens"
-        params = {"min_ts": since, "count": 100}
+        r.raise_for_status()
+        listens = r.json().get("payload", {}).get("listens", [])
 
-        try:
-            response = requests.get(url, params=params, headers=LB_HEADERS)
-            response.raise_for_status()
-            data = response.json()
-            listens = data.get("payload", {}).get("listens", [])
-
-            if listens:
-                console.print(
-                    f"[green]Successfully fetched {len(listens)} new tracks.[/green]"
-                )
-                return listens
-            else:
-                console.print("[white]No new tracks found since last sync.[/white]")
-                return []
-        except Exception as e:
-            console.print(f"[bold red]Error fetching from ListenBrainz: {e}[/bold red]")
+        if listens:
+            console.print(
+                f"[green]✓ Fetched {len(listens)} new tracks for '{lb_username}'.[/green]"
+            )
+            return listens
+        else:
+            console.print(
+                f"[white]No new tracks for '{lb_username}' since last sync.[/white]"
+            )
             return []
-
-
-def deep_history_sync(pagination=20):
-    all_listens = []
-
-    ceiling_ts = None
-
-    fresh_lb_conf = tune_config.get("listenbrainz", {})
-    username = fresh_lb_conf.get("username")
-
-    if not username:
+    except Exception as e:
         console.print(
-            "[bold red]deep_history_sync aborted: No username found.[/bold red]"
+            f"[bold red]Error fetching listens for '{lb_username}': {e}[/bold red]"
         )
         return []
 
-    LB_HEADERS = {
-        "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-    }
+
+def deep_history_sync(
+    pagination: int = 20, lb_user: Dict[str, str] = None
+) -> List[dict]:
+    if lb_user:
+        lb_username = lb_user["lb_username"]
+        decrypted_token = lb_user["decrypted_token"]
+        authed_headers = _get_authed_headers(decrypted_token)
+    else:
+        fresh_lb_conf = tune_config.get("listenbrainz", {})
+        lb_username = fresh_lb_conf.get("username")
+        authed_headers = LB_HEADERS
+
+    if not lb_username:
+        console.print(
+            "[bold red]deep_history_sync aborted: No LB username available.[/bold red]"
+        )
+        return []
+
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Deep History Sync[/bold cyan]\n"
+            f"LB user: [magenta]{lb_username}[/magenta]",
+            box=box.ROUNDED,
+        )
+    )
+
+    all_listens = []
+    ceiling_ts = None
+    url = f"{LB_BASE}/1/user/{lb_username}/listens"
 
     while True:
         params = {"count": pagination}
         if ceiling_ts is not None:
             params["max_ts"] = ceiling_ts
 
-        url = f"https://api.listenbrainz.org/1/user/{username}/listens"
-
         try:
-            response = requests.get(url, params=params, headers=LB_HEADERS)
-            response.raise_for_status()
+            r = requests.get(url, params=params, headers=authed_headers, timeout=15)
+            r.raise_for_status()
 
-            data = response.json()
-            listens = data.get("payload", {}).get("listens", [])
+            listens = r.json().get("payload", {}).get("listens", [])
 
             if not listens:
                 console.print("[yellow]No more history found.[/yellow]")
@@ -347,24 +461,24 @@ def deep_history_sync(pagination=20):
 
             all_listens.extend(listens)
             console.print(
-                f"[bold green]Fetched {len(all_listens)} total...[/bold green]"
+                f"[bold green]  ↳ Fetched {len(all_listens)} total for '{lb_username}'...[/bold green]"
             )
 
             ceiling_ts = listens[-1]["listened_at"] - 1
-
             time.sleep(0.5)
+
             if len(listens) < pagination:
                 console.print(
-                    "[bold green]All History from ListenBrainz fetched[/bold green]"
+                    f"[bold green]✓ All history fetched for '{lb_username}'[/bold green]"
                 )
                 return all_listens
 
         except Exception as e:
-            console.print(f"[bold red]Deep Sync API Error:[/bold red] {e}")
+            console.print(
+                f"[bold red]Deep Sync API Error for '{lb_username}':[/bold red] {e}"
+            )
             if hasattr(e, "response") and e.response is not None:
-                console.print(
-                    f"[bold red]ListenBrainz says:[/bold red] {e.response.text}"
-                )
+                console.print(f"[bold red]LB says:[/bold red] {e.response.text}")
             break
 
     return all_listens
@@ -374,7 +488,7 @@ def getSongsFromDb():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
     songs = cursor.execute(
-        "select song_id, title, artist, album, artistJSON, genre from library"
+        "SELECT song_id, title, artist, album, artistJSON, genre FROM library"
     ).fetchall()
     conn.close()
 
@@ -416,7 +530,6 @@ def fallback_stage_1(unmatched_listens, songs_list, matched_records):
         db_artist = str(s.get("artist", "")).lower().strip()
         db_album = str(s.get("album", "")).lower().strip()
         db_title = str(s.get("title", "")).lower().strip()
-
         if db_artist:
             artist_dict[db_artist].append(s)
         if db_album:
@@ -451,7 +564,6 @@ def fallback_stage_1(unmatched_listens, songs_list, matched_records):
         if candidates:
             choices = {s["songId"]: s["title"] for s in candidates}
             result = process.extractOne(um_title, choices, scorer=fuzz.token_set_ratio)
-
             if result and result[1] >= 85.0:
                 matched_id = result[2]
                 matched_song = next(
@@ -459,7 +571,8 @@ def fallback_stage_1(unmatched_listens, songs_list, matched_records):
                 )
                 matched_records.append({"listen": unmatched, "song": matched_song})
                 console.print(
-                    f"[bold blue]✔ FUZZY ({result[1]:.1f}% via {lookup_type}):[/bold blue] '{um_title}' -> [dim]ID: {matched_id}[/dim]"
+                    f"[bold blue]✔ FUZZY ({result[1]:.1f}% via {lookup_type}):[/bold blue] "
+                    f"'{um_title}' -> [dim]ID: {matched_id}[/dim]"
                 )
             else:
                 deep_unmatched.append(unmatched)
@@ -508,7 +621,8 @@ def fallback_stage_2(unmatched_listens, artist_dict, matched_records):
                 )
                 matched_records.append({"listen": unmatched, "song": matched_song})
                 console.print(
-                    f"[bold magenta]✔ STAGE 2 MATCH ({title_match[1]:.1f}%):[/bold magenta] '{um_title}' -> [dim]ID: {matched_id}[/dim]"
+                    f"[bold magenta]✔ STAGE 2 MATCH ({title_match[1]:.1f}%):[/bold magenta] "
+                    f"'{um_title}' -> [dim]ID: {matched_id}[/dim]"
                 )
                 continue
 
@@ -521,7 +635,6 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
         "[bold yellow]Starting Fallback 3: Global Title -> Multi-Artist Verification[/bold yellow]"
     )
     absolute_misses = []
-
     title_dict = defaultdict(list)
     all_titles_pool = {}
     song_by_id = {}
@@ -553,7 +666,8 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
                 if artist_match and artist_match[1] >= 80.0:
                     matched_records.append({"listen": unmatched, "song": candidate})
                     console.print(
-                        f"[bold magenta]✔ STAGE 3 MATCH (Exact Title):[/bold magenta] '{um_title}' -> [dim]ID: {candidate['songId']}[/dim]"
+                        f"[bold magenta]✔ STAGE 3 MATCH (Exact Title):[/bold magenta] "
+                        f"'{um_title}' -> [dim]ID: {candidate['songId']}[/dim]"
                     )
                     matched = True
                     break
@@ -574,7 +688,8 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
                 if artist_match and artist_match[1] >= 80.0:
                     matched_records.append({"listen": unmatched, "song": candidate})
                     console.print(
-                        f"[bold magenta]✔ STAGE 3 MATCH (Fuzzy Title {t_match[1]:.1f}%):[/bold magenta] '{t_match[0]}' -> [dim]ID: {candidate_id}[/dim]"
+                        f"[bold magenta]✔ STAGE 3 MATCH (Fuzzy Title {t_match[1]:.1f}%):[/bold magenta] "
+                        f"'{t_match[0]}' -> [dim]ID: {candidate_id}[/dim]"
                     )
                     matched = True
                     break
@@ -585,70 +700,88 @@ def fallback_stage_3(unmatched_listens, songs_list, matched_records):
     return absolute_misses
 
 
-def fuzzyMatchingSong():
-    fresh_lb_conf = tune_config.get("listenbrainz", {})
-    if not fresh_lb_conf.get("username"):
-        console.print(
-            "[bold red]Aborting: No ListenBrainz username configured.[/bold red]"
+def fuzzyMatchingSong() -> Optional[int]:
+    console.print(
+        Panel.fit(
+            "[bold magenta]ListenBrainz Sync — Multi-User[/bold magenta]",
+            box=box.DOUBLE_EDGE,
         )
+    )
+
+    lb_users = _load_lb_users()
+
+    if not lb_users:
+        console.print("[bold red]No valid LB users found. Aborting.[/bold red]")
         return None
 
     songs_list = getSongsFromDb()
-    responseSongs = getListenBrainzResponse()
-
-    if not responseSongs:
-        console.print("[yellow]No ListenBrainz data to process.[/yellow]")
-        return None
-
-    newest_ts = responseSongs[0].get("listened_at")
-
-    console.print("[cyan]Building local library exact-match index...[/cyan]")
 
     exact_match_dict = {}
     for s in songs_list:
         artist = str(s["artist"]).lower().strip() if s["artist"] else ""
         title = str(s["title"]).lower().strip() if s["title"] else ""
-        lookup_key = f"{artist} - {title}"
-        exact_match_dict[lookup_key] = s
+        exact_match_dict[f"{artist} - {title}"] = s
 
-    unmatched_listens = []
-    matched_records = []
+    global_newest_ts = None
 
-    console.print(f"[cyan]Processing {len(responseSongs)} listens...[/cyan]")
-
-    for listen in responseSongs:
-        metadata = listen.get("track_metadata", {})
-        lb_title = str(metadata.get("track_name", "")).lower().strip()
-        lb_artist = str(metadata.get("artist_name", "")).lower().strip()
-
-        matched_song = exact_match_dict.get(f"{lb_artist} - {lb_title}")
-        if matched_song:
-            matched_records.append({"listen": listen, "song": matched_song})
-        else:
-            unmatched_listens.append(listen)
-
-    console.print(
-        f"[bold green]Direct Matches Found: {len(matched_records)}/{len(responseSongs)}[/bold green]"
-    )
-
-    final_garbage = []
-    if unmatched_listens:
-        console.print(
-            f"[bold yellow]Sending {len(unmatched_listens)} tracks to Fallback Pipeline...[/bold yellow]"
+    for lb_user in lb_users:
+        console.rule(
+            f"[bold blue]Processing: {lb_user['db_username']} "
+            f"→ LB: {lb_user['lb_username']}[/bold blue]"
         )
-        remaining_1, artist_index = fallback_stage_1(
-            unmatched_listens, songs_list, matched_records
-        )
-        remaining_2 = fallback_stage_2(remaining_1, artist_index, matched_records)
-        if remaining_2:
-            final_garbage = fallback_stage_3(remaining_2, songs_list, matched_records)
+
+        response_songs = getListenBrainzResponse(lb_user)
+
+        if not response_songs:
             console.print(
-                f"[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
+                f"[yellow]No listens returned for '{lb_user['lb_username']}'. Skipping.[/yellow]"
             )
+            continue
 
-    batchSave(matched_records, unmatched_records=final_garbage)
+        newest_ts = response_songs[0].get("listened_at")
+        if newest_ts and (global_newest_ts is None or newest_ts > global_newest_ts):
+            global_newest_ts = newest_ts
 
-    return newest_ts
+        unmatched_listens = []
+        matched_records = []
+
+        console.print(f"[cyan]Processing {len(response_songs)} listens...[/cyan]")
+
+        for listen in response_songs:
+            metadata = listen.get("track_metadata", {})
+            lb_title = str(metadata.get("track_name", "")).lower().strip()
+            lb_artist = str(metadata.get("artist_name", "")).lower().strip()
+
+            matched_song = exact_match_dict.get(f"{lb_artist} - {lb_title}")
+            if matched_song:
+                matched_records.append({"listen": listen, "song": matched_song})
+            else:
+                unmatched_listens.append(listen)
+
+        console.print(
+            f"[bold green]Direct Matches: {len(matched_records)}/{len(response_songs)}[/bold green]"
+        )
+
+        final_garbage = []
+        if unmatched_listens:
+            console.print(
+                f"[bold yellow]Sending {len(unmatched_listens)} to Fallback Pipeline...[/bold yellow]"
+            )
+            remaining_1, artist_index = fallback_stage_1(
+                unmatched_listens, songs_list, matched_records
+            )
+            remaining_2 = fallback_stage_2(remaining_1, artist_index, matched_records)
+            if remaining_2:
+                final_garbage = fallback_stage_3(
+                    remaining_2, songs_list, matched_records
+                )
+                console.print(
+                    f"[bold red]True Misses (Ignored): {len(final_garbage)}[/bold red]"
+                )
+
+        batchSave(matched_records, unmatched_records=final_garbage)
+
+    return global_newest_ts
 
 
 def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], int]:
@@ -661,11 +794,11 @@ def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], 
 
     matched_results = {}
     unmatched_listens = []
+
     for idx, track in enumerate(tracks):
         um_title = str(track.title or "").strip()
         um_artist = str(track.artist or "").strip()
         um_album = str(track.album or "").strip()
-
         lookup_key = f"{um_artist.lower()} - {um_title.lower()}"
         exact = exact_match_dict.get(lookup_key)
 
@@ -687,7 +820,6 @@ def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], 
             unmatched_listens.append(fake_listen)
 
     matched_records = []
-
     if unmatched_listens:
         remaining_1, artist_index = fallback_stage_1(
             unmatched_listens, songs_list, matched_records

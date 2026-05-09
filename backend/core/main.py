@@ -17,6 +17,7 @@ from core.db import (
     get_db_connection_lib,
     # migrate_playlist_ids
     migrate_playlist_primary_key,
+    init_db_MB,
 )
 from metadata.itunesFuzzy import useFallBackMethods
 import metadata.library as library
@@ -24,7 +25,13 @@ from metadata.library import normalise_genre, normalise_artist, sync_library
 from navidrome.watcher import start_sse
 from misc.misc import push_star
 import uvicorn
-from navidrome.state import notification_status, tune_config, save_config
+from navidrome.state import (
+    notification_status,
+    tune_config,
+    save_config,
+    automation_config,
+    save_automation_config,
+)
 from dotenv import load_dotenv
 import os
 
@@ -42,8 +49,15 @@ from playlists.playlist import (
     build_discovery_playlist,
 )
 from scrobble.listenBrainz import fuzzyMatchingSong
-
-# from misc import setup_logger
+from playlists.Listenbrainz import (
+    FetchCF,
+    fillMusicBrainzDB,
+    fetchPendingSongs,
+    match_and_update_nvid,
+    retryFailedSongs,
+    filter_pool_by_genre,
+    build_LB_CF_playlist,
+)
 
 load_dotenv()
 console = Console()
@@ -454,6 +468,113 @@ def run_lb_fuzzy_matching() -> None:
     )
 
 
+def MusicbrainzSeeding():
+    inserted = fillMusicBrainzDB()
+    if inserted != 0:
+        fetchPendingSongs()
+        retryFailedSongs()
+        match_and_update_nvid()
+
+
+def musicBrainzThread():
+    with console.status("[dim]Starting Musicbrainz song fetching[/dim]"):
+        try:
+            MusicbrainzThread = threading.Thread(target=MusicbrainzSeeding, daemon=True)
+            MusicbrainzThread.start()
+            time.sleep(2.0)
+
+            if not MusicbrainzThread.is_alive():
+                console.print(
+                    "[red]✗ Watcher failed to start:[/red] check that Navidrome is running."
+                )
+
+        except Exception as e:
+            console.print(f"[red]✗ Watcher startup failed:[/red] {e}")
+            sys.exit(1)
+    console.print("[green]✓ Musicbrainz seeding is running[/green]")
+
+
+def generate_listenbrainz_playlist(user_id: str, saveConfig: bool = False):
+    print(f"\n[LB_CF] Starting playlist generation for user: {user_id}")
+
+    cf_config = automation_config.get("cf_playlist_config", {})
+    playlist_name = cf_config.get("Name", "Listenbrainz Playlist")
+
+    print("[LB_CF] Fetching database history and library...")
+    library, history = getDataFromDb()
+    alias_to_cat = get_translation_maps(readJSON())
+
+    print("[LB_CF] Calculating standard Navidrome scores...")
+    standard_scores = score_song(user_id, library, history)
+
+    print("[LB_CF] Building Collaborative Filtering playlist...")
+    song_ids, song_signals, new_lowest_score = build_LB_CF_playlist(
+        user_id=user_id,
+        cf_config=cf_config,
+        history_dict=history,
+        alias_to_cat=alias_to_cat,
+        standard_scores=standard_scores,
+    )
+
+    if not song_ids:
+        print(f"[LB_CF] Error: No songs returned for {user_id}. Aborting.")
+        return False
+
+    print(f"[LB_CF] Pushing {len(song_ids)} songs to Navidrome...")
+    push_playlist(
+        song_ids=song_ids,
+        user_id=user_id,
+        song_signals=song_signals,
+        playname=playlist_name,
+        newPlaylist=False,
+        playlist_type="listenbrainz_cf",
+    )
+    if saveConfig:
+        cf_config["last_score"] = new_lowest_score
+
+    cf_config["last_generated"] = int(time.time())
+
+    save_automation_config({"cf_playlist_config": cf_config})
+
+    print(
+        f"[LB_CF] Playlist generation complete! Next run will start at score: {new_lowest_score}\n"
+    )
+    return True
+
+
+def autoGenerateLB_CF(current_hour: int, current_day, timezone_str: str):
+    cf_config = automation_config.get("cf_playlist_config", {})
+    cf_auto_time = cf_config.get("auto_generate_time", 1)
+    cf_last_generated = cf_config.get("last_generated", 0)
+    cf_users = cf_config.get("for_users", [])
+
+    cf_last_run_date = None
+    if cf_last_generated > 0:
+        cf_last_run_date = datetime.fromtimestamp(
+            cf_last_generated, ZoneInfo(timezone_str)
+        ).date()
+
+    if current_hour >= cf_auto_time and current_day != cf_last_run_date:
+        if len(cf_users) > 0:
+            console.print(
+                f"[dim]Auto CF playlist generation triggered (Scheduled: {cf_auto_time}:00, Current: {current_hour}:00).[/dim]"
+            )
+            for user in cf_users:
+                try:
+                    generate_listenbrainz_playlist(user, saveConfig=False)
+                    console.print(f"[green]✓ ListenBrainz CF pushed for {user}[/green]")
+                except Exception as e:
+                    console.print(
+                        f"[red]✗ ListenBrainz CF generation failed for {user}:[/red] {e}"
+                    )
+        else:
+            console.print(
+                "[yellow]⚠ Auto CF generation skipped: no users configured in for_users.[/yellow]"
+            )
+        cf_config["last_generated"] = int(time.time())
+        save_automation_config({"cf_playlist_config": cf_config})
+
+
 def main():
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
 
@@ -464,8 +585,8 @@ def main():
             init_db_usr()
             init_db_playlist()
             init_search_db()
+            init_db_MB()
             status_registry.update("Db", status="initialized")
-
             conn = get_db_connection()
             conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             conn.execute("VACUUM")
@@ -548,9 +669,13 @@ def main():
     last_auto_sync_day = None
     isGenerated = False
     is_lb_syncing = False
-    last_lb_sync_timestamp = None  
-
+    last_lb_sync_timestamp = None
+    # MusicbrainzSeeding()
+    # FetchCF()
+    # musicBrainzThread()
+    # generate_listenbrainz_playlist("adii")
     while True:
+        # autoGenerateLB_CF()
 
         if library._startSyncSong and not library._isSyncing:
             console.print("[dim]Manual library sync triggered.[/dim]")
@@ -562,6 +687,7 @@ def main():
         current_day = now.date()
         settings = library.getSyncSettings()
         auto_sync_hour = settings["auto_sync"]
+        autoGenerateLB_CF(current_hour, current_day, library._timezone)
 
         if (
             current_hour == auto_sync_hour
@@ -693,8 +819,8 @@ def main():
                     f"[dim]ListenBrainz sync triggered (interval: {pool_time_hours}h).[/dim]"
                 )
                 is_lb_syncing = True
-                last_lb_sync_timestamp = current_unix_time  
-                
+                last_lb_sync_timestamp = current_unix_time
+
                 def run_lb_sync():
                     try:
                         lb_conf = tune_config.get("listenbrainz", {})
@@ -718,6 +844,8 @@ def main():
                         save_config(tune_config)
                         console.print("[green]✓ ListenBrainz sync complete.[/green]")
                         run_lb_fuzzy_matching()
+                        # FetchCF()
+                        print("skipping Fetch cf")
                     except Exception as e:
                         console.print(f"[red]✗ ListenBrainz sync failed:[/red] {e}")
                     finally:

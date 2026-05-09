@@ -18,6 +18,7 @@ DB_PATH_LOG = os.path.join(DATA_DIR, "tunelog.db")
 DB_PATH_LIB = os.path.join(DATA_DIR, "songlist.db")
 DB_PATH_USR = os.path.join(DATA_DIR, "users.db")
 DB_PATH_PLTS = os.path.join(DATA_DIR, "playlist.db")
+DB_PATH_MB = os.path.join(DATA_DIR, "musicbrainz.db")
 
 
 def get_db_connection():
@@ -47,6 +48,13 @@ def get_db_connection_usr():
 def get_db_connection_playlist():
     os.makedirs(os.path.dirname(DB_PATH_PLTS), exist_ok=True)
     conn = sqlite3.connect(DB_PATH_PLTS, timeout=30)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_db_connection_Musicbrainz():
+    os.makedirs(os.path.dirname(DB_PATH_MB), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH_MB, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -153,7 +161,8 @@ def init_db():
 def init_db_lib():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
-
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS library (
             song_id     TEXT PRIMARY KEY,
@@ -168,6 +177,16 @@ def init_db_lib():
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created     TIMESTAMP,
             explicit    TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS LB_CF (
+            recording_mbid   TEXT PRIMARY KEY,
+            username        TEXT,
+            score            REAL,
+            cf_last_updated  INTEGER,
+            fetched_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            latest_listened_at    TEXT
         )
     """)
 
@@ -189,7 +208,18 @@ def init_db_lib():
             "explicit": "TEXT",
         },
     )
-
+    _ensure_columns(
+        cursor,
+        "LB_CF",
+        {
+            "recording_mbid": "TEXT PRIMARY KEY",
+            "username" : "Text" ,
+            "score": "REAL",
+            "cf_last_updated": "INTEGER",
+            "fetched_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "latest_listened_at":"TEXT"
+        },
+    )
     conn.commit()
     conn.close()
 
@@ -206,7 +236,9 @@ def init_db_usr():
             password    TEXT,
             isAdmin     BOOLEAN,
             playlistId  TEXT,
-            playlistIds TEXT
+            playlistIds TEXT,
+            LB_token    TEXT,
+            LB_username TEXT
         )
     """)
 
@@ -221,6 +253,8 @@ def init_db_usr():
             "isAdmin": "BOOLEAN",
             "playlistId": "TEXT",
             "playlistIds": "TEXT",
+            "LB_token"    :"TEXT",
+            "LB_username" : "TEXT"
         },
     )
 
@@ -381,9 +415,54 @@ def migrate_playlist_primary_key():
     conn.close()
 
 
+import sqlite3
+
+
+def init_db_MB():
+    conn = get_db_connection_Musicbrainz()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS hydration_cache (
+            recording_mbid      TEXT PRIMARY KEY,
+            title               TEXT,
+            artist              TEXT,
+            artist_mbid         TEXT,
+            album               TEXT,
+            release_mbid        TEXT,
+            release_group_mbid  TEXT,
+            duration_ms         INTEGER,
+            fetch_status        TEXT DEFAULT 'PENDING',
+            last_synced         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            nvid                TEXT
+        )
+    """)
+    _ensure_columns(
+        cursor,
+        "hydration_cache",
+        {
+            "recording_mbid": "TEXT PRIMARY KEY",
+            "title": "TEXT",
+            "artist": "TEXT",
+            "artist_mbid": "TEXT",
+            "album": "TEXT",
+            "release_mbid": "TEXT",
+            "release_group_mbid": "TEXT",
+            "duration_ms": "INTEGER",
+            "fetch_status": "TEXT DEFAULT 'PENDING'",
+            "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "nvid" : "TEXT"
+        },
+    )
+
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
     init_db()
     init_db_lib()
     init_db_usr()
     init_db_playlist()
     init_search_db()
+    init_db_MB()

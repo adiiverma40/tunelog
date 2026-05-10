@@ -8,6 +8,8 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - Assistance in some of the `research` like which python module to use and stuff
 - `Playlist` Page was re written using claude ai
 
+## UPDATE: 
+- LISTENBRAINZ COLLABRATIVE FILTTERING - using Listenbrainz recommendation to create a playlist with the song that is in your library read Listenbrainz wiki for more details
 
 ### Wiki: 
 - [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks
@@ -16,10 +18,6 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 
 > **ItunesFuzzy:** Songs that are new or that is not in either `itunes` or `musicbrainz`, such as of `small creators` will be marked `unmatched` as api will return `none`
 
-
-### Update :
-- Discovery Playlist :- This playlist is created by choosing the recently added song, not by when song was released and then passed through genre injection to choose the best song that matches your past genre. for more read the playlist wiki
-- Itunes Fuzzy :- For songs that is not in your library or not identifed by the script, it uses itunes and musicbrainz to match it, if its success then its gets marked as itunes else not matched in database. why? for future updates
 
 ### Note 
 > If there is any error, try copy pasting the config.json from github to your local file

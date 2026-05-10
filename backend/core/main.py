@@ -508,7 +508,7 @@ def generate_listenbrainz_playlist(user_id: str, saveConfig: bool = False):
     standard_scores = score_song(user_id, library, history)
 
     print("[LB_CF] Building Collaborative Filtering playlist...")
-    song_ids, song_signals, new_lowest_score = build_LB_CF_playlist(
+    song_ids, song_signals, new_heard_score, new_unheard_score = build_LB_CF_playlist(
         user_id=user_id,
         cf_config=cf_config,
         history_dict=history,
@@ -529,15 +529,22 @@ def generate_listenbrainz_playlist(user_id: str, saveConfig: bool = False):
         newPlaylist=False,
         playlist_type="listenbrainz_cf",
     )
-    if saveConfig:
-        cf_config["last_score"] = new_lowest_score
-
     cf_config["last_generated"] = int(time.time())
+
+    if saveConfig:
+        cf_config["heard_last_score"] = new_heard_score
+        cf_config["unheard_last_score"] = new_unheard_score
+        print(
+            f"[LB_CF] Saving score cursors → heard: {new_heard_score:.4f}, "
+            f"unheard: {new_unheard_score:.4f}"
+        )
 
     save_automation_config({"cf_playlist_config": cf_config})
 
     print(
-        f"[LB_CF] Playlist generation complete! Next run will start at score: {new_lowest_score}\n"
+        f"[LB_CF] Playlist generation complete!\n"
+        f"         Heard cursor:   {new_heard_score:.4f}\n"
+        f"         Unheard cursor: {new_unheard_score:.4f}\n"
     )
     return True
 
@@ -573,6 +580,45 @@ def autoGenerateLB_CF(current_hour: int, current_day, timezone_str: str):
             )
         cf_config["last_generated"] = int(time.time())
         save_automation_config({"cf_playlist_config": cf_config})
+def Auto_LB_CF(thread=True):
+    fetch_conf = automation_config.get("weekly_LB_fetch", {})
+    last_synced = fetch_conf.get("last_synced", 0)
+    current_unix_time = int(time.time())
+
+    is_scheduled = (current_unix_time - last_synced >= 86400)
+    is_manual = not thread
+
+    if is_scheduled or is_manual:
+        
+        if is_manual:
+            console.print("[dim]Manual ListenBrainz CF fetch triggered via API.[/dim]")
+        else:
+            console.print("[dim]Daily ListenBrainz CF fetch triggered (24h interval passed).[/dim]")
+
+        automation_config["weekly_LB_fetch"]["last_synced"] = current_unix_time
+        try:
+            save_automation_config(automation_config)
+        except Exception as e:
+            console.print(f"[red]✗ Failed to save config for weekly_LB_fetch:[/red] {e}")
+
+        def fetch_worker():
+            try:
+                if thread:
+                    print("sleeping 15 sec to let other process initialize")
+                    time.sleep(15)
+                
+                inserted = FetchCF()
+                if inserted is not None and inserted >= 0: 
+                    MusicbrainzSeeding()
+            except Exception as e:
+                console.print(f"[red]✗ ListenBrainz CF fetch crashed:[/red] {e}")
+        
+        if thread:
+            fetch_thread = threading.Thread(target=fetch_worker, daemon=True)
+            fetch_thread.start()
+        else: 
+            fetch_worker()
+
 
 
 def main():
@@ -670,12 +716,10 @@ def main():
     isGenerated = False
     is_lb_syncing = False
     last_lb_sync_timestamp = None
-    # MusicbrainzSeeding()
-    # FetchCF()
-    # musicBrainzThread()
-    # generate_listenbrainz_playlist("adii")
+
     while True:
-        # autoGenerateLB_CF()
+
+        Auto_LB_CF()
 
         if library._startSyncSong and not library._isSyncing:
             console.print("[dim]Manual library sync triggered.[/dim]")
@@ -845,7 +889,7 @@ def main():
                         console.print("[green]✓ ListenBrainz sync complete.[/green]")
                         run_lb_fuzzy_matching()
                         # FetchCF()
-                        print("skipping Fetch cf")
+                        # print("skipping Fetch cf")
                     except Exception as e:
                         console.print(f"[red]✗ ListenBrainz sync failed:[/red] {e}")
                     finally:

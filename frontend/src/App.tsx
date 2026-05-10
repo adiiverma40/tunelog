@@ -20,6 +20,7 @@ import JamUsers from "./pages/Jam/JamUsers";
 import { fetchLogin, fetchGetUsers } from "./API/API";
 import { useNotificationStream } from "./hooks/Usenotificationstream";
 import ListenBrainzImport from "./pages/scrobble/listenbrainz";
+import ListenbrainzCF from "./pages/playlist/LB_CF";
 export default function App() {
   const navigate = useNavigate();
 
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
           <Route path="/jamuser" element={<JamUsers />} />
+          <Route path="/playlist/listenbrainz/cf" element={<ListenbrainzCF />} />
 
           <Route
             path="/scrobble/listenbrainz"

@@ -1003,3 +1003,140 @@ export const createNavidromePlaylist = async (
   });
   return res.json();
 };
+
+export interface LBCFConfig {
+  size: number;
+  heard: number;
+  unheard: number;
+  unheard_genre_injection: boolean;
+  heard_genre_injection: boolean;
+  last_generated: number;
+  auto_generate_time: number;
+  Name: string;
+  backfill_unheard_song: boolean;
+  use_blend: boolean;
+  heard_last_score: number;
+  unheard_last_score: number;
+  fallbackScore: boolean;
+  for_users: string[];
+}
+
+export interface WeeklyLBFetch {
+  last_synced: number;
+  check_interval: number;
+}
+
+export interface LBCFConfigPayload {
+  cf_playlist_config: LBCFConfig;
+  weekly_LB_fetch: WeeklyLBFetch;
+}
+
+export async function fetchLBCFConfig(): Promise<
+  | {
+      status: "ok";
+      cf_playlist_config: LBCFConfig;
+      weekly_LB_fetch: WeeklyLBFetch;
+    }
+  | { status: "error"; reason: string }
+> {
+  const token =
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    "";
+
+  const res = await fetch(`${BASE_URL}/api/lb-cf/config`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+  return res.json();
+}
+
+export async function saveLBCFConfig(
+  payload: LBCFConfigPayload,
+): Promise<{ status: "ok" } | { status: "error"; reason: string }> {
+  const token =
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    "";
+
+  const res = await fetch(`${BASE_URL}/api/lb-cf/config`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+  return res.json();
+}
+
+export async function generateLBCFPlaylist(): Promise<
+  { status: "ok"; playlist_id?: string } | { status: "error"; reason: string }
+> {
+  const token =
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    "";
+
+  const res = await fetch(`${BASE_URL}/api/lb-cf/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+  return res.json();
+}
+
+function getToken(): string {
+  return (
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    ""
+  );
+}
+
+function getCurrentUser(): string {
+  return (
+    localStorage.getItem("tunelog_user") ??
+    sessionStorage.getItem("tunelog_user") ??
+    ""
+  );
+}
+
+export async function fetchLBHasToken(): Promise<
+  { status: "ok"; has_token: boolean } | { status: "error"; reason: string }
+> {
+  const user = getCurrentUser();
+  const res = await fetch(
+    `${BASE_URL}/api/lb-cf/has-token?user=${encodeURIComponent(user)}`,
+    { headers: { Authorization: `Bearer ${getToken()}` } },
+  );
+  if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+  return res.json();
+}
+
+export async function setLBToken(
+  lbToken: string,
+): Promise<{ status: "ok" } | { status: "error"; reason: string }> {
+  const user = getCurrentUser();
+  const res = await fetch(`${BASE_URL}/api/lb-cf/set-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ user, token: lbToken }),
+  });
+  if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+  return res.json();
+}

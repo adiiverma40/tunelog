@@ -48,12 +48,14 @@ const navItems: NavItem[] = [
     path: "/user",
   },
 
-  {
+ {
     icon: <AudioIcon />,
     name: "Playlist",
-    path: "/playlist",
+    subItems: [
+      { name: "Tunelog Blend", path: "/playlist" },
+      { name: "Listenbrainz CF", path: "/playlist/listenbrainz/cf" },
+    ],
   },
-
   {
     icon: <PageIcon />,
     name: "Library",

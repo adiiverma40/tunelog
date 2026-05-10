@@ -1,7 +1,7 @@
 # This to give frontend api data
 
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, UploadFile, Query, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, Query, File, Form , BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
@@ -62,6 +62,15 @@ import re
 import socketio
 from scrobble.listenBrainz import batchMatchNavidromeTracks
 from core.crypto import decrypt_token
+from navidrome.state import automation_config, save_automation_config
+from core.main import generate_listenbrainz_playlist , Auto_LB_CF
+import time
+import threading
+
+from core.crypto import encrypt_token
+
+str
+
 
 load_dotenv()
 
@@ -103,6 +112,9 @@ def startup():
     init_db()
     init_db_lib()
     init_db_usr()
+
+
+VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
 
 
 class CreateUserData(BaseModel):
@@ -206,12 +218,6 @@ class LBMatchResponse(BaseModel):
     reason: Optional[str] = None
 
 
-# class CreatePlaylistRequest(BaseModel):
-#     name: str = Field(..., min_length=1)
-#     song_ids: List[str] = Field(default_factory=list)
-#     user_id: Optional[str] = None
-
-
 class CreatePlaylistRequest(BaseModel):
     name: str
     song_ids: list[str]
@@ -224,7 +230,36 @@ class CreatePlaylistResponse(BaseModel):
     playlist_id: Optional[str] = None
 
 
-VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
+class LBCFConfig(BaseModel):
+    size: int
+    heard: int
+    unheard: int
+    unheard_genre_injection: bool
+    heard_genre_injection: bool
+    last_generated: int
+    auto_generate_time: int
+    Name: str
+    backfill_unheard_song: bool
+    use_blend: bool
+    unheard_last_score: float
+    heard_last_score: float
+    fallbackScore: bool
+    for_users: list[str]
+
+
+class WeeklyLBFetch(BaseModel):
+    last_synced: int
+    check_interval: int
+
+
+class LBCFConfigPayload(BaseModel):
+    cf_playlist_config: Optional[dict] = None
+    weekly_LB_fetch: Optional[dict] = None
+
+
+class SetTokenRequest(BaseModel):
+    user: str
+    token: str
 
 
 @app.post("/api/user/profile/update")
@@ -1956,3 +1991,103 @@ def create_navidrome_playlist(payload: CreatePlaylistRequest):
     return CreatePlaylistResponse(
         status="error", reason="Failed to create playlist in Navidrome."
     )
+
+
+def run_generation_task():
+    try:
+        cf_config = automation_config.get("cf_playlist_config", {})
+        cf_users = cf_config.get("for_users", [])
+
+        if not cf_users:
+            return
+
+        for user in cf_users:
+            generate_listenbrainz_playlist(user, saveConfig=True)
+            cf_config = automation_config.get("cf_playlist_config", {})
+
+        print(f"Background generation complete for users: {cf_users}")
+
+    except Exception as e:
+        print(f"Background generation failed: {e}")
+
+
+@app.get("/api/lb-cf/config")
+async def fetch_lb_cf_config():
+    try:
+        return {
+            "status": "ok",
+            "cf_playlist_config": automation_config.get("cf_playlist_config", {}),
+            "weekly_LB_fetch": automation_config.get("weekly_LB_fetch", {}),
+        }
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
+@app.post("/api/lb-cf/config")
+async def save_lb_cf_config(payload: LBCFConfigPayload):
+    try:
+        success, message = save_automation_config(payload.dict(exclude_unset=True))
+
+        if not success:
+            return {"status": "error", "reason": message}
+
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
+@app.post("/api/lb-cf/generate")
+async def generate_lb_cf_playlist():
+    try:
+        cf_config = automation_config.get("cf_playlist_config", {})
+        if not cf_config.get("for_users"):
+            return {"status": "error", "reason": "No users configured for generation."}
+
+        thread = threading.Thread(target=run_generation_task)
+        thread.start()
+
+        return {"status": "ok", "message": "Generation started in the background."}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
+@app.get("/api/lb-cf/has-token")
+async def check_lb_token(user: str):
+    try:
+        conn = get_db_connection_usr()
+
+        cursor = conn.execute("SELECT LB_token FROM user WHERE username=?", (user,))
+        row = cursor.fetchone()
+        conn.close()
+        has_token = bool(row and row["LB_token"])
+
+        return {"status": "ok", "has_token": has_token}
+
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
+@app.post("/api/lb-cf/set-token")
+async def set_lb_token(payload: SetTokenRequest):
+    try:
+        encrypted_token = encrypt_token(payload.token)
+
+        conn = get_db_connection_usr()
+        conn.execute(
+            "UPDATE user SET LB_token=? WHERE username=?",
+            (encrypted_token, payload.user),
+        )
+        if conn.total_changes == 0:
+            conn.close()
+            return {"status": "error", "reason": "User not found"}
+
+        conn.commit()
+        conn.close()
+        print("stating auto lb cf")
+        BackgroundTasks(Auto_LB_CF(False))
+
+        return {"status": "ok"}
+    
+
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}

@@ -157,22 +157,22 @@ false = False
 
 DEFAULT_AUTO_CONFIG = {
     "weekly_LB_fetch": {"last_synced": 0, "check_interval": 12},
-    "cf_playlist_config" : {
-        "size" : 50,
-        "heard" : 25,
-        "unheard" : 25,
+    "cf_playlist_config": {
+        "size": 50,
+        "heard": 25,
+        "unheard": 25,
         "unheard_genre_injection": true,
-        "heard_genre_injection" : false,
-        "last_generated" : 0, 
-        "auto_generate_time" : 1,
-        "Name" : "Listenbrainz Playlist",
-        "backfill_unheard_song" : true,
-        "use_blend" : true,
-        "last_score" : 0,
-        "fallbackScore" : true,
-        "for_users" : []
-
-    }
+        "heard_genre_injection": false,
+        "unheard_last_score": 0,
+        "heard_last_score": 0,
+        "auto_generate_time": 1,
+        "Name": "Listenbrainz Playlist",
+        "backfill_unheard_song": true,
+        "use_blend": true,
+        "last_score": 0,
+        "fallbackScore": true,
+        "for_users": [],
+    },
 }
 
 config_lock = threading.Lock()

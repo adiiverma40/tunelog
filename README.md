@@ -9,7 +9,7 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - `Playlist` Page was re written using claude ai
 
 ## UPDATE: 
-- LISTENBRAINZ COLLABRATIVE FILTTERING - using Listenbrainz recommendation to create a playlist with the song that is in your library read Listenbrainz wiki for more details
+- LISTENBRAINZ COLLABRATIVE FILTTERING - using Listenbrainz recommendation to create a playlist with the song that is in your library read [Listenbrainz wiki](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration) for more details
 
 ### Wiki: 
 - [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks

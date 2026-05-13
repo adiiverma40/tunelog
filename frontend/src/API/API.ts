@@ -1140,3 +1140,50 @@ export async function setLBToken(
   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
   return res.json();
 }
+
+export interface LBLibrarySong {
+  navidrome_id: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  recording_mbid: string;
+  for_user: string;
+  score: number;
+}
+
+export interface LBMissingSong {
+  recording_mbid: string;
+  release_mbid: string | null;
+  title: string;
+  artist: string;
+  album: string | null;
+  for_user: string;
+  score: number;
+}
+
+export interface LBLibraryResponse {
+  status: "ok" | "error";
+  in_library: LBLibrarySong[];
+  not_in_library: LBMissingSong[];
+  reason?: string;
+}
+
+export async function fetchLBLibraryRecommendations(): Promise<LBLibraryResponse> {
+  const token =
+    localStorage.getItem("tunelog_token") ??
+    sessionStorage.getItem("tunelog_token") ??
+    "";
+
+  const res = await fetch(`${BASE_URL}/api/lb-cf/library`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok)
+    return {
+      status: "error",
+      in_library: [],
+      not_in_library: [],
+      reason: `HTTP ${res.status}`,
+    };
+  return res.json();
+}

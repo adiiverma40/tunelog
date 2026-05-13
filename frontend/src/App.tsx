@@ -21,6 +21,7 @@ import { fetchLogin, fetchGetUsers } from "./API/API";
 import { useNotificationStream } from "./hooks/Usenotificationstream";
 import ListenBrainzImport from "./pages/scrobble/listenbrainz";
 import ListenbrainzCF from "./pages/playlist/LB_CF";
+import ListenbrainzLibrary from "./pages/librarySync/listenbrainz";
 export default function App() {
   const navigate = useNavigate();
 
@@ -63,6 +64,8 @@ export default function App() {
           <Route index path="/" element={<Home />} />
           <Route path="/user" element={<UserProfiles />} />
           <Route path="/librarySync" element={<LibrarySync />} />
+
+          <Route path="/library/listenbrainz" element={<ListenbrainzLibrary />} />
           <Route path="/playlist" element={<Playlist />} />
           <Route path="/users/:username" element={<UserProfilePage />} />
           <Route path="/manual" element={<ManualMarking />} />

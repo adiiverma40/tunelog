@@ -1,7 +1,15 @@
 # This to give frontend api data
 
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, UploadFile, Query, File, Form , BackgroundTasks
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    UploadFile,
+    Query,
+    File,
+    Form,
+    BackgroundTasks,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
@@ -63,7 +71,7 @@ import socketio
 from scrobble.listenBrainz import batchMatchNavidromeTracks
 from core.crypto import decrypt_token
 from navidrome.state import automation_config, save_automation_config
-from core.main import generate_listenbrainz_playlist , Auto_LB_CF
+from core.main import generate_listenbrainz_playlist, Auto_LB_CF
 import time
 import threading
 
@@ -2087,7 +2095,71 @@ async def set_lb_token(payload: SetTokenRequest):
         BackgroundTasks(Auto_LB_CF(False))
 
         return {"status": "ok"}
-    
 
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
+
+from core.db import DB_PATH_MB
+
+
+@app.get("/api/lb-cf/library")
+async def fetch_lb_library_recommendations():
+    try:
+        conn = get_db_connection_lib()
+        cursor = conn.cursor()
+        cursor.execute(f"ATTACH DATABASE '{DB_PATH_MB}' AS mb")
+        query = """
+            SELECT 
+                cf.recording_mbid,
+                h.title,
+                h.artist,
+                h.album,
+                h.release_mbid,
+                cf.username,
+                cf.score,
+                h.nvid
+            FROM LB_CF cf
+            INNER JOIN mb.hydration_cache h ON cf.recording_mbid = h.recording_mbid
+            ORDER BY cf.score DESC
+        """
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        response = {
+            "status": "ok",
+            "in_library": [],
+            "not_in_library": [],
+            "reason": None,
+        }
+
+        for row in rows:
+            mbid, title, artist, album, release_mbid, for_user, score, nvid = row
+
+            item = {
+                "recording_mbid": mbid,
+                "title": title,
+                "artist": artist,
+                "album": album,
+                "for_user": for_user,
+                "score": round(score, 3) if score is not None else 0.0,
+            }
+
+            if nvid:
+                item["navidrome_id"] = nvid
+                response["in_library"].append(item)
+            else:
+                item["release_mbid"] = release_mbid
+                response["not_in_library"].append(item)
+
+        conn.close()
+        return response
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "in_library": [],
+            "not_in_library": [],
+            "reason": f"Database error: {str(e)}",
+        }

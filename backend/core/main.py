@@ -475,6 +475,8 @@ def MusicbrainzSeeding():
         retryFailedSongs()
         match_and_update_nvid()
 
+    match_and_update_nvid()
+
 
 def musicBrainzThread():
     with console.status("[dim]Starting Musicbrainz song fetching[/dim]"):
@@ -580,45 +582,51 @@ def autoGenerateLB_CF(current_hour: int, current_day, timezone_str: str):
             )
         cf_config["last_generated"] = int(time.time())
         save_automation_config({"cf_playlist_config": cf_config})
+
+
 def Auto_LB_CF(thread=True):
     fetch_conf = automation_config.get("weekly_LB_fetch", {})
     last_synced = fetch_conf.get("last_synced", 0)
     current_unix_time = int(time.time())
 
-    is_scheduled = (current_unix_time - last_synced >= 86400)
+    is_scheduled = current_unix_time - last_synced >= 86400
     is_manual = not thread
 
     if is_scheduled or is_manual:
-        
+
         if is_manual:
             console.print("[dim]Manual ListenBrainz CF fetch triggered via API.[/dim]")
         else:
-            console.print("[dim]Daily ListenBrainz CF fetch triggered (24h interval passed).[/dim]")
+            console.print(
+                "[dim]Daily ListenBrainz CF fetch triggered (24h interval passed).[/dim]"
+            )
 
         automation_config["weekly_LB_fetch"]["last_synced"] = current_unix_time
         try:
             save_automation_config(automation_config)
         except Exception as e:
-            console.print(f"[red]✗ Failed to save config for weekly_LB_fetch:[/red] {e}")
+            console.print(
+                f"[red]✗ Failed to save config for weekly_LB_fetch:[/red] {e}"
+            )
 
         def fetch_worker():
             try:
                 if thread:
                     print("sleeping 15 sec to let other process initialize")
                     time.sleep(15)
-                
+
                 inserted = FetchCF()
-                if inserted is not None and inserted >= 0: 
+                if inserted is not None and inserted >= 0:
                     MusicbrainzSeeding()
+                # match_and_update_nvid()
             except Exception as e:
                 console.print(f"[red]✗ ListenBrainz CF fetch crashed:[/red] {e}")
-        
+
         if thread:
             fetch_thread = threading.Thread(target=fetch_worker, daemon=True)
             fetch_thread.start()
-        else: 
+        else:
             fetch_worker()
-
 
 
 def main():

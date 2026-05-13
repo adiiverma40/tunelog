@@ -61,6 +61,7 @@ const navItems: NavItem[] = [
     name: "Library",
     subItems: [
       { name: "Sync", path: "/librarySync" },
+      {name : "Listenbrainz CF" , path : "/library/listenbrainz"},
       { name: "Import", path: "/import" },
     ],
   },

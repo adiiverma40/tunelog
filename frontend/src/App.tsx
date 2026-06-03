@@ -22,6 +22,8 @@ import { useNotificationStream } from "./hooks/Usenotificationstream";
 import ListenBrainzImport from "./pages/scrobble/listenbrainz";
 import ListenbrainzCF from "./pages/playlist/LB_CF";
 import ListenbrainzLibrary from "./pages/librarySync/listenbrainz";
+import SkippedSongs from "./pages/Library/skipped";
+
 export default function App() {
   const navigate = useNavigate();
 
@@ -65,7 +67,10 @@ export default function App() {
           <Route path="/user" element={<UserProfiles />} />
           <Route path="/librarySync" element={<LibrarySync />} />
 
-          <Route path="/library/listenbrainz" element={<ListenbrainzLibrary />} />
+          <Route
+            path="/library/listenbrainz"
+            element={<ListenbrainzLibrary />}
+          />
           <Route path="/playlist" element={<Playlist />} />
           <Route path="/users/:username" element={<UserProfilePage />} />
           <Route path="/manual" element={<ManualMarking />} />
@@ -76,7 +81,12 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
           <Route path="/jamuser" element={<JamUsers />} />
-          <Route path="/playlist/listenbrainz/cf" element={<ListenbrainzCF />} />
+
+          <Route path="/library/skipped" element={<SkippedSongs />} />
+          <Route
+            path="/playlist/listenbrainz/cf"
+            element={<ListenbrainzCF />}
+          />
 
           <Route
             path="/scrobble/listenbrainz"

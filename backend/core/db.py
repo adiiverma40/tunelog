@@ -1,12 +1,13 @@
-import sqlite3
-import os
-import time
 import functools
+import os
+import sqlite3
+import time
+
+from navidrome.state import status_registry
 from rich.console import Console
 
 console = Console()
 
-from navidrome.state import status_registry
 
 if os.path.exists("/app/data"):
     DATA_DIR = "/app/data"
@@ -158,11 +159,77 @@ def init_db():
     conn.close()
 
 
+# def init_db_lib():
+#     conn = get_db_connection_lib()
+#     cursor = conn.cursor()
+#     cursor.execute("PRAGMA journal_mode=WAL;")
+
+#     cursor.execute("""
+#         CREATE TABLE IF NOT EXISTS library (
+#             song_id     TEXT PRIMARY KEY,
+#             title       TEXT,
+#             artist      TEXT,
+#             artistId    TEXT,
+#             artistJSON  TEXT,
+#             album       TEXT,
+#             albumId     TEXT,
+#             genre       TEXT,
+#             duration    INTEGER,
+#             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#             created     TIMESTAMP,
+#             explicit    TEXT
+#         )
+#     """)
+#     cursor.execute("""
+#         CREATE TABLE IF NOT EXISTS LB_CF (
+#             recording_mbid   TEXT PRIMARY KEY,
+#             username        TEXT,
+#             score            REAL,
+#             cf_last_updated  INTEGER,
+#             fetched_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#             latest_listened_at    TEXT
+#         )
+#     """)
+
+#     _ensure_columns(
+#         cursor,
+#         "library",
+#         {
+#             "song_id": "TEXT PRIMARY KEY",
+#             "title": "TEXT",
+#             "artist": "TEXT",
+#             "artistId": "TEXT",
+#             "artistJSON": "TEXT",
+#             "album": "TEXT",
+#             "albumId": "TEXT",
+#             "genre": "TEXT",
+#             "duration": "INTEGER",
+#             "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+#             "created": "TIMESTAMP",
+#             "explicit": "TEXT",
+#         },
+#     )
+#     _ensure_columns(
+#         cursor,
+#         "LB_CF",
+#         {
+#             "recording_mbid": "TEXT PRIMARY KEY",
+#             "username" : "Text" ,
+#             "score": "REAL",
+#             "cf_last_updated": "INTEGER",
+#             "fetched_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+#             "latest_listened_at":"TEXT"
+#         },
+#     )
+#     conn.commit()
+#     conn.close()
+
+
 def init_db_lib():
     conn = get_db_connection_lib()
     cursor = conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL;")
-    
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS library (
             song_id     TEXT PRIMARY KEY,
@@ -179,14 +246,16 @@ def init_db_lib():
             explicit    TEXT
         )
     """)
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS LB_CF (
-            recording_mbid   TEXT PRIMARY KEY,
-            username        TEXT,
-            score            REAL,
-            cf_last_updated  INTEGER,
-            fetched_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            latest_listened_at    TEXT
+            recording_mbid      TEXT NOT NULL,
+            username            TEXT NOT NULL,
+            score               REAL,
+            cf_last_updated     INTEGER,
+            fetched_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            latest_listened_at  TEXT,
+            PRIMARY KEY (recording_mbid, username)
         )
     """)
 
@@ -212,14 +281,42 @@ def init_db_lib():
         cursor,
         "LB_CF",
         {
-            "recording_mbid": "TEXT PRIMARY KEY",
-            "username" : "Text" ,
+            "recording_mbid": "TEXT NOT NULL",
+            "username": "TEXT NOT NULL",
             "score": "REAL",
             "cf_last_updated": "INTEGER",
             "fetched_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-            "latest_listened_at":"TEXT"
+            "latest_listened_at": "TEXT",
         },
     )
+
+    # --- migrate existing table if it still has the old single-column PK ---
+    row = cursor.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='LB_CF'"
+    ).fetchone()
+    if row and "PRIMARY KEY (recording_mbid, username)" not in row[0]:
+        cursor.executescript("""
+            ALTER TABLE LB_CF RENAME TO LB_CF_old;
+
+            CREATE TABLE LB_CF (
+                recording_mbid      TEXT NOT NULL,
+                username            TEXT NOT NULL,
+                score               REAL,
+                cf_last_updated     INTEGER,
+                fetched_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                latest_listened_at  TEXT,
+                PRIMARY KEY (recording_mbid, username)
+            );
+
+            INSERT OR IGNORE INTO LB_CF
+                SELECT recording_mbid, username, score,
+                       cf_last_updated, fetched_at, latest_listened_at
+                FROM LB_CF_old;
+
+            DROP TABLE LB_CF_old;
+        """)
+        conn.commit()
+
     conn.commit()
     conn.close()
 
@@ -253,8 +350,8 @@ def init_db_usr():
             "isAdmin": "BOOLEAN",
             "playlistId": "TEXT",
             "playlistIds": "TEXT",
-            "LB_token"    :"TEXT",
-            "LB_username" : "TEXT"
+            "LB_token": "TEXT",
+            "LB_username": "TEXT",
         },
     )
 
@@ -451,7 +548,7 @@ def init_db_MB():
             "duration_ms": "INTEGER",
             "fetch_status": "TEXT DEFAULT 'PENDING'",
             "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-            "nvid" : "TEXT"
+            "nvid": "TEXT",
         },
     )
 

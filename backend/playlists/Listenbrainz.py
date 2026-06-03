@@ -140,114 +140,6 @@ def save_cf_to_db(db_username: str, mbids: list[dict], cf_last_updated: int) -> 
     return len(rows)
 
 
-def FetchCF():
-    console.print(
-        Panel.fit(
-            "[bold magenta]ListenBrainz CF Recommendation Fetcher[/bold magenta]",
-            subtitle="TuneLog · multi-user",
-            box=box.DOUBLE_EDGE,
-        )
-    )
-    inserted = 0 
-
-    usr_conn = get_db_connection_usr()
-    cursor = usr_conn.cursor()
-    cursor.execute(
-        "SELECT username, LB_token, LB_username FROM user WHERE LB_token IS NOT NULL AND LB_token != ''"
-    )
-    users = cursor.fetchall()
-    usr_conn.close()
-
-    if not users:
-        console.print(
-            "[yellow]⚠ No users with LB_token found in the database. Exiting.[/yellow]"
-        )
-        return
-
-    console.print(
-        f"[bold green]✓ Found {len(users)} user(s) with LB token[/bold green]\n"
-    )
-
-    summary = Table(title="Fetch Summary", box=box.SIMPLE_HEAVY, show_lines=True)
-    summary.add_column("DB User", style="cyan", no_wrap=True)
-    summary.add_column("LB User", style="magenta", no_wrap=True)
-    summary.add_column("Tracks Saved", style="green", justify="right")
-    summary.add_column("Status", style="bold")
-
-    for user in users:
-        db_username = user["username"]
-        raw_token = user["LB_token"]
-        stored_lb_un = user["LB_username"]
-
-        console.rule(f"[bold blue]User: {db_username}[/bold blue]")
-
-        console.print("  [dim]→ Decrypting token...[/dim]")
-        try:
-            decrypted = decrypt_token(raw_token)
-        except Exception as e:
-            console.print(f"  [red]✗ Token decryption failed: {e}[/red]")
-            summary.add_row(db_username, "—", "0", "[red]Decrypt failed[/red]")
-            continue
-
-        console.print("  [dim]→ Validating token + resolving LB username...[/dim]")
-        lb_username = resolve_lb_username(decrypted)
-
-        if not lb_username:
-            if stored_lb_un:
-                console.print(
-                    f"  [yellow]⚠ Falling back to stored LB_username: '{stored_lb_un}'[/yellow]"
-                )
-                lb_username = stored_lb_un
-            else:
-                console.print(
-                    f"  [red]✗ Could not determine LB username for '{db_username}'. Skipping.[/red]"
-                )
-                summary.add_row(db_username, "—", "0", "[red]No LB username[/red]")
-                continue
-
-        console.print(
-            f"  [green]✓ LB username resolved: [bold]{lb_username}[/bold][/green]"
-        )
-
-        console.print(
-            f"  [dim]→ Fetching CF recommendations for '{lb_username}'...[/dim]"
-        )
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TimeElapsedColumn(),
-            console=console,
-            transient=True,
-        ) as progress:
-            task = progress.add_task(f"  Fetching for {lb_username}...", total=None)
-            mbids, cf_last_updated = fetch_cf_recordings(lb_username, decrypted)
-            progress.update(task, completed=True)
-
-        if not mbids:
-            summary.add_row(db_username, lb_username, "0", "[yellow]No data[/yellow]")
-            continue
-
-        console.print(
-            f"  [dim]→ Saving {len(mbids)} tracks to LB_CF (db_user='{db_username}')...[/dim]"
-        )
-        saved = save_cf_to_db(db_username, mbids, cf_last_updated)
-        inserted = saved
-        console.print(
-            f"  [bold green]✓ Saved {saved} CF tracks for '{db_username}'[/bold green]"
-        )
-
-        summary.add_row(db_username, lb_username, str(saved), "[green]✓ OK[/green]")
-
-    console.print()
-    console.print(summary)
-    console.print(
-        Panel.fit("[bold green]CF fetch complete.[/bold green]", box=box.ROUNDED)
-    )
-    return inserted
-    
-
-
 def fillMusicBrainzDB():
     lib_conn = get_db_connection_lib()
     lib_cursor = lib_conn.cursor()
@@ -1023,3 +915,214 @@ def build_LB_CF_playlist(
     )
 
     return final_ids[:size], song_signals, new_heard_score, new_unheard_score
+
+
+
+
+def fetch_top_similar_user(lb_username: str, decrypted_token: str) -> str | None:
+    url = f"{LB_BASE}/1/user/{lb_username}/similar-users"
+    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+
+        if r.status_code == 200:
+            payload = r.json().get("payload", [])
+            if not payload:
+                console.print(
+                    f"  [yellow]⚠ No similar users found for '{lb_username}'[/yellow]"
+                )
+                return None
+
+            top = payload[0]
+            top_username = top.get("user_name")
+            top_similarity = top.get("similarity", 0.0)
+
+            console.print(
+                f"  [green]✓ Top similar user: [bold]{top_username}[/bold] "
+                f"[dim](similarity: {top_similarity:.2%})[/dim][/green]"
+            )
+            return top_username
+
+        elif r.status_code == 404:
+            console.print(
+                f"  [yellow]⚠ No similar users data for '{lb_username}' (404)[/yellow]"
+            )
+            return None
+        else:
+            console.print(
+                f"  [red]✗ similar-users returned HTTP {r.status_code}: "
+                f"{r.text[:200]}[/red]"
+            )
+            return None
+
+    except Exception as e:
+        console.print(f"  [red]✗ similar-users request failed: {e}[/red]")
+        return None
+
+
+def FetchCF():
+    console.print(
+        Panel.fit(
+            "[bold magenta]ListenBrainz CF Recommendation Fetcher[/bold magenta]",
+            subtitle="TuneLog · multi-user",
+            box=box.DOUBLE_EDGE,
+        )
+    )
+    inserted = 0
+
+    usr_conn = get_db_connection_usr()
+    cursor = usr_conn.cursor()
+    cursor.execute(
+        "SELECT username, LB_token, LB_username FROM user WHERE LB_token IS NOT NULL AND LB_token != ''"
+    )
+    users = cursor.fetchall()
+    usr_conn.close()
+
+    if not users:
+        console.print(
+            "[yellow]⚠ No users with LB_token found in the database. Exiting.[/yellow]"
+        )
+        return
+
+    console.print(
+        f"[bold green]✓ Found {len(users)} user(s) with LB token[/bold green]\n"
+    )
+
+    summary = Table(title="Fetch Summary", box=box.SIMPLE_HEAVY, show_lines=True)
+    summary.add_column("DB User", style="cyan", no_wrap=True)
+    summary.add_column("LB User", style="magenta", no_wrap=True)
+    summary.add_column("Similar User", style="yellow", no_wrap=True)
+    summary.add_column("Own CF Saved", style="green", justify="right")
+    summary.add_column("Similar CF Saved", style="bright_yellow", justify="right")
+    summary.add_column("Status", style="bold")
+
+    for user in users:
+        db_username = user["username"]
+        raw_token = user["LB_token"]
+        stored_lb_un = user["LB_username"]
+
+        console.rule(f"[bold blue]User: {db_username}[/bold blue]")
+
+        console.print("  [dim]→ Decrypting token...[/dim]")
+        try:
+            decrypted = decrypt_token(raw_token)
+        except Exception as e:
+            console.print(f"  [red]✗ Token decryption failed: {e}[/red]")
+            summary.add_row(db_username, "—", "—", "0", "0", "[red]Decrypt failed[/red]")
+            continue
+
+        console.print("  [dim]→ Validating token + resolving LB username...[/dim]")
+        lb_username = resolve_lb_username(decrypted)
+
+        if not lb_username:
+            if stored_lb_un:
+                console.print(
+                    f"  [yellow]⚠ Falling back to stored LB_username: '{stored_lb_un}'[/yellow]"
+                )
+                lb_username = stored_lb_un
+            else:
+                console.print(
+                    f"  [red]✗ Could not determine LB username for '{db_username}'. Skipping.[/red]"
+                )
+                summary.add_row(db_username, "—", "—", "0", "0", "[red]No LB username[/red]")
+                continue
+
+        console.print(
+            f"  [green]✓ LB username resolved: [bold]{lb_username}[/bold][/green]"
+        )
+
+        console.print(
+            f"  [dim]→ Fetching own CF recommendations for '{lb_username}'...[/dim]"
+        )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        ) as progress:
+            task = progress.add_task(f"  Fetching CF for {lb_username}...", total=None)
+            mbids, cf_last_updated = fetch_cf_recordings(lb_username, decrypted)
+            progress.update(task, completed=True)
+
+        own_saved = 0
+        if not mbids:
+            console.print(f"  [yellow]⚠ No own CF data for '{lb_username}'[/yellow]")
+        else:
+            console.print(
+                f"  [dim]→ Saving {len(mbids)} own CF tracks (db_user='{db_username}')...[/dim]"
+            )
+            own_saved = save_cf_to_db(db_username, mbids, cf_last_updated)
+            console.print(
+                f"  [bold green]✓ Saved {own_saved} own CF tracks for '{db_username}'[/bold green]"
+            )
+
+        console.print(
+            f"  [dim]→ Fetching top similar user for '{lb_username}'...[/dim]"
+        )
+        similar_username = fetch_top_similar_user(lb_username, decrypted)
+        similar_saved = 0
+
+        if not similar_username:
+            console.print(
+                f"  [yellow]⚠ No similar user found for '{lb_username}', skipping similar CF.[/yellow]"
+            )
+            summary.add_row(
+                db_username, lb_username, "—",
+                str(own_saved), "0",
+                "[green]✓ Own only[/green]" if own_saved else "[yellow]No data[/yellow]"
+            )
+            inserted = own_saved
+            continue
+
+        console.print(
+            f"  [dim]→ Fetching CF for similar user '{similar_username}'...[/dim]"
+        )
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        ) as progress:
+            task = progress.add_task(
+                f"  Fetching CF for {similar_username}...", total=None
+            )
+            sim_mbids, sim_cf_last_updated = fetch_cf_recordings(similar_username, decrypted)
+            progress.update(task, completed=True)
+
+        if not sim_mbids:
+            console.print(
+                f"  [yellow]⚠ No CF data for similar user '{similar_username}'[/yellow]"
+            )
+        else:
+            sim_db_key = f"{db_username}__sim__{similar_username}"
+            console.print(
+                f"  [dim]→ Saving {len(sim_mbids)} similar-user CF tracks "
+                f"(key='{sim_db_key}')...[/dim]"
+            )
+            similar_saved = save_cf_to_db(sim_db_key, sim_mbids, sim_cf_last_updated)
+            console.print(
+                f"  [bold bright_yellow]✓ Saved {similar_saved} similar-user CF tracks "
+                f"for '{similar_username}'[/bold bright_yellow]"
+            )
+
+        inserted = own_saved + similar_saved
+        summary.add_row(
+            db_username,
+            lb_username,
+            similar_username,
+            str(own_saved),
+            str(similar_saved),
+            "[green]✓ OK[/green]",
+        )
+
+    console.print()
+    console.print(summary)
+    console.print(
+        Panel.fit("[bold green]CF fetch complete.[/bold green]", box=box.ROUNDED)
+    )
+    return inserted

@@ -1187,3 +1187,26 @@ export async function fetchLBLibraryRecommendations(): Promise<LBLibraryResponse
     };
   return res.json();
 }
+
+export interface SkippedSong {
+  id: number;
+  song_id: string | null;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  duration: number | null;
+  signal: string | null;
+  genre: string | null;
+  timestamp: string;
+  user_id: string | null;
+}
+
+export async function getSkippedSongs(): Promise<SkippedSong[]> {
+  const res = await fetch(`${BASE_URL}/api/listens/skipped`);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch skipped songs: ${res.status} ${res.statusText}`,
+    );
+  }
+  return res.json() as Promise<SkippedSong[]>;
+}

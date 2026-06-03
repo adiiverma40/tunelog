@@ -75,9 +75,21 @@ from core.main import generate_listenbrainz_playlist, Auto_LB_CF
 import time
 import threading
 
+import uuid
+import asyncio
+from datetime import datetime, timezone
+from jam import (
+    sendSongPayload,
+    AddQueue,
+    currentQueue,
+    ClearQueue,
+    future_queue_ids,
+    past_queue_ids,
+)
 from core.crypto import encrypt_token
 
-str
+from core.db import DB_PATH_MB
+
 
 
 load_dotenv()
@@ -1390,17 +1402,6 @@ def getListenbrainz():
 # ========================================================
 
 
-import uuid
-import asyncio
-from datetime import datetime, timezone
-from jam import (
-    sendSongPayload,
-    AddQueue,
-    currentQueue,
-    ClearQueue,
-    future_queue_ids,
-    past_queue_ids,
-)
 
 HOST_RECONNECT_GRACE = 20
 host_reconnect_task = None
@@ -2100,8 +2101,6 @@ async def set_lb_token(payload: SetTokenRequest):
         return {"status": "error", "reason": str(e)}
 
 
-from core.db import DB_PATH_MB
-
 
 @app.get("/api/lb-cf/library")
 async def fetch_lb_library_recommendations():
@@ -2161,5 +2160,22 @@ async def fetch_lb_library_recommendations():
             "status": "error",
             "in_library": [],
             "not_in_library": [],
+            "reason": f"Database error: {str(e)}",
+        }
+
+@app.get("/api/listens/skipped")
+def get_skipped_songs():
+    print("Requesting skipped songs ")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM listens WHERE signal = 'skip' ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        print(f"Returning {len(rows)} skipped songs")
+        return rows
+    except Exception as e:
+        return {
+            "status": "error",
             "reason": f"Database error: {str(e)}",
         }

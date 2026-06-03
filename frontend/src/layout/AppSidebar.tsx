@@ -63,6 +63,7 @@ const navItems: NavItem[] = [
       { name: "Sync", path: "/librarySync" },
       {name : "Listenbrainz CF" , path : "/library/listenbrainz"},
       { name: "Import", path: "/import" },
+      { name: "Skipped Song", path: "/library/skipped" },
     ],
   },
 

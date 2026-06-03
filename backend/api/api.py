@@ -2165,14 +2165,14 @@ async def fetch_lb_library_recommendations():
 
 @app.get("/api/listens/skipped")
 def get_skipped_songs():
-    print("Requesting skipped songs ")
+    # print("Requesting skipped songs ")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM listens WHERE signal = 'skip' ORDER BY timestamp DESC")
         rows = cursor.fetchall()
         conn.close()
-        print(f"Returning {len(rows)} skipped songs")
+        # print(f"Returning {len(rows)} skipped songs")
         return rows
     except Exception as e:
         return {

@@ -31,7 +31,7 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm  # Native ARM64 runner — no QEMU
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
@@ -123,23 +123,21 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
 
       - name: Create and push multi-platform manifest
-        id: merge
         working-directory: /tmp/digests/backend
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}@sha256:%s ' *)
 
-      - name: Inspect image
+      - name: Inspect and sign the published Docker image
         run: |
-          docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          DIGEST=$(docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+            --format '{{.Manifest.Digest}}')
 
-      - name: Sign the published Docker image
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.merge.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+          echo "Signing with digest: $DIGEST"
+
+          echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${DIGEST}
 
   build-frontend:
     runs-on: ${{ matrix.runner }}
@@ -156,7 +154,7 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm  # Native ARM64 runner — no QEMU
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
@@ -248,20 +246,18 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
 
       - name: Create and push multi-platform manifest
-        id: merge
         working-directory: /tmp/digests/frontend
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}@sha256:%s ' *)
 
-      - name: Inspect image
+      - name: Inspect and sign the published Docker image
         run: |
-          docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          DIGEST=$(docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
+            --format '{{.Manifest.Digest}}')
 
-      - name: Sign the published Docker image
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.merge.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+          echo "Signing with digest: $DIGEST"
+
+          echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${DIGEST}

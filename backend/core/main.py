@@ -1,63 +1,64 @@
+import os
 import sys
-import requests
 import threading
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from rich.console import Console
-from navidrome.state import status_registry
-from .config import build_url, event_queue
+
+import metadata.library as library
+import requests
+import uvicorn
 from core.db import (
     get_db_connection,
+    get_db_connection_lib,
     init_db,
     init_db_lib,
-    init_db_usr,
+    init_db_MB,
     init_db_playlist,
+    init_db_usr,
     init_search_db,
-    get_db_connection_lib,
     # migrate_playlist_ids
     migrate_playlist_primary_key,
-    init_db_MB,
-)
-from metadata.itunesFuzzy import useFallBackMethods
-import metadata.library as library
-from metadata.library import normalise_genre, normalise_artist, sync_library
-from navidrome.watcher import start_sse
-from misc.misc import push_star
-import uvicorn
-from navidrome.state import (
-    notification_status,
-    tune_config,
-    save_config,
-    automation_config,
-    save_automation_config,
 )
 from dotenv import load_dotenv
-import os
-
-from playlists.playlist import (
-    getDataFromDb,
-    score_song,
-    get_unheard_songs,
-    get_wildcard_songs,
-    build_playlist,
-    push_playlist,
-    resolve_date_window,
-    get_translation_maps,
-    readJSON,
-    get_discovery_pool,
-    build_discovery_playlist,
+from metadata.itunesFuzzy import useFallBackMethods
+from metadata.library import normalise_artist, normalise_genre, sync_library
+from misc.misc import push_star
+from navidrome.state import (
+    automation_config,
+    notification_status,
+    save_automation_config,
+    save_config,
+    status_registry,
+    tune_config,
 )
-from scrobble.listenBrainz import fuzzyMatchingSong
+from navidrome.watcher import start_sse
 from playlists.Listenbrainz import (
     FetchCF,
-    fillMusicBrainzDB,
+    build_LB_CF_playlist,
     fetchPendingSongs,
+    fillMusicBrainzDB,
+    filter_pool_by_genre,
     match_and_update_nvid,
     retryFailedSongs,
-    filter_pool_by_genre,
-    build_LB_CF_playlist,
 )
+from playlists.playlist import (
+    build_discovery_playlist,
+    build_playlist,
+    get_discovery_pool,
+    get_translation_maps,
+    get_unheard_songs,
+    get_wildcard_songs,
+    getDataFromDb,
+    push_playlist,
+    readJSON,
+    resolve_date_window,
+    score_song,
+)
+from rich.console import Console
+from scrobble.listenBrainz import fuzzyMatchingSong
+
+from .config import build_url, event_queue
 
 load_dotenv()
 console = Console()
@@ -167,8 +168,8 @@ def signal_system(percent_played, song_id, user_id):
 
         cursor.execute(
             """
-            SELECT COUNT(*) FROM listens 
-            WHERE song_id = ? AND user_id = ? 
+            SELECT COUNT(*) FROM listens
+            WHERE song_id = ? AND user_id = ?
             AND signal IN ('positive', 'repeat')
             AND timestamp > datetime('now', '-{window} minutes')
         """,
@@ -364,9 +365,9 @@ def _update_entry(
     cursor = conn.cursor()
 
     base_where_clause = """
-        WHERE COALESCE(title, '') = ? 
+        WHERE COALESCE(title, '') = ?
           AND COALESCE(artist, '') = ?
-          AND tag = 'unmatched' 
+          AND tag = 'unmatched'
           AND (comment IS NULL OR comment = '')
     """
 
@@ -390,8 +391,8 @@ def _update_entry(
     else:
         cursor.execute(
             f"""
-            UPDATE listenbrainz 
-            SET    tag = ?, comment = ? 
+            UPDATE listenbrainz
+            SET    tag = ?, comment = ?
             {base_where_clause}
             """,
             (tag, comment, raw_title, raw_artist),
@@ -655,10 +656,11 @@ def main():
 
     with console.status("[dim]Starting API and proxy...[/dim]"):
         try:
+            # print("api router")
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
-                args=("api.api:socket_app",),
-                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "warning"},
+                args=("api.api_entry:socket_app",),
+                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "debug"},
                 daemon=True,
             )
             ProxyThread = threading.Thread(

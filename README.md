@@ -22,8 +22,10 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 
 
 ### Note 
-> If there is any error, try copy pasting the config.json from github to your local file
+- If there is any error, try copy pasting the config.json from github to your local file
+- If Fast Library sync is taking too long, that will likely due to lyrics plugins, try turning off Lyrics Plugin in navidrome and runing the sync again Or change the lyrics priorty to emmbedded or .lrc
 
+  
 ## Features
 
 - Personalized playlist generation from listening history

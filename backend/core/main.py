@@ -66,6 +66,11 @@ active = {}
 
 CURRENT_VERSION = "0.001"
 
+def format_ms(ms):
+    total_seconds = ms // 1000
+    minutes, seconds = divmod(total_seconds, 60)
+    return f"{minutes} min {seconds} sec"
+
 
 def navidrome_url(endpoint):
     url = build_url(endpoint)
@@ -73,85 +78,95 @@ def navidrome_url(endpoint):
     return response.json()
 
 
+
+# 
+#
+# TWO  SEPERATE WORK CODE
+# 1. FOR NORMAL PLAY PAUSE AND SKIP
+# 2. FOR PAUSE SPECIFALLY, 
+# 
+# my plan is to use time.time to calculate play duration for a song undernormal condition
+# if state is pause then rely on postionMs instead of time.time
+# why? to counter condition where user has paused a song
+#  
+
+
+
+
+def make_entry(entry, positionMs):
+    return {
+        "song_id":      entry["id"],
+        "user_id":      entry["username"],
+        "title":        entry.get("title", ""),
+        "album":        entry.get("album", ""),
+        "artist":       normalise_artist(entry.get("artist", "")),
+        "genre":        normalise_genre(entry.get("genre")),
+        "duration":     entry["duration"],
+        "positionMs":   positionMs,
+        "state":        entry["state"],
+        "playbackRate": 1,
+        "actualPlay":   time.monotonic() - (positionMs / 1000),
+    }
+
+
 def Watcher():
     url_response = navidrome_url("getNowPlaying")
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
 
-    now = time.time()
-    timeout = tune_config["behavioral_scoring"]["stale_session_timeout_sec"]
-    for user_id in list(active.keys()):
-        if now - active[user_id]["last_seen"] > timeout:
-            console.print(
-                f"[blue][STALE] {user_id} flushed: {active[user_id]['title']}"
-            )
-            log_history(active.pop(user_id))
-
-    if not entries:
-        for user_id in list(active.keys()):
-            active[user_id]["actual_played"] += now - active[user_id]["last_seen"]
-            active[user_id]["last_seen"] = now
-            log_history(active.pop(user_id))
-            console.print(f"[bold red][STOP] {user_id} stopped")
-            notification_status.songState.append(
-                {"username": user_id, "song": "", "state": "stopped"}
-            )
-        return
-
-    latest = {}
     for entry in entries:
-        user_id = entry["username"]
-        if user_id not in latest or entry["minutesAgo"] < latest[user_id]["minutesAgo"]:
-            latest[user_id] = entry
-    entries = list(latest.values())
+        user_id     = entry["username"]
+        song_id     = entry["id"]
+        state       = entry["state"]
+        positionMs  = entry["positionMs"]
 
-    for entry in entries:
-        user_id = entry["username"]
-        song_id = entry["id"]
-
-        if user_id in active and active[user_id]["song_id"] == song_id:
-            active[user_id]["actual_played"] += now - active[user_id]["last_seen"]
-            active[user_id]["last_seen"] = now
+        if user_id not in active:
+            active[user_id] = make_entry(entry, positionMs)
             console.print(
-                f"[bold blue][SAME] {user_id} still playing: {active[user_id]['title']} | played: {round(active[user_id]['actual_played'])}s"
+                f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
+                f"[purple]Started: {entry['title']}[/purple] at "
+                f"[bold green]{format_ms(positionMs)}[/bold green] "
+                f"[bold red][STATE]: {state}"
             )
 
-            notification_status.songState.append(
-                {"username": user_id, "song": active[user_id]["title"], "state": "same"}
+        elif song_id == active[user_id]["song_id"]:
+            prev_state = active[user_id]["state"]
+            active[user_id]["positionMs"] = positionMs
+            active[user_id]["state"]      = state
+
+            if state != "paused":
+                active[user_id]["actualPlay"] = time.monotonic() - (positionMs / 1000)
+
+            if prev_state == "paused" and state != "paused":
+                active[user_id]["actualPlay"] = time.monotonic() - (positionMs / 1000)
+
+            console.print(
+                f"[bold blue][SAME][/bold blue] [green]{user_id}[/green] "
+                f"[purple]playing: {entry['title']}[/purple] at "
+                f"[bold green]{format_ms(positionMs)}[/bold green] "
+                f"[bold red][STATE]: {state}"
             )
 
         else:
-            if user_id in active:
-                active[user_id]["actual_played"] += now - active[user_id]["last_seen"]
-                log_history(active.pop(user_id))
-
-            active[user_id] = {
-                "song_id": song_id,
-                "user_id": user_id,
-                "title": entry.get("title", ""),
-                "album": entry.get("album", ""),
-                "artist": normalise_artist(entry.get("artist", "")),
-                "genre": normalise_genre(entry.get("genre")),
-                "duration": entry["duration"],
-                "actual_played": 0,
-                "last_seen": now,
-            }
-            console.print(f"[bold blue][NEW] {user_id} started: {entry['title']}")
-            notification_status.songState.append(
-                {"username": user_id, "song": entry["title"], "state": "started"}
+            log_history(active.pop(user_id))
+            active[user_id] = make_entry(entry, positionMs)
+            console.print(
+                f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
+                f"[purple]Started: {entry['title']}[/purple] at "
+                f"[bold green]{format_ms(positionMs)}[/bold green] "
+                f"[bold red][STATE]: {state}"
             )
-            # print(notification_status.songState)
 
     current_users = {entry["username"] for entry in entries}
     for user_id in list(active.keys()):
         if user_id not in current_users:
-            active[user_id]["actual_played"] += now - active[user_id]["last_seen"]
-            log_history(active.pop(user_id))
+            stopped_entry = active.pop(user_id)
+            log_history(stopped_entry)
             notification_status.songState.append(
-                {"username": user_id, "song": entry["title"], "state": "stopped"}
+                {"username": user_id, "song": stopped_entry["title"], "state": "stopped"}
             )
             console.print(f"[bold red][STOP] {user_id} stopped")
 
-
+            
 def signal_system(percent_played, song_id, user_id):
     scoring = tune_config["behavioral_scoring"]
     if percent_played <= scoring["skip_threshold_pct"]:
@@ -184,117 +199,41 @@ def signal_system(percent_played, song_id, user_id):
 
     return base
 
-
 def log_history(song):
-    played = min(song["actual_played"], song["duration"])
+    actual  = song["actualPlay"]
+    current = time.monotonic()
+    played  = min(current - actual, song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
     signal = signal_system(percent_played, song["song_id"], song["user_id"])
-
-    behavioralScoring = tune_config["behavioral_scoring"]
-    long_song = behavioralScoring["long_song_duration"]
-
+    console.print(
+        f"[bold blue] {song['user_id']} [/bold blue] Listened  [red]: [/red] [green] {song['title']} [/green]  [red]: [/red] "
+        f"[purple]{format_ms(played * 1000)} [red] :  [/red]{percent_played} % [red] : [/red] {signal} "
+    )
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    if song["duration"] >= long_song:
-        console.print("[bold red]Long song detected — merging listen history.")
-
-        window_count = max(1, round(song["duration"] / long_song))
-
-        prior_rows = cursor.execute(
-            """
-            SELECT id, played, signal FROM listens
-            WHERE song_id = ? AND user_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (song["song_id"], song["user_id"], window_count),
-        ).fetchall()
-
-        prior_ids = [row[0] for row in prior_rows]
-        prior_played_total = sum(row[1] for row in prior_rows)
-        most_recent_prior_signal = prior_rows[0][2] if prior_rows else None
-
-        combined_played = prior_played_total + played
-        combined_played = min(combined_played, song["duration"])
-        combined_percent = min(round((combined_played / song["duration"]) * 100), 100)
-
-        scoring = tune_config["behavioral_scoring"]
-        if combined_percent <= scoring["skip_threshold_pct"]:
-            merged_signal = "skip"
-        elif combined_percent < scoring["positive_threshold_pct"]:
-            merged_signal = "partial"
-        else:
-            merged_signal = "positive"
-        if (
-            prior_rows
-            and most_recent_prior_signal != "skip"
-            and merged_signal == "positive"
-        ):
-            merged_signal = "repeat"
-
-        if prior_ids:
-            placeholders = ",".join("?" * len(prior_ids))
-            cursor.execute(
-                f"DELETE FROM listens WHERE id IN ({placeholders})", prior_ids
-            )
-            console.print(f"[yellow]Deleted {len(prior_ids)} prior row(s) for merge.")
-
-        cursor.execute(
-            """
-            INSERT INTO listens(
-                song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
-            )
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            """,
-            (
-                song["song_id"],
-                song["title"],
-                song["artist"],
-                song["album"],
-                song["genre"],
-                song["duration"],
-                combined_played,
-                combined_percent,
-                merged_signal,
-                song["user_id"],
-            ),
+    cursor.execute(
+        """
+        INSERT INTO listens(
+            song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
         )
-
-        console.print(
-            f"[green]Merged row inserted — played: {combined_played}s ({combined_percent}%), signal: {merged_signal}"
-        )
-
-        conn.commit()
-        conn.close()
-        push_star(song, merged_signal)
-
-    else:
-        cursor.execute(
-            """
-            INSERT INTO listens(
-                song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
-            )
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            """,
-            (
-                song["song_id"],
-                song["title"],
-                song["artist"],
-                song["album"],
-                song["genre"],
-                song["duration"],
-                played,
-                percent_played,
-                signal,
-                song["user_id"],
-            ),
-        )
-
-        conn.commit()
-        conn.close()
-        push_star(song, signal)
-
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            song["song_id"],
+            song["title"],
+            song["artist"],
+            song["album"],
+            song["genre"],
+            song["duration"],
+            played,
+            percent_played,
+            signal,
+            song["user_id"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+    push_star(song, signal)
 
 def autoSyncWithFallback():
     console.print("[bold yellow] Starting auto sync...")
@@ -705,6 +644,7 @@ def main():
             watcherThread = threading.Thread(target=start_sse, daemon=True)
             watcherThread.start()
             time.sleep(2.0)
+            Watcher()
 
             if not watcherThread.is_alive():
                 status_registry.update(
@@ -726,6 +666,10 @@ def main():
     isGenerated = False
     is_lb_syncing = False
     last_lb_sync_timestamp = None
+
+    console.print("[bold blue] Starting Library Sync")
+    syncThread = threading.Thread(target=library.sync_library, daemon=True)
+    syncThread.start()
 
     while True:
 

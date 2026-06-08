@@ -7,11 +7,40 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - Some part in debuggin and some assistance in building frontend like `socketio`
 - Assistance in some of the `research` like which python module to use and stuff
 - `Playlist` Page was re written using claude ai
+## Updates
 
-## UPDATE: 
-- Added Skipped song in library page of the dashboard
-- Collabrative Recommendation from the top similar user on listenbrainz
-- LISTENBRAINZ COLLABRATIVE FILTTERING - using Listenbrainz recommendation to create a playlist with the song that is in your library read [Listenbrainz wiki](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration) for more details
+###  Navidrome 0.62.0 Playback Reporting Support
+
+Navidrome `0.62.0` introduced the `playbackReport` API, which provides more accurate playback state reporting from clients.
+
+TuneLog now supports this new reporting mechanism, resulting in significantly improved tracking of:
+
+* Full plays
+* Partial plays
+* Skips
+* Repeats
+
+> **Recommended:** Update your Navidrome client to a version that supports `playbackReport` for the most accurate listening statistics and recommendations.
+
+---
+
+### New Features
+
+####  Skipped Songs Tracking
+
+A new **Skipped Songs** section has been added to the Library dashboard, making it easier to review songs that are frequently skipped.
+
+####  Similar User Recommendations
+
+TuneLog can now generate collaborative recommendations using listening data from the most similar users on ListenBrainz.
+
+####  ListenBrainz Collaborative Filtering Integration
+
+TuneLog now supports **ListenBrainz Collaborative Filtering (CF)** recommendations.
+
+This feature uses ListenBrainz recommendation data and matches it against songs already available in your library to automatically generate personalized playlists.
+
+For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
 
 ### Wiki: 
 - [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks

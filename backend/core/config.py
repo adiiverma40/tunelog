@@ -1,25 +1,15 @@
-# config file, use for creating url
-# API CALL
-
-# TODO : idk how but implement a dynamic users list, i have 3 users i can add it mannualy,
-# to implement dynamic users we will get data from web ui and put it in database, already done, after that we will pull infro from database to make it dynamic
 
 
-# if someone is reviewing this, add a way to implement multiple users
-
-# implement Itunes API search for the songs and write the metadata, add columns for explict content
-# uses best match from api, using artist name as a refrance, if no artist name, fall back to 1st result
-
-
-from dotenv import load_dotenv
 import os
-from urllib.parse import urlencode
-import requests
 import re
-from queue import Queue
 from pathlib import Path
-from core.db import get_db_connection_usr, db_supervisor
+from queue import Queue
 from time import sleep
+from urllib.parse import urlencode
+
+import requests
+from core.db import db_supervisor, get_db_connection_usr
+from dotenv import load_dotenv
 from rich.console import Console
 
 console = Console()
@@ -47,6 +37,26 @@ def getAllUser():
     }
 
     return USER_CREDENTIALS
+
+
+
+def getJWT(admin_username, admin_password):
+    try:
+        res = requests.post(
+            f"{Navidrome_url}/auth/login",
+            json={"username": admin_username, "password": admin_password},
+            timeout=5,
+        )
+        if res.status_code == 200:
+            return res.json().get("token")
+        return None
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        console.log("[yellow]Warning: Navidrome is currently unreachable.[/yellow]")
+        return None
+    except Exception as e:
+        console.log(f"[red]API Error (getJWT):[/red] {e}")
+        return None
+
 
 
 # default url to pull data from api

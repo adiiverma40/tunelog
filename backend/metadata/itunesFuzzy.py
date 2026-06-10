@@ -5,7 +5,6 @@ import requests
 import re
 import time
 import urllib.parse
-import json
 
 from core.db import get_db_connection_lib
 from navidrome.state import app_state

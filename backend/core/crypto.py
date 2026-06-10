@@ -1,8 +1,6 @@
 import os
-from dotenv import load_dotenv
 from cryptography.fernet import Fernet
-
-
+from dotenv import load_dotenv
 
 load_dotenv()
 MASTER_KEY = os.getenv("MASTER_KEY")
@@ -26,5 +24,3 @@ def decrypt_token(encrypted_token: str) -> str:
     encrypted_bytes = encrypted_token.encode("utf-8")
     decrypted_bytes = cipher_suite.decrypt(encrypted_bytes)
     return decrypted_bytes.decode("utf-8")
-
-

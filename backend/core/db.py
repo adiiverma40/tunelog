@@ -159,71 +159,6 @@ def init_db():
     conn.close()
 
 
-# def init_db_lib():
-#     conn = get_db_connection_lib()
-#     cursor = conn.cursor()
-#     cursor.execute("PRAGMA journal_mode=WAL;")
-
-#     cursor.execute("""
-#         CREATE TABLE IF NOT EXISTS library (
-#             song_id     TEXT PRIMARY KEY,
-#             title       TEXT,
-#             artist      TEXT,
-#             artistId    TEXT,
-#             artistJSON  TEXT,
-#             album       TEXT,
-#             albumId     TEXT,
-#             genre       TEXT,
-#             duration    INTEGER,
-#             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-#             created     TIMESTAMP,
-#             explicit    TEXT
-#         )
-#     """)
-#     cursor.execute("""
-#         CREATE TABLE IF NOT EXISTS LB_CF (
-#             recording_mbid   TEXT PRIMARY KEY,
-#             username        TEXT,
-#             score            REAL,
-#             cf_last_updated  INTEGER,
-#             fetched_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-#             latest_listened_at    TEXT
-#         )
-#     """)
-
-#     _ensure_columns(
-#         cursor,
-#         "library",
-#         {
-#             "song_id": "TEXT PRIMARY KEY",
-#             "title": "TEXT",
-#             "artist": "TEXT",
-#             "artistId": "TEXT",
-#             "artistJSON": "TEXT",
-#             "album": "TEXT",
-#             "albumId": "TEXT",
-#             "genre": "TEXT",
-#             "duration": "INTEGER",
-#             "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-#             "created": "TIMESTAMP",
-#             "explicit": "TEXT",
-#         },
-#     )
-#     _ensure_columns(
-#         cursor,
-#         "LB_CF",
-#         {
-#             "recording_mbid": "TEXT PRIMARY KEY",
-#             "username" : "Text" ,
-#             "score": "REAL",
-#             "cf_last_updated": "INTEGER",
-#             "fetched_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-#             "latest_listened_at":"TEXT"
-#         },
-#     )
-#     conn.commit()
-#     conn.close()
-
 
 def init_db_lib():
     conn = get_db_connection_lib()
@@ -243,7 +178,8 @@ def init_db_lib():
             duration    INTEGER,
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created     TIMESTAMP,
-            explicit    TEXT
+            explicit    TEXT,
+            path        TEXT
         )
     """)
 
@@ -275,6 +211,7 @@ def init_db_lib():
             "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
             "created": "TIMESTAMP",
             "explicit": "TEXT",
+            "path" : "TEXT"
         },
     )
     _ensure_columns(

@@ -1,52 +1,11 @@
-# this will be used to normalise the noisy genre data to a less noisy for better genre  injection in playlist
-
-# Idea is to make user play match the following, hindi ost -> | -> bollywood
-#
-# to do that i m gonna use json to store it in /data folder
-
-
-# use fuzzy matching to outmatically change genre of the highest matching genre
-
-# ISSUES : IDK how to discribe, when fuzzy matching punjabi and punjabi pop both matches punjabi and pop with high fuzz  score creating this
-# tunelog-backend   | Request recived to read data from json
-# tunelog-backend   | File missing or corrupted. Resetting to default...
-# tunelog-backend   | Request recived to read data from json
-# tunelog-backend   | writng
-# tunelog-backend   | writng
-# tunelog-backend   | writng
-# tunelog-backend   | Starting bulk update for : 1 Genre
-# tunelog-backend   | [('pop', 'punjabi')]
-# tunelog-backend   | writng
-# tunelog-backend   | Starting bulk update for : 1 Genre
-# tunelog-backend   | [('pop', 'punjabi')]
-# tunelog-backend   | writng
-# tunelog-backend   | Starting bulk update for : 1 Genre
-# tunelog-backend   | [('pop', 'punjabi')]
-# tunelog-backend   | writng
-# tunelog-backend   | Starting bulk update for : 1 Genre
-# tunelog-backend   | [('pop', 'punjabi')]
-# tunelog-backend   | writng
-# tunelog-backend   | writng
-# tunelog-backend   | writng
-
-# fix: stop looking if exact match or fuzzy score = 100
-
-
-# data = {
-#     "Bollywood": ["Hindi OST", "Hindi", "Bollywood Pop"],
-#     "Hip-Hop": ["Rap", "RnB"],
-#     "Unmapped": ["Bhangra", "Indie Rock"],
-# }
 
 
 import json
-from rapidfuzz import fuzz
+from core.db import db_supervisor, get_db_connection, get_db_connection_lib
 from misc.misc import UpdateDBgenre
-from core.db import get_db_connection, get_db_connection_lib, db_supervisor
+from navidrome.state import status_registry, tune_config
+from rapidfuzz import fuzz
 from rich.console import Console
-
-# from config import status_registry
-from navidrome.state import status_registry , tune_config
 
 console = Console()
 
@@ -218,9 +177,9 @@ def autoGenre(data=None):
 
             if best_score == 100:
                 break
-        
+
         strictness = tune_config["api_and_performance"]["sync_confidence"]["genre_map_strictness"]
-        
+
         if best_match and best_score >= strictness:
             console.print(
                 f"[cyan]Auto-Mapping:[/cyan] {genre1} → {best_match} ({best_score}%)"

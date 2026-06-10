@@ -1,10 +1,11 @@
-import time
-import threading
 import asyncio
 import json
-from rich.console import Console
 import os
+import threading
+import time
 from typing import Tuple
+
+from rich.console import Console
 
 console = Console()
 
@@ -86,6 +87,7 @@ app_state = SyncState()
 CONFIG_DIR = "./config"
 CONFIG_FILE_PATH = f"{CONFIG_DIR}/config.json"
 AUTOMATION_CONFIG_FILE_PATH = f"{CONFIG_DIR}/Automation_config.json"
+SKIPPED_CONFIG_FILE_PATH = f"{CONFIG_DIR}/Skip_config.json"
 
 DEFAULT_CONFIG = {
     "playlist_generation": {
@@ -175,6 +177,12 @@ DEFAULT_AUTO_CONFIG = {
     },
 }
 
+DEFAULT_SKIP_CONFIG = {
+    "base_path" : "",
+    "type" : "",
+    "action" : "move"
+}
+
 config_lock = threading.Lock()
 
 
@@ -257,6 +265,7 @@ tune_config = load_generic_config(CONFIG_FILE_PATH, DEFAULT_CONFIG)
 automation_config = load_generic_config(
     AUTOMATION_CONFIG_FILE_PATH, DEFAULT_AUTO_CONFIG
 )
+skip_config = load_generic_config(SKIPPED_CONFIG_FILE_PATH , DEFAULT_SKIP_CONFIG)
 
 
 def save_config(new_config_data: dict) -> Tuple[bool, str]:
@@ -274,3 +283,7 @@ def save_automation_config(new_config_data: dict) -> Tuple[bool, str]:
         automation_config,
         "Automation Configuration",
     )
+
+def save_skip_config(newconfigdata : dict  ) -> Tuple[bool , str] :
+    global skip_config
+    return save_generic_config(SKIPPED_CONFIG_FILE_PATH , newconfigdata , skip_config , "skipConfig")

@@ -1201,12 +1201,112 @@ export interface SkippedSong {
   user_id: string | null;
 }
 
+
+export type ShellType = "bash" | "mac" | "powershell";
+export type ScriptAction = "delete" | "move";
+
+export interface SkippedSong {
+  id: number;
+  song_id: string | null;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  duration: number | null;
+  genre: string | null;
+  skip_count: number | null;
+  timestamp: string;
+  user_id: string | null;
+}
+
+export interface RecommendedSong {
+  song_id: string | null;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  reason: string | null;
+  skip_count: number | null;
+}
+
+export interface GenerateScriptRequest {
+  song_ids: string[];
+  shell: ShellType;
+  base_path: string;
+  action: ScriptAction;
+}
+
+export interface GenerateScriptResponse {
+  script: string;
+}
+
 export async function getSkippedSongs(): Promise<SkippedSong[]> {
-  const res = await fetch(`${BASE_URL}/api/listens/skipped`);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch skipped songs: ${res.status} ${res.statusText}`,
-    );
-  }
+  const res = await fetch(`${BASE_URL}/api/listens/skipped`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok)
+    throw new Error(`Failed to fetch skipped songs: ${res.status} ${res.statusText}`);
   return res.json() as Promise<SkippedSong[]>;
+}
+
+
+export async function getRecommendedDeletes(): Promise<RecommendedSong[]> {
+  const res = await fetch(`${BASE_URL}/api/library/recommend-delete`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok)
+    throw new Error(`Failed to fetch recommendations: ${res.status} ${res.statusText}`);
+  return res.json() as Promise<RecommendedSong[]>;
+}
+
+export async function generateScript(
+  req: GenerateScriptRequest,
+): Promise<GenerateScriptResponse> {
+  const res = await fetch(`${BASE_URL}/api/library/generate-script`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok)
+    throw new Error(`Failed to generate script: ${res.status} ${res.statusText}`);
+  return res.json() as Promise<GenerateScriptResponse>;
+}
+
+
+export interface SkippedSettings {
+  shell: ShellType;
+  basePath: string;
+  action: ScriptAction;
+}
+
+export async function getScriptSettings(): Promise<SkippedSettings | null> {
+  const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch script settings: ${res.status} ${res.statusText}`);
+  }
+  
+  return res.json() as Promise<SkippedSettings>;
+}
+
+export async function saveScriptSettings(settings: SkippedSettings): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
+    method: "PUT", 
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to save script settings: ${res.status} ${res.statusText}`);
+  }
 }

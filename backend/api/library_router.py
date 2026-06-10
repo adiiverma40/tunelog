@@ -1,17 +1,20 @@
 import os
 import re
 import shutil
+import string
 import tempfile
 from threading import Thread
 
+from misc.bashScript import moveBashScript
 import metadata.library as library
 from core.db import get_db_connection_lib
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from metadata.genre import DeleteDataJson, autoGenre, readJson, writeJson
 from metadata.itunesFuzzy import useFallBackMethods
+from core.db import get_db_connection
 
 # from rich.console import Console
-from navidrome.state import app_state
+from navidrome.state import app_state, save_skip_config, skip_config
 from playlists.importPlaylist import fuzzymatching
 from pydantic import BaseModel
 from rich.console import Console
@@ -27,6 +30,13 @@ VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
 class UpdateMarkingPayload(BaseModel):
     song_id: str
     explicit: str
+
+class generateScriptPayload(BaseModel):
+      song_ids: list[str]
+      shell: str
+      base_path: str
+      action: str
+    
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -303,3 +313,96 @@ async def import_csv(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+# =========================================
+#       skipped songs api
+# ===================================
+
+
+@router.get("/api/listens/skipped")
+def get_skipped_songs():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        #  CLEARLY THIS SQL QUERY WAS WRITTEN BY AI
+        query = """
+            SELECT
+                MAX(id) AS id,
+                song_id,
+                title,
+                artist,
+                album,
+                duration,
+                genre,
+                COUNT(*) AS skip_count,
+                MAX(timestamp) AS timestamp,
+                MAX(user_id) AS user_id
+            FROM listens
+            WHERE signal = 'skip'
+            GROUP BY song_id
+            ORDER BY skip_count DESC
+        """
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+        if rows and isinstance(rows[0], tuple):
+            columns = [column[0] for column in cursor.description]
+            result = [dict(zip(columns, row)) for row in rows]
+            return result
+
+        return [dict(row) for row in rows]
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "reason": f"Database error: {str(e)}",
+        }
+
+class ScriptSettingsPayload(BaseModel):
+    shell: str
+    basePath: str
+    action: str
+
+
+@router.put("/api/library/script-settings")
+def update_script_settings(payload: ScriptSettingsPayload):
+    new_config_data = {
+        "base_path": payload.basePath,
+        "type": payload.shell,
+        "action": payload.action
+    }
+
+    success, error_msg = save_skip_config(new_config_data)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg
+        )
+
+    return Response(status_code=status.HTTP_200_OK)
+
+@router.get("/api/library/script-settings")
+def getSkipSetting():
+    settings = skip_config
+
+    frontend_payload = {
+        "shell": settings.get("type", ""),
+        "basePath": settings.get("base_path", ""),
+        "action": settings.get("action", "move")
+    }
+
+    return frontend_payload
+
+@router.post("/api/library/generate-script")
+def generateSkipSetting(settings : generateScriptPayload):
+    songs = settings.song_ids
+    action = settings.action
+    base = settings.base_path
+    print(songs)
+    if action == "move":
+        script = moveBashScript(songs)
+        print(script)
+        return script

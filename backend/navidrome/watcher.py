@@ -41,7 +41,7 @@ def start_sse():
                     data = line.split(":", 1)[1].strip()
                     status_registry.update("SSE", status="running")
                     # print("event type : " , event_type , "data : " , data)
-
+                    # print(event_type , " : " , data)
                     if event_type == "nowPlayingCount":
                         event_queue.put("nowPlaying")
 
@@ -68,7 +68,7 @@ def start_sse():
             requests.exceptions.ConnectionError,
         ) as e:
             console.print(
-                f"[bold yellow]SSE Connection lost (Timeout/Network). Retrying in 5s...[/bold yellow]"
+                "[bold yellow]SSE Connection lost (Timeout/Network). Retrying in 5s...[/bold yellow]"
             )
             status_registry.update("SSE", status="retrying", error=str(e))
             time.sleep(5)

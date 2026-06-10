@@ -1,6 +1,7 @@
 import os
 import shutil
 from pathlib import Path
+from core.config import getJWT
 
 import requests
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -33,24 +34,6 @@ class LoginData(BaseModel):
 class AdminAuth(BaseModel):
     admin: str
     adminPD: str
-
-
-def getJWT(admin_username, admin_password):
-    try:
-        res = requests.post(
-            f"{Navidrome_url}/auth/login",
-            json={"username": admin_username, "password": admin_password},
-            timeout=5,
-        )
-        if res.status_code == 200:
-            return res.json().get("token")
-        return None
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        console.log("[yellow]Warning: Navidrome is currently unreachable.[/yellow]")
-        return None
-    except Exception as e:
-        console.log(f"[red]API Error (getJWT):[/red] {e}")
-        return None
 
 
 @router.post("/auth/login")

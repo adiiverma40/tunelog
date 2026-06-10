@@ -5,19 +5,11 @@ from navidrome.state import status_registry
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.columns import Columns
 import sqlite3
 from datetime import datetime
 import os
 import json
 import sys
-from datetime import datetime
-from loguru import logger
-
-
-import os
-import sys
-import json
 from loguru import logger
 from navidrome.state import notification_status, tune_config
 
@@ -442,6 +434,7 @@ def log_summary(user_id, size, counts):
 
 def crossCheckDatabase(data):
     console.print("[bold blue]Updating song metadata in batch...")
+    print("request came to delete database data ")
     conn = get_db_connection()
     try:
         cursor = conn.cursor()

@@ -24,21 +24,6 @@ def getMonthlyListens():
     conn.close()
     return [{"month": row[0], "count": row[1]} for row in rows]
 
-@router.get("/api/listens/skipped")
-def get_skipped_songs():
-    # print("get skipped songs")
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM listens WHERE signal = 'skip' ORDER BY timestamp DESC")
-        rows = cursor.fetchall()
-        conn.close()
-        return rows
-    except Exception as e:
-        return {
-            "status": "error",
-            "reason": f"Database error: {str(e)}",
-        }
 
 @router.get("/api/stats")
 def stats():

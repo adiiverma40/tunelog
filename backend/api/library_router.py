@@ -5,15 +5,15 @@ import string
 import tempfile
 from threading import Thread
 
-from misc.bashScript import moveBashScript
 import metadata.library as library
-from core.db import get_db_connection_lib
+from core.db import get_db_connection, get_db_connection_lib
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from metadata.genre import DeleteDataJson, autoGenre, readJson, writeJson
 from metadata.itunesFuzzy import useFallBackMethods
-from core.db import get_db_connection
-
-# from rich.console import Console
+from misc.scripts.bashScript import BashScript as moveBashScript
+from misc.scripts.fishScript import FishScript
+from misc.scripts.macScript import MacShellScript
+from misc.scripts.powershellScript import PowerShellScript
 from navidrome.state import app_state, save_skip_config, skip_config
 from playlists.importPlaylist import fuzzymatching
 from pydantic import BaseModel
@@ -36,7 +36,7 @@ class generateScriptPayload(BaseModel):
       shell: str
       base_path: str
       action: str
-    
+
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -396,13 +396,26 @@ def getSkipSetting():
 
     return frontend_payload
 
+
 @router.post("/api/library/generate-script")
 def generateSkipSetting(settings : generateScriptPayload):
     songs = settings.song_ids
-    action = settings.action
-    base = settings.base_path
-    print(songs)
-    if action == "move":
+    # action = settings.action
+    shell = settings.shell
+    # print(songs)
+    # print(settings)
+    script = ""
+    if shell == "bash":
         script = moveBashScript(songs)
-        print(script)
-        return script
+    elif shell == "fish":
+        script = FishScript(songs)
+
+    elif shell == "mac":
+        script = MacShellScript(songs)
+    elif shell == "powershell":
+        script = PowerShellScript(songs)
+    else :
+        return "error : unknow shell type"
+
+    # print(script)
+    return script

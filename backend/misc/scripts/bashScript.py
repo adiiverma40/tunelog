@@ -1,8 +1,10 @@
 import os
 import shlex
 from pathlib import Path
+
 from core.db import get_db_connection_lib
 from navidrome.state import skip_config
+
 
 def get_multiple_songs_info(song_ids: list[str]):
     if not song_ids:
@@ -27,18 +29,18 @@ def get_multiple_songs_info(song_ids: list[str]):
     conn.close()
     return result
 
-def moveBashScript(song_ids):
+def BashScript(song_ids):
     songs = get_multiple_songs_info(song_ids)
     if not songs:
         return "echo 'No songs found to process.'"
-    
+
     base_path = skip_config.get("base_path", "")
     action = skip_config.get("action", "move")
-    
+
     if base_path:
         trash_path = str(Path(base_path).parent / "tunelogTrash")
     else:
-        trash_path = "./tunelogTrash" 
+        trash_path = "./tunelogTrash"
 
     lines = [
         "#!/bin/bash",
@@ -50,38 +52,38 @@ def moveBashScript(song_ids):
         "echo ''",
         "echo -e '\\e[1mSelected songs:\\e[0m'"
     ]
-    
+
     for idx, song in enumerate(songs, 1):
         title = song.get("title", "Unknown Title")
         artist = song.get("artist", "Unknown Artist")
         path = song.get("path", "")
-        lines.append(f"echo '{idx}. {title} by {artist} - {path}'")
-        
+        lines.append(f'echo "{idx}. {title} by {artist} - {path}"')
+
     lines.append("echo ''")
-    
+
     lines.append("read -p 'Are you sure you want to proceed? (y/N) ' -n 1 -r")
     lines.append("echo ''")
     lines.append("if [[ $REPLY =~ ^[Yy]$ ]]")
     lines.append("then")
-    
+
     if action == "move":
         lines.append(f"    mkdir -p {shlex.quote(trash_path)}")
         for song in songs:
             if song.get("path"):
                 lines.append(f"    mv {shlex.quote(f"{base_path}{song['path']}")} {shlex.quote(trash_path)}/")
         lines.append("    echo 'Songs moved to trash successfully.'")
-        
+
     elif action == "delete":
         for song in songs:
             if song.get("path"):
-                lines.append(f"    rm {shlex.quote(song['path'])}")
+                lines.append(f"    rm {shlex.quote(f"{base_path}{song['path']}")}")
         lines.append("    echo 'Songs deleted successfully.'")
-        
+
     else:
         lines.append(f"    echo 'Error: Unknown action ({action})'")
-        
+
     lines.append("else")
     lines.append("    echo 'Operation cancelled.'")
     lines.append("fi")
-    
+
     return "\n".join(lines)

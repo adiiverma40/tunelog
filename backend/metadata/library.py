@@ -428,11 +428,11 @@ def sync_library():
             nav_genre    = normalise_genre(song.get("genre"))
             nav_path     = song.get("path", "")
 
-            raw_artists    = _nav_participants(song)          
+            raw_artists    = _nav_participants(song)
             nav_artistId   = raw_artists[0]["id"] if raw_artists else ""
             nav_artistJSON = json.dumps(raw_artists)
             nav_albumId    = song.get("albumId", "")
-            created        = _nav_created(song)             
+            created        = _nav_created(song)
 
             existing = dbSongs.get(song_id)
             if existing:
@@ -596,6 +596,92 @@ def sync_library():
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
     conn.close()
+
+
+
+
+
+
+
+
+def recommendDelete():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # QUERY WRITTEN BY AI
+        query = """
+        WITH ranked AS (
+            SELECT
+                l.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY l.song_id
+                    ORDER BY l.timestamp DESC, l.id DESC
+                ) AS rn
+            FROM listens l
+        ),
+        qualifying_songs AS (
+            SELECT song_id
+            FROM ranked
+            WHERE rn <= 3
+            GROUP BY song_id
+            HAVING COUNT(*) = 3
+               AND SUM(CASE WHEN signal = 'skip' THEN 1 ELSE 0 END) = 3
+        )
+        SELECT
+            MAX(l.id) AS id,
+            l.song_id,
+            MAX(l.title) AS title,
+            MAX(l.artist) AS artist,
+            MAX(l.album) AS album,
+            MAX(l.duration) AS duration,
+            MAX(l.genre) AS genre,
+            COUNT(*) AS interaction_count,
+            SUM(CASE WHEN l.signal = 'skip' THEN 1 ELSE 0 END) AS skip_count,
+            MAX(l.timestamp) AS timestamp,
+            MAX(l.user_id) AS user_id
+        FROM listens l
+        JOIN qualifying_songs q
+            ON l.song_id = q.song_id
+        GROUP BY l.song_id
+        ORDER BY timestamp DESC;
+        """
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+
+        if rows and isinstance(rows[0], tuple):
+            columns = [column[0] for column in cursor.description]
+            result = [dict(zip(columns, row)) for row in rows]
+            return result
+
+        return [dict(row) for row in rows]
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "reason": f"Database error: {str(e)}",
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     init_db_lib()
     sync_library()

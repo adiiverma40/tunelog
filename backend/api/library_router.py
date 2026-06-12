@@ -10,6 +10,7 @@ from core.db import get_db_connection, get_db_connection_lib
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from metadata.genre import DeleteDataJson, autoGenre, readJson, writeJson
 from metadata.itunesFuzzy import useFallBackMethods
+from metadata.library import recommendDelete as RD
 from misc.scripts.bashScript import BashScript as moveBashScript
 from misc.scripts.fishScript import FishScript
 from misc.scripts.macScript import MacShellScript
@@ -37,6 +38,11 @@ class generateScriptPayload(BaseModel):
       base_path: str
       action: str
 
+
+class ScriptSettingsPayload(BaseModel):
+    shell: str
+    basePath: str
+    action: str
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -360,10 +366,6 @@ def get_skipped_songs():
             "reason": f"Database error: {str(e)}",
         }
 
-class ScriptSettingsPayload(BaseModel):
-    shell: str
-    basePath: str
-    action: str
 
 
 @router.put("/api/library/script-settings")
@@ -400,10 +402,7 @@ def getSkipSetting():
 @router.post("/api/library/generate-script")
 def generateSkipSetting(settings : generateScriptPayload):
     songs = settings.song_ids
-    # action = settings.action
     shell = settings.shell
-    # print(songs)
-    # print(settings)
     script = ""
     if shell == "bash":
         script = moveBashScript(songs)
@@ -417,5 +416,11 @@ def generateSkipSetting(settings : generateScriptPayload):
     else :
         return "error : unknow shell type"
 
-    # print(script)
     return script
+
+
+@router.get("/api/library/recommend-delete")
+def recommendDelete():
+    # songs = r
+    # here RD means RecommendDelete, script imported from metadata.library
+    return RD()

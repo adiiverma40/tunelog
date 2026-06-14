@@ -79,16 +79,37 @@ def navidrome_url(endpoint):
 
 
 
-# 
-#
-# TWO  SEPERATE WORK CODE
-# 1. FOR NORMAL PLAY PAUSE AND SKIP
-# 2. FOR PAUSE SPECIFALLY, 
-# 
-# my plan is to use time.time to calculate play duration for a song undernormal condition
-# if state is pause then rely on postionMs instead of time.time
-# why? to counter condition where user has paused a song
-#  
+
+class PlaybackTracker:
+    def __init__(self):
+        self.is_playing = False
+        self.anchor_time = 0.0
+        self.anchor_position_ms = 0.0
+
+    def sync_state(self, state: str, position_ms: float):
+        if state == "starting":
+            self.is_playing = True
+            self.anchor_position_ms = position_ms
+            self.anchor_time = time.monotonic()
+
+        elif state == "playing":
+            self.is_playing = True
+            self.anchor_position_ms = position_ms
+            self.anchor_time = time.monotonic()
+
+        elif state in ["paused", "stopped"]:
+            self.is_playing = False
+            self.anchor_position_ms = position_ms
+
+    def get_projected_time(self) -> float:
+        if not self.is_playing:
+            return self.anchor_position_ms
+
+        elapsed_real_time_ms = (time.monotonic() - self.anchor_time) * 1000
+        return self.anchor_position_ms + elapsed_real_time_ms
+
+
+
 
 
 
@@ -105,7 +126,7 @@ def make_entry(entry, positionMs):
         "positionMs":   positionMs,
         "state":        entry["state"],
         "playbackRate": 1,
-        "actualPlay":   time.monotonic() - (positionMs / 1000),
+        "tracker":      PlaybackTracker(),
     }
 
 
@@ -114,13 +135,14 @@ def Watcher():
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
 
     for entry in entries:
-        user_id     = entry["username"]
-        song_id     = entry["id"]
-        state       = entry["state"]
-        positionMs  = entry["positionMs"]
+        user_id    = entry["username"]
+        song_id    = entry["id"]
+        state      = entry["state"]
+        positionMs = entry["positionMs"]
 
         if user_id not in active:
             active[user_id] = make_entry(entry, positionMs)
+            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
             console.print(
                 f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
                 f"[purple]Started: {entry['title']}[/purple] at "
@@ -129,16 +151,9 @@ def Watcher():
             )
 
         elif song_id == active[user_id]["song_id"]:
-            prev_state = active[user_id]["state"]
             active[user_id]["positionMs"] = positionMs
             active[user_id]["state"]      = state
-
-            if state != "paused":
-                active[user_id]["actualPlay"] = time.monotonic() - (positionMs / 1000)
-
-            if prev_state == "paused" and state != "paused":
-                active[user_id]["actualPlay"] = time.monotonic() - (positionMs / 1000)
-
+            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
             console.print(
                 f"[bold blue][SAME][/bold blue] [green]{user_id}[/green] "
                 f"[purple]playing: {entry['title']}[/purple] at "
@@ -149,6 +164,7 @@ def Watcher():
         else:
             log_history(active.pop(user_id))
             active[user_id] = make_entry(entry, positionMs)
+            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
             console.print(
                 f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
                 f"[purple]Started: {entry['title']}[/purple] at "
@@ -166,7 +182,44 @@ def Watcher():
             )
             console.print(f"[bold red][STOP] {user_id} stopped")
 
-            
+
+def log_history(song):
+    played_ms  = song["tracker"].get_projected_time()
+    played     = min(played_ms / 1000, song["duration"])
+    percent_played = min(round((played / song["duration"]) * 100), 100)
+    signal = signal_system(percent_played, song["song_id"], song["user_id"])
+    console.print(
+        f"[bold blue] {song['user_id']} [/bold blue] Listened  [red]: [/red] [green] {song['title']} [/green]  [red]: [/red] "
+        f"[purple]{format_ms(played * 1000)} [red] :  [/red]{percent_played} % [red] : [/red] {signal} "
+    )
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO listens(
+            song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
+        )
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            song["song_id"],
+            song["title"],
+            song["artist"],
+            song["album"],
+            song["genre"],
+            song["duration"],
+            played,
+            percent_played,
+            signal,
+            song["user_id"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+    push_star(song, signal)
+
+
+
 def signal_system(percent_played, song_id, user_id):
     scoring = tune_config["behavioral_scoring"]
     if percent_played <= scoring["skip_threshold_pct"]:
@@ -199,41 +252,6 @@ def signal_system(percent_played, song_id, user_id):
 
     return base
 
-def log_history(song):
-    actual  = song["actualPlay"]
-    current = time.monotonic()
-    played  = min(current - actual, song["duration"])
-    percent_played = min(round((played / song["duration"]) * 100), 100)
-    signal = signal_system(percent_played, song["song_id"], song["user_id"])
-    console.print(
-        f"[bold blue] {song['user_id']} [/bold blue] Listened  [red]: [/red] [green] {song['title']} [/green]  [red]: [/red] "
-        f"[purple]{format_ms(played * 1000)} [red] :  [/red]{percent_played} % [red] : [/red] {signal} "
-    )
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO listens(
-            song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
-        )
-        VALUES (?,?,?,?,?,?,?,?,?,?)
-        """,
-        (
-            song["song_id"],
-            song["title"],
-            song["artist"],
-            song["album"],
-            song["genre"],
-            song["duration"],
-            played,
-            percent_played,
-            signal,
-            song["user_id"],
-        ),
-    )
-    conn.commit()
-    conn.close()
-    push_star(song, signal)
 
 def autoSyncWithFallback():
     console.print("[bold yellow] Starting auto sync...")

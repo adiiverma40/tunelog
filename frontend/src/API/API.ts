@@ -407,6 +407,7 @@ export interface ListenBrainzConfig {
   for_users: string[];
   dedup_window_seconds: number;
   last_synced: number;
+  PushLovedSongs: boolean;
 }
 
 export interface TuneConfig {

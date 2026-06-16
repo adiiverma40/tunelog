@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -62,6 +63,7 @@ interface Config {
   lb_for_users: string[];
   lb_dedup_window: number;
   lb_last_synced: number;
+  lb_push_loved_songs: boolean;
 
   long_song_duration: number;
 }
@@ -117,54 +119,55 @@ const DEFAULTS: Config = {
   lb_for_users: [],
   lb_dedup_window: 30,
   lb_last_synced: 0,
+  lb_push_loved_songs: false,
   long_song_duration: 300,
 };
 
-const mapApiToState = (api: TuneConfig): Config => ({
-  long_song_duration: api.behavioral_scoring.long_song_duration,
-  playlist_size: api.playlist_generation.playlist_size,
-  wildcard_day: api.playlist_generation.wildcard_day,
-  auto_generate_playlist: api.playlist_generation.auto_generate_playlist,
-  auto_generate_time: api.playlist_generation.auto_generate_time,
+const mapApiToState = (api: any): Config => ({
+  long_song_duration: api.behavioral_scoring?.long_song_duration ?? 300,
+  playlist_size: api.playlist_generation?.playlist_size ?? 40,
+  wildcard_day: api.playlist_generation?.wildcard_day ?? 60,
+  auto_generate_playlist: api.playlist_generation?.auto_generate_playlist ?? true,
+  auto_generate_time: api.playlist_generation?.auto_generate_time ?? 4,
   auto_generate_when_complete:
-    api.playlist_generation.auto_generate_when_complete,
+    api.playlist_generation?.auto_generate_when_complete ?? true,
   auto_generate_completion_percent:
-    api.playlist_generation.auto_generate_completion_percent,
-  auto_generate_explicit: api.playlist_generation.auto_generate_explicit,
-  auto_generate_for: api.playlist_generation.auto_generate_for,
-  auto_generate_injection: api.playlist_generation.auto_generate_injection,
+    api.playlist_generation?.auto_generate_completion_percent ?? 80,
+  auto_generate_explicit: api.playlist_generation?.auto_generate_explicit ?? "all",
+  auto_generate_for: api.playlist_generation?.auto_generate_for ?? [],
+  auto_generate_injection: api.playlist_generation?.auto_generate_injection ?? true,
   last_auto_generate: "0",
-  w_repeat: api.playlist_generation.signal_weights.repeat,
-  w_positive: api.playlist_generation.signal_weights.positive,
-  w_partial: api.playlist_generation.signal_weights.partial,
-  w_skip: api.playlist_generation.signal_weights.skip,
-  s_positive: api.playlist_generation.slot_ratios.positive,
-  s_repeat: api.playlist_generation.slot_ratios.repeat,
-  s_partial: api.playlist_generation.slot_ratios.partial,
-  s_skip: api.playlist_generation.slot_ratios.skip,
-  inj_signal: api.playlist_generation.injection_breakdown.signal,
-  inj_unheard: api.playlist_generation.injection_breakdown.unheard,
-  inj_wildcard: api.playlist_generation.injection_breakdown.wildcard,
-  skip_thresh: api.behavioral_scoring.skip_threshold_pct,
-  pos_thresh: api.behavioral_scoring.positive_threshold_pct,
-  repeat_window: api.behavioral_scoring.repeat_time_window_min,
-  stale_timeout: api.behavioral_scoring.stale_session_timeout_sec,
-  min_listens: api.behavioral_scoring.min_listens_for_star,
-  decay: api.behavioral_scoring.historical_decay_factor,
-  sync_hour: api.sync_and_automation.auto_sync_hour,
-  timezone: api.sync_and_automation.timezone,
-  itunes_fallback: api.sync_and_automation.use_itunes_fallback,
-  auto_sync_after_navidrome: api.sync_and_automation.auto_sync_after_navidrome,
-  fuzzy_iter: api.api_and_performance.max_fuzzy_iterations,
-  api_retries: api.api_and_performance.api_max_retries,
-  retry_delay: api.api_and_performance.api_retry_delay_sec,
-  itunes_depth: api.api_and_performance.itunes_search_depth,
-  min_match: api.api_and_performance.sync_confidence.min_match_score,
+  w_repeat: api.playlist_generation?.signal_weights?.repeat ?? 3,
+  w_positive: api.playlist_generation?.signal_weights?.positive ?? 2,
+  w_partial: api.playlist_generation?.signal_weights?.partial ?? 0,
+  w_skip: api.playlist_generation?.signal_weights?.skip ?? -2,
+  s_positive: api.playlist_generation?.slot_ratios?.positive ?? 0.35,
+  s_repeat: api.playlist_generation?.slot_ratios?.repeat ?? 0.35,
+  s_partial: api.playlist_generation?.slot_ratios?.partial ?? 0.25,
+  s_skip: api.playlist_generation?.slot_ratios?.skip ?? 0.05,
+  inj_signal: api.playlist_generation?.injection_breakdown?.signal ?? 0.57,
+  inj_unheard: api.playlist_generation?.injection_breakdown?.unheard ?? 0.35,
+  inj_wildcard: api.playlist_generation?.injection_breakdown?.wildcard ?? 0.08,
+  skip_thresh: api.behavioral_scoring?.skip_threshold_pct ?? 30,
+  pos_thresh: api.behavioral_scoring?.positive_threshold_pct ?? 80,
+  repeat_window: api.behavioral_scoring?.repeat_time_window_min ?? 30,
+  stale_timeout: api.behavioral_scoring?.stale_session_timeout_sec ?? 600,
+  min_listens: api.behavioral_scoring?.min_listens_for_star ?? 3,
+  decay: api.behavioral_scoring?.historical_decay_factor ?? 0.9,
+  sync_hour: api.sync_and_automation?.auto_sync_hour ?? 2,
+  timezone: api.sync_and_automation?.timezone ?? "Asia/Kolkata",
+  itunes_fallback: api.sync_and_automation?.use_itunes_fallback ?? false,
+  auto_sync_after_navidrome: api.sync_and_automation?.auto_sync_after_navidrome ?? true,
+  fuzzy_iter: api.api_and_performance?.max_fuzzy_iterations ?? 500,
+  api_retries: api.api_and_performance?.api_max_retries ?? 3,
+  retry_delay: api.api_and_performance?.api_retry_delay_sec ?? 3,
+  itunes_depth: api.api_and_performance?.itunes_search_depth ?? 200,
+  min_match: api.api_and_performance?.sync_confidence?.min_match_score ?? 70,
   meta_overwrite:
-    api.api_and_performance.sync_confidence.metadata_overwrite_score,
+    api.api_and_performance?.sync_confidence?.metadata_overwrite_score ?? 80,
   genre_strictness:
-    api.api_and_performance.sync_confidence.genre_map_strictness,
-  duration_tol: api.api_and_performance.sync_confidence.duration_tolerance_pct,
+    api.api_and_performance?.sync_confidence?.genre_map_strictness ?? 95,
+  duration_tol: api.api_and_performance?.sync_confidence?.duration_tolerance_pct ?? 10,
   jam_same_song_in_queue: api.jam?.same_song_in_queue ?? false,
   jam_only_host_change_queue: api.jam?.only_host_change_queue ?? false,
   jam_only_host_clear_queue: api.jam?.only_host_clear_queue ?? true,
@@ -176,9 +179,10 @@ const mapApiToState = (api: TuneConfig): Config => ({
   lb_for_users: api.listenbrainz?.for_users ?? [],
   lb_dedup_window: api.listenbrainz?.dedup_window_seconds ?? 30,
   lb_last_synced: api.listenbrainz?.last_synced ?? 0,
+  lb_push_loved_songs: api.listenbrainz?.PushLovedSongs ?? false,
 });
 
-const mapStateToApi = (state: Config): TuneConfig => ({
+const mapStateToApi = (state: Config): any => ({
   playlist_generation: {
     playlist_size: state.playlist_size,
     wildcard_day: state.wildcard_day,
@@ -209,7 +213,7 @@ const mapStateToApi = (state: Config): TuneConfig => ({
     },
   },
   behavioral_scoring: {
-    long_song_duration: 300,
+    long_song_duration: state.long_song_duration,
     skip_threshold_pct: state.skip_thresh,
     positive_threshold_pct: state.pos_thresh,
     repeat_time_window_min: state.repeat_window,
@@ -249,6 +253,7 @@ const mapStateToApi = (state: Config): TuneConfig => ({
     for_users: state.lb_for_users,
     dedup_window_seconds: state.lb_dedup_window,
     last_synced: state.lb_last_synced,
+    PushLovedSongs: state.lb_push_loved_songs,
   },
 });
 
@@ -1493,6 +1498,16 @@ export default function Config() {
               onChange={(v) => set("lb_dedup_window", v)}
               min={0}
               unit="min"
+            />
+          </ConfigRow>
+          <ConfigRow
+            label="Push loved songs"
+            desc="Sync starred/hearted tracks from local Navidrome to ListenBrainz"
+          >
+            <Switch
+              label=""
+              defaultChecked={cfg.lb_push_loved_songs}
+              onChange={(v) => set("lb_push_loved_songs", v)}
             />
           </ConfigRow>
         </SectionCard>

@@ -109,11 +109,13 @@ def _get_json(url_value, retries=3, token=""):
         if attempt < retries:
             time.sleep(1.5 * attempt)
     raise last_error
+
 def url(batch, offset):
     base_url = f"{Navidrome_url}/api/song"
     end = offset + batch
     song_url = base_url + f"?_end={end}&_order=ASC&_sort=title&_start={offset}&title="
     return song_url
+
 def fetch_all_song():
     all_song = []
     offset = 0
@@ -128,43 +130,8 @@ def fetch_all_song():
             all_song.extend(songs)
             offset += batch
     return all_song
-def fetchSongFromDB():
-    db_songs = {}
-    with console.status("[bold blue]Fetching library and lyrics from db..."):
-        conn = get_db_connection_lib()
-        cursor = conn.cursor()
-        query = """
-            SELECT
-                l.song_id, l.title, l.artist, l.album, l.genre, l.explicit, l.duration,
-                l.artistId, l.artistJSON, l.albumId, l.path, l.created,
-                m.lyrics
-            FROM library l
-            LEFT JOIN search_metadata m ON l.song_id = m.song_id
-        """
-        rows = cursor.execute(query).fetchall()
-        conn.close()
-        if not rows:
-            return {}
-        db_songs = {
-            row[0]: {
-                "song_id":    row[0],
-                "title":      row[1],
-                "artist":     row[2],
-                "album":      row[3],
-                "genre":      row[4],
-                "explicit":   row[5],
-                "duration":   row[6],
-                "artistId":   row[7],
-                "artistJSON": row[8],
-                "albumId":    row[9],
-                "path":       row[10],
-                "created":    row[11],
-                "lyrics":     row[12],
-            }
-            for row in rows
-        }
-        console.log(f"[bold green]Loaded {len(db_songs)} songs with metadata & lyrics.")
-        return db_songs
+
+
 def remove_deleted_songs(navidrome_ids: set, dbSongId: set):
     deleted_ids = dbSongId - navidrome_ids
     if not deleted_ids:
@@ -359,6 +326,50 @@ def _nav_created(song: dict) -> str:
     return song.get("createdAt", "") or song.get("birthTime", "")
 
 
+
+
+def fetchSongFromDB():
+    db_songs = {}
+    with console.status("[bold blue]Fetching library and lyrics from db..."):
+        conn = get_db_connection_lib()
+        cursor = conn.cursor()
+        query = """
+            SELECT
+                l.song_id, l.title, l.artist, l.album, l.genre, l.explicit, l.duration,
+                l.artistId, l.artistJSON, l.albumId, l.path, l.created,
+                l.starred, l.mbzRecordingID,
+                m.lyrics
+            FROM library l
+            LEFT JOIN search_metadata m ON l.song_id = m.song_id
+        """
+        rows = cursor.execute(query).fetchall()
+        conn.close()
+        if not rows:
+            return {}
+        db_songs = {
+            row[0]: {
+                "song_id":        row[0],
+                "title":          row[1],
+                "artist":         row[2],
+                "album":          row[3],
+                "genre":          row[4],
+                "explicit":       row[5],
+                "duration":       row[6],
+                "artistId":       row[7],
+                "artistJSON":     row[8],
+                "albumId":        row[9],
+                "path":           row[10],
+                "created":        row[11],
+                "starred":        bool(row[12]),
+                "mbzRecordingID": row[13] or "",
+                "lyrics":         row[14],
+            }
+            for row in rows
+        }
+        console.log(f"[bold green]Loaded {len(db_songs)} songs with metadata & lyrics.")
+        return db_songs
+
+
 def sync_library():
     global _isSyncing, _progress, _startSyncSong, _stopSync
     _isSyncing = True
@@ -377,12 +388,13 @@ def sync_library():
     skipped = 0
     insert_batch: list[tuple] = []
     update_batch: list[tuple] = []
+
     def flush_batches():
         if insert_batch:
             cursor.executemany(
                 """INSERT INTO library
-                   (song_id, title, artist, album, genre, duration, explicit, artistId, artistJSON, albumId, path, created)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (song_id, title, artist, album, genre, duration, explicit, artistId, artistJSON, albumId, path, created, starred, mbzRecordingID)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 insert_batch,
             )
             crossCheckDatabase(
@@ -394,18 +406,20 @@ def sync_library():
                 """UPDATE library
                    SET title=?, artist=?, album=?, genre=?, duration=?, explicit=?,
                        artistId=?, artistJSON=?, albumId=?, path=?, created=?,
+                       starred=?, mbzRecordingID=?,
                        last_synced=CURRENT_TIMESTAMP
                    WHERE song_id=?""",
                 update_batch,
             )
             crossCheckDatabase(
                 [
-                    (item[0], item[1], item[2], item[3], item[11])
+                    (item[0], item[1], item[2], item[3], item[13])
                     for item in update_batch
                 ]
             )
             update_batch.clear()
         conn.commit()
+
     progress_bar = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -420,13 +434,15 @@ def sync_library():
                 console.log("[bold red]Sync stopped by user.")
                 break
 
-            song_id      = song["id"]
-            song_title   = song.get("title", "Unknown")
-            song_artist  = normalise_artist(song.get("artist", "Unknown"))
-            nav_album    = song.get("album", "")
-            nav_duration = song.get("duration", 0)
-            nav_genre    = normalise_genre(song.get("genre"))
-            nav_path     = song.get("path", "")
+            song_id          = song["id"]
+            song_title       = song.get("title", "Unknown")
+            song_artist      = normalise_artist(song.get("artist", "Unknown"))
+            nav_album        = song.get("album", "")
+            nav_duration     = song.get("duration", 0)
+            nav_genre        = normalise_genre(song.get("genre"))
+            nav_path         = song.get("path", "")
+            nav_starred      = bool(song.get("starred", False))
+            nav_mbzRecording = song.get("mbzRecordingID", "") or ""
 
             raw_artists    = _nav_participants(song)
             nav_artistId   = raw_artists[0]["id"] if raw_artists else ""
@@ -443,6 +459,8 @@ def sync_library():
                     or existing["duration"]      != nav_duration
                     or existing.get("created")   != created
                     or existing.get("path", "")  != nav_path
+                    or existing.get("starred")   != nav_starred
+                    or existing.get("mbzRecordingID", "") != nav_mbzRecording
                 )
                 if fast_sync:
                     if metadata_changed:
@@ -459,6 +477,8 @@ def sync_library():
                                 nav_albumId,
                                 nav_path,
                                 created,
+                                nav_starred,
+                                nav_mbzRecording,
                                 song_id,
                             )
                         )
@@ -482,6 +502,8 @@ def sync_library():
                                     nav_albumId,
                                     nav_path,
                                     created,
+                                    nav_starred,
+                                    nav_mbzRecording,
                                     song_id,
                                 )
                             )
@@ -517,6 +539,8 @@ def sync_library():
                                     nav_albumId,
                                     nav_path,
                                     created,
+                                    nav_starred,
+                                    nav_mbzRecording,
                                     song_id,
                                 )
                             )
@@ -557,6 +581,8 @@ def sync_library():
                         nav_albumId,
                         nav_path,
                         created,
+                        nav_starred,
+                        nav_mbzRecording,
                     )
                 )
                 inserted += 1
@@ -596,9 +622,6 @@ def sync_library():
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("VACUUM")
     conn.close()
-
-
-
 
 
 

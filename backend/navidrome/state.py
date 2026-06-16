@@ -151,6 +151,7 @@ DEFAULT_CONFIG = {
         "for_users": [],
         "enabled": False,
         "dedup_window_seconds": 30,
+        "PushLovedSongs" : False
     },
 }
 

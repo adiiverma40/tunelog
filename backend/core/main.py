@@ -2,6 +2,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -20,12 +21,14 @@ from core.db import (
     # migrate_playlist_ids
     migrate_playlist_primary_key,
 )
+from CORN.pushHeartLB import pushStarredToListenBrainz
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import normalise_artist, normalise_genre, sync_library
 from misc.misc import push_star
 from navidrome.state import (
     automation_config,
+    false,
     notification_status,
     save_automation_config,
     save_config,
@@ -139,7 +142,6 @@ def Watcher():
         song_id    = entry["id"]
         state      = entry["state"]
         positionMs = entry["positionMs"]
-
         if user_id not in active:
             active[user_id] = make_entry(entry, positionMs)
             active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
@@ -586,7 +588,6 @@ def Auto_LB_CF(thread=True):
         else:
             fetch_worker()
 
-
 def main():
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
 
@@ -605,10 +606,12 @@ def main():
             conn.close()
 
             migrate_playlist_primary_key()
-        except Exception as e:
-            status_registry.update("Db", status="crashed", error=e)
-            console.print(f"[red]✗ Database initialization failed:[/red] {e}")
-            sys.exit(1)
+        except Exception:
+            traceback.print_exc()
+            raise
+            # status_registry.update("Db", status="crashed", error=e)
+            # console.print(f"[red]✗ Database initialization failed:[/red] {e}")
+            # sys.exit(1)
     console.print("[green]✓ Database ready[/green]")
 
     with console.status("[dim]Starting API and proxy...[/dim]"):
@@ -685,9 +688,17 @@ def main():
     is_lb_syncing = False
     last_lb_sync_timestamp = None
 
-    console.print("[bold blue] Starting Library Sync")
-    syncThread = threading.Thread(target=library.sync_library, daemon=True)
+    console.print("[bold blue]Starting Library Sync")
+    syncThread = threading.Thread(target=library.sync_library)
     syncThread.start()
+    syncThread.join()
+
+    if tune_config['listenbrainz']["PushLovedSongs"] : 
+        console.print("[bold blue]Pushing Starred Song to Listenbrainz")
+        pushThread = threading.Thread(target=pushStarredToListenBrainz , daemon=True)
+        pushThread.start()
+    else:
+        console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     while True:
 

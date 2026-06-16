@@ -179,7 +179,9 @@ def init_db_lib():
             last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created     TIMESTAMP,
             explicit    TEXT,
-            path        TEXT
+            path        TEXT,
+            starred	    BOOL,
+            mbzRecordingID TEXT
         )
     """)
 
@@ -194,6 +196,27 @@ def init_db_lib():
             PRIMARY KEY (recording_mbid, username)
         )
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS synced_tracks  (
+            mbzRecordingID      TEXT NOT NULL,
+            songId              TEXT NOT NULL PRIMARY KEY,
+            starred               BOOL,
+            last_synced     INTEGER,
+            done            bool
+        )
+    """)
+    _ensure_columns(
+        cursor,
+        "synced_tracks",
+        {
+            "mbzRecordingID"  :    "TEXT NOT NULL",
+            "songId"          :    "TEXT NOT NULL PRIMARY KEY",
+            "starred"        :       "BOOL",
+            "last_synced"    : "INTEGER",
+            "done"          :  "bool"
+        },
+    )
 
     _ensure_columns(
         cursor,
@@ -211,7 +234,9 @@ def init_db_lib():
             "last_synced": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
             "created": "TIMESTAMP",
             "explicit": "TEXT",
-            "path" : "TEXT"
+            "path" : "TEXT",
+            "starred" : "BOOL",
+            "mbzRecordingID" : "TEXT"
         },
     )
     _ensure_columns(

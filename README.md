@@ -9,6 +9,8 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - `Playlist` Page was re written using claude ai
 ## Updates
 
+### New Push Star Feature
+
 ###  Navidrome 0.62.0 Playback Reporting Support
 
 Navidrome `0.62.0` introduced the `playbackReport` API, which provides more accurate playback state reporting from clients.
@@ -25,6 +27,9 @@ TuneLog now supports this new reporting mechanism, resulting in significantly im
 ---
 
 ### New Features
+#### Push Local Starred(heart) to Listenbrainz
+
+This feature lets user sync there local starred song from `navidrome` to `listenbrainz`. Read here [Push Heart](https://github.com/adiiverma40/tunelog/wiki/Push-Starred-Song-to-ListenBrainz)
 
 ####  Skipped Songs Tracking
 

@@ -1,15 +1,25 @@
 import os
+
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 
 load_dotenv()
+
+KEY_FILE_PATH = "/app/data/master.key"
 MASTER_KEY = os.getenv("MASTER_KEY")
 
 if not MASTER_KEY:
+    if os.path.exists(KEY_FILE_PATH):
+        with open(KEY_FILE_PATH, "r") as key_file:
+            MASTER_KEY = key_file.read().strip()
+
+if not MASTER_KEY:
     MASTER_KEY = Fernet.generate_key().decode()
-    with open(".env", "a") as env_file:
-        env_file.write(f"\nMASTER_KEY={MASTER_KEY}\n")
-    print("Generated new MASTER_KEY and saved to .env")
+    os.makedirs(os.path.dirname(KEY_FILE_PATH), exist_ok=True)
+
+    with open(KEY_FILE_PATH, "w") as key_file:
+        key_file.write(MASTER_KEY)
+    print(f"Generated new MASTER_KEY and saved to {KEY_FILE_PATH}")
 
 cipher_suite = Fernet(MASTER_KEY.encode())
 

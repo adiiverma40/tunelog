@@ -434,7 +434,8 @@ def MusicbrainzSeeding():
         fetchPendingSongs()
         retryFailedSongs()
         match_and_update_nvid()
-
+    console.print("[bold green]Checking for the pending song")
+    fetchPendingSongs()
     match_and_update_nvid()
 
 
@@ -699,6 +700,9 @@ def main():
         pushThread.start()
     else:
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
+
+    console.print("Checking Musicbrainz Remaining Seedings")
+    musicBrainzThread()
 
     while True:
 

@@ -9,7 +9,8 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - `Playlist` Page was re written using claude ai
 ## Updates
 
-### New Push Star Feature
+### New Push Star Feature 
+- Lets user update the local heart songs to listenbrainz
 
 ###  Navidrome 0.62.0 Playback Reporting Support
 

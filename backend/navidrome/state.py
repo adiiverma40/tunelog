@@ -144,7 +144,6 @@ DEFAULT_CONFIG = {
         "only_host_add_queue": False,
     },
     "listenbrainz": {
-        "username": "",
         "treat_data_as": "partial",
         "pool_listen_brainz": 1,
         "last_synced": 0,

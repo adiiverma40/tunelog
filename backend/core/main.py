@@ -69,6 +69,7 @@ active = {}
 
 CURRENT_VERSION = "0.001"
 
+
 def format_ms(ms):
     total_seconds = ms // 1000
     minutes, seconds = divmod(total_seconds, 60)
@@ -79,8 +80,6 @@ def navidrome_url(endpoint):
     url = build_url(endpoint)
     response = requests.get(url)
     return response.json()
-
-
 
 
 class PlaybackTracker:
@@ -112,24 +111,19 @@ class PlaybackTracker:
         return self.anchor_position_ms + elapsed_real_time_ms
 
 
-
-
-
-
-
 def make_entry(entry, positionMs):
     return {
-        "song_id":      entry["id"],
-        "user_id":      entry["username"],
-        "title":        entry.get("title", ""),
-        "album":        entry.get("album", ""),
-        "artist":       normalise_artist(entry.get("artist", "")),
-        "genre":        normalise_genre(entry.get("genre")),
-        "duration":     entry["duration"],
-        "positionMs":   positionMs,
-        "state":        entry["state"],
+        "song_id": entry["id"],
+        "user_id": entry["username"],
+        "title": entry.get("title", ""),
+        "album": entry.get("album", ""),
+        "artist": normalise_artist(entry.get("artist", "")),
+        "genre": normalise_genre(entry.get("genre")),
+        "duration": entry["duration"],
+        "positionMs": positionMs,
+        "state": entry["state"],
         "playbackRate": 1,
-        "tracker":      PlaybackTracker(),
+        "tracker": PlaybackTracker(),
     }
 
 
@@ -138,9 +132,9 @@ def Watcher():
     entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
 
     for entry in entries:
-        user_id    = entry["username"]
-        song_id    = entry["id"]
-        state      = entry["state"]
+        user_id = entry["username"]
+        song_id = entry["id"]
+        state = entry["state"]
         positionMs = entry["positionMs"]
         if user_id not in active:
             active[user_id] = make_entry(entry, positionMs)
@@ -154,7 +148,7 @@ def Watcher():
 
         elif song_id == active[user_id]["song_id"]:
             active[user_id]["positionMs"] = positionMs
-            active[user_id]["state"]      = state
+            active[user_id]["state"] = state
             active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
             console.print(
                 f"[bold blue][SAME][/bold blue] [green]{user_id}[/green] "
@@ -180,14 +174,18 @@ def Watcher():
             stopped_entry = active.pop(user_id)
             log_history(stopped_entry)
             notification_status.songState.append(
-                {"username": user_id, "song": stopped_entry["title"], "state": "stopped"}
+                {
+                    "username": user_id,
+                    "song": stopped_entry["title"],
+                    "state": "stopped",
+                }
             )
             console.print(f"[bold red][STOP] {user_id} stopped")
 
 
 def log_history(song):
-    played_ms  = song["tracker"].get_projected_time()
-    played     = min(played_ms / 1000, song["duration"])
+    played_ms = song["tracker"].get_projected_time()
+    played = min(played_ms / 1000, song["duration"])
     percent_played = min(round((played / song["duration"]) * 100), 100)
     signal = signal_system(percent_played, song["song_id"], song["user_id"])
     console.print(
@@ -219,7 +217,6 @@ def log_history(song):
     conn.commit()
     conn.close()
     push_star(song, signal)
-
 
 
 def signal_system(percent_played, song_id, user_id):
@@ -554,7 +551,6 @@ def Auto_LB_CF(thread=True):
     is_manual = not thread
 
     if is_scheduled or is_manual:
-
         if is_manual:
             console.print("[dim]Manual ListenBrainz CF fetch triggered via API.[/dim]")
         else:
@@ -588,6 +584,7 @@ def Auto_LB_CF(thread=True):
             fetch_thread.start()
         else:
             fetch_worker()
+
 
 def main():
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
@@ -694,18 +691,18 @@ def main():
     syncThread.start()
     syncThread.join()
 
-    if tune_config['listenbrainz']["PushLovedSongs"] : 
+    if tune_config["listenbrainz"]["PushLovedSongs"]:
         console.print("[bold blue]Pushing Starred Song to Listenbrainz")
-        pushThread = threading.Thread(target=pushStarredToListenBrainz , daemon=True)
+        pushThread = threading.Thread(target=pushStarredToListenBrainz, daemon=True)
         pushThread.start()
     else:
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     console.print("Checking Musicbrainz Remaining Seedings")
+
     musicBrainzThread()
 
     while True:
-
         Auto_LB_CF()
 
         if library._startSyncSong and not library._isSyncing:
@@ -855,12 +852,16 @@ def main():
                 def run_lb_sync():
                     try:
                         lb_conf = tune_config.get("listenbrainz", {})
-                        if not lb_conf.get("username") or not lb_conf.get("enabled"):
+
+                        # UPDATED: We no longer check for lb_conf.get("username")
+                        # We only check if the sync is enabled globally in the config
+                        if not lb_conf.get("enabled"):
                             console.print(
-                                "[yellow]⚠ ListenBrainz sync skipped: username not set or disabled.[/yellow]"
+                                "[yellow]⚠ ListenBrainz sync skipped: disabled in config.[/yellow]"
                             )
                             return
 
+                        # fuzzyMatchingSong() handles fetching all DB users now
                         LatestTimeStamp = fuzzyMatchingSong()
 
                         if LatestTimeStamp:
@@ -875,8 +876,7 @@ def main():
                         save_config(tune_config)
                         console.print("[green]✓ ListenBrainz sync complete.[/green]")
                         run_lb_fuzzy_matching()
-                        # FetchCF()
-                        # print("skipping Fetch cf")
+
                     except Exception as e:
                         console.print(f"[red]✗ ListenBrainz sync failed:[/red] {e}")
                     finally:

@@ -1,18 +1,19 @@
-import requests
-from rapidfuzz import process, fuzz
-from collections import defaultdict
 import datetime
-import time
 import json
-from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+import sqlite3
+import time
+from collections import defaultdict
+from typing import Any, Dict, List, Optional
+
+import requests
 from core.crypto import decrypt_token
+from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+from navidrome.state import tune_config
+from rapidfuzz import fuzz, process
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
-from rich import box
-from navidrome.state import tune_config
-import sqlite3
-from typing import Optional, Dict, Any, List
 
 console = Console()
 
@@ -25,27 +26,10 @@ LB_HEADERS = {
 LB_BASE = "https://api.listenbrainz.org"
 
 
-def resolve_lb_username(decrypted_token: str) -> str | None:
-    url = f"{LB_BASE}/1/validate-token"
-    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("valid"):
-                return data.get("user_name")
-            console.print(
-                f"    [red]✗ Token invalid: {data.get('message', 'unknown')}[/red]"
-            )
-        else:
-            console.print(f"    [red]✗ validate-token HTTP {r.status_code}[/red]")
-    except Exception as e:
-        console.print(f"    [red]✗ validate-token failed: {e}[/red]")
-    return None
-
 
 def _get_authed_headers(decrypted_token: str) -> dict:
     return {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+
 
 
 def _load_lb_users() -> List[Dict[str, str]]:
@@ -53,24 +37,23 @@ def _load_lb_users() -> List[Dict[str, str]]:
     cursor = usr_conn.cursor()
     cursor.execute(
         "SELECT username, LB_token, LB_username FROM user "
-        "WHERE LB_token IS NOT NULL AND LB_token != ''"
+        "WHERE LB_token IS NOT NULL AND LB_token != '' "
+        "AND LB_username IS NOT NULL AND LB_username != ''"
     )
     rows = cursor.fetchall()
     usr_conn.close()
 
     if not rows:
-        console.print("[yellow]⚠ No users with LB_token found in users.db.[/yellow]")
+        console.print(
+            "[yellow]⚠ No users with valid LB credentials found in users.db.[/yellow]"
+        )
         return []
 
     resolved = []
     for row in rows:
         db_username = row["username"]
         raw_token = row["LB_token"]
-        stored_lb_un = row["LB_username"]
-
-        console.print(
-            f"  [dim]→ Resolving LB identity for DB user '{db_username}'...[/dim]"
-        )
+        lb_username = row["LB_username"]
 
         try:
             decrypted = decrypt_token(raw_token)
@@ -78,24 +61,10 @@ def _load_lb_users() -> List[Dict[str, str]]:
             console.print(f"  [red]✗ Decrypt failed for '{db_username}': {e}[/red]")
             continue
 
-        lb_username = resolve_lb_username(decrypted)
-
-        if not lb_username:
-            if stored_lb_un:
-                console.print(
-                    f"  [yellow]⚠ validate-token gave nothing; "
-                    f"falling back to stored LB_username '{stored_lb_un}'[/yellow]"
-                )
-                lb_username = stored_lb_un
-            else:
-                console.print(
-                    f"  [red]✗ Cannot determine LB username for '{db_username}'. Skipping.[/red]"
-                )
-                continue
-
         console.print(
             f"  [green]✓ '{db_username}' → LB: [bold]{lb_username}[/bold][/green]"
         )
+
         resolved.append(
             {
                 "db_username": db_username,
@@ -205,7 +174,7 @@ def batchSave(matched_records, unmatched_records=None):
 
         if is_duplicate:
             duplicates_ignored += 1
-            console.print(f"[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
+            console.print("[bold yellow] ↳ ⚠ Duplicate Ignored[/bold yellow]")
             lb_log_data.append(
                 (
                     song_id,
@@ -231,7 +200,7 @@ def batchSave(matched_records, unmatched_records=None):
                 current_signal = "repeat"
                 current_percent = 100.0
                 console.print(
-                    f"[bold blue] ↳ ↻ Flagged as Repeat (Gap: {int(time_diff/60)}m)[/bold blue]"
+                    f"[bold blue] ↳ ↻ Flagged as Repeat (Gap: {int(time_diff / 60)}m)[/bold blue]"
                 )
 
         existing_history[song_id].append(listened_at)
@@ -805,7 +774,7 @@ def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], 
         if exact:
             matched_results[idx] = {
                 "navidrome_id": exact["songId"],
-                "matched_name": f'{exact.get("artist", "")} - {exact.get("title", "")}',
+                "matched_name": f"{exact.get('artist', '')} - {exact.get('title', '')}",
                 "match_type": "exact",
             }
         else:
@@ -833,7 +802,7 @@ def batchMatchNavidromeTracks(tracks: List[Any]) -> tuple[List[Dict[str, Any]], 
         idx = listen["_original_index"]
         matched_results[idx] = {
             "navidrome_id": song["songId"],
-            "matched_name": f'{song.get("artist", "")} - {song.get("title", "")}',
+            "matched_name": f"{song.get('artist', '')} - {song.get('title', '')}",
             "match_type": "fallback",
         }
 

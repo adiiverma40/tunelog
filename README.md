@@ -34,19 +34,19 @@ This feature lets user sync there local starred song from `navidrome` to `listen
 
 ####  Skipped Songs Tracking
 
-A new **Skipped Songs** section has been added to the Library dashboard, making it easier to review songs that are frequently skipped.
+- A new **Skipped Songs** section has been added to the Library dashboard, making it easier to review songs that are frequently skipped.
 
 ####  Similar User Recommendations
 
-TuneLog can now generate collaborative recommendations using listening data from the most similar users on ListenBrainz.
+- TuneLog can now generate collaborative recommendations using listening data from the most similar users on ListenBrainz.
 
 ####  ListenBrainz Collaborative Filtering Integration
 
-TuneLog now supports **ListenBrainz Collaborative Filtering (CF)** recommendations.
+- TuneLog now supports **ListenBrainz Collaborative Filtering (CF)** recommendations.
 
-This feature uses ListenBrainz recommendation data and matches it against songs already available in your library to automatically generate personalized playlists.
+> This feature uses ListenBrainz recommendation data and matches it against songs already available in your library to automatically generate personalized playlists.
 
-For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
+> For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
 
 ### Wiki: 
 - [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks
@@ -72,6 +72,10 @@ For setup instructions and details, see the [ListenBrainz Collaborative Filterin
 - Logging and error handling
 - Web dashboard and API backend
 - Navidrome jam
+
+## Changes:
+- No need to Mannually Add Listenbrainz token, Go to playlist > Listenbrainz cf > Add the token and save it
+- 
 
 ### Navidrome jam
 In the dashboard there is a jam section, if you wish to use jam go to jam and `now playing` section in the dashboard

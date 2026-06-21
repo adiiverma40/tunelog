@@ -10,15 +10,14 @@ from core.db import (
     get_db_connection_usr,
 )
 from core.main import Auto_LB_CF, generate_listenbrainz_playlist
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, Query
 from navidrome.state import automation_config, save_automation_config
 from playlists.playlist import API_push_playlist
 from pydantic import BaseModel
 from scrobble.listenBrainz import batchMatchNavidromeTracks
 
-router = APIRouter(
-    tags=['listenbrainz']
-)
+router = APIRouter(tags=["listenbrainz"])
+
 
 class LBPlaylist(BaseModel):
     id: str
@@ -26,6 +25,7 @@ class LBPlaylist(BaseModel):
     creator: str
     track_count: int
     type: Literal["user", "created_for_you"]
+
 
 class LBTrack(BaseModel):
     title: str
@@ -35,18 +35,22 @@ class LBTrack(BaseModel):
     navidrome_id: Optional[str] = None
     cover_art_url: Optional[str] = None
 
+
 class PlaylistResponse(BaseModel):
     status: Literal["ok", "error"]
     playlists: List[LBPlaylist]
     reason: Optional[str] = None
+
 
 class PlaylistTracksResponse(BaseModel):
     status: Literal["ok", "error"]
     tracks: List[LBTrack]
     reason: Optional[str] = None
 
+
 class LBMatchRequest(BaseModel):
     tracks: List[LBTrack]
+
 
 class LBMatchResponse(BaseModel):
     status: Literal["ok", "error"]
@@ -54,15 +58,18 @@ class LBMatchResponse(BaseModel):
     matched_count: int
     reason: Optional[str] = None
 
+
 class CreatePlaylistRequest(BaseModel):
     name: str
     song_ids: list[str]
     dashboard_user: str = ""
 
+
 class CreatePlaylistResponse(BaseModel):
     status: Literal["ok", "error"]
     reason: Optional[str] = None
     playlist_id: Optional[str] = None
+
 
 class LBCFConfig(BaseModel):
     size: int
@@ -80,22 +87,27 @@ class LBCFConfig(BaseModel):
     fallbackScore: bool
     for_users: list[str]
 
+
 class WeeklyLBFetch(BaseModel):
     last_synced: int
     check_interval: int
+
 
 class LBCFConfigPayload(BaseModel):
     cf_playlist_config: Optional[dict] = None
     weekly_LB_fetch: Optional[dict] = None
 
+
 class SetTokenRequest(BaseModel):
     user: str
     token: str
+
 
 LB_HEADERS = {
     "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)",
     "Accept": "application/json",
 }
+
 
 @router.get("/api/listenbrainz")
 def getListenbrainz():
@@ -106,6 +118,7 @@ def getListenbrainz():
     conn.close()
 
     return [dict(row) for row in rows]
+
 
 @router.get(
     "/api/listenbrainz/playlist/{playlist_id}/tracks",
@@ -166,6 +179,7 @@ def get_playlist_tracks(playlist_id: str, username: str = Query("")):
     except Exception as e:
         return PlaylistTracksResponse(status="error", tracks=[], reason=str(e))
 
+
 @router.post("/api/listenbrainz/match", response_model=LBMatchResponse)
 def match_tracks(payload: LBMatchRequest):
     output_tracks, matched_count = batchMatchNavidromeTracks(payload.tracks)
@@ -175,6 +189,7 @@ def match_tracks(payload: LBMatchRequest):
         "tracks": output_tracks,
         "matched_count": matched_count,
     }
+
 
 def get_lb_token_for_user(dashboard_user: str) -> str | None:
     conn = get_db_connection_usr()
@@ -186,6 +201,7 @@ def get_lb_token_for_user(dashboard_user: str) -> str | None:
     if not row or not row[0]:
         return None
     return decrypt_token(row[0])
+
 
 def resolve_lb_username(token: str) -> str | None:
     try:
@@ -200,6 +216,7 @@ def resolve_lb_username(token: str) -> str | None:
     except Exception:
         pass
     return None
+
 
 @router.get("/api/listenbrainz/playlists", response_model=PlaylistResponse)
 def get_playlists(
@@ -217,7 +234,6 @@ def get_playlists(
             )
         resolvedUsername = resolve_lb_username(token)
 
-
         if not resolvedUsername:
             return PlaylistResponse(
                 status="error",
@@ -225,7 +241,6 @@ def get_playlists(
                 reason="Could not resolve LB username from token.",
             )
         lb_username = resolvedUsername
-
 
     auth_headers = {**LB_HEADERS}
     if token:
@@ -283,6 +298,7 @@ def get_playlists(
     except Exception as e:
         return PlaylistResponse(status="error", playlists=[], reason=str(e))
 
+
 @router.post("/api/navidrome/playlist/create", response_model=CreatePlaylistResponse)
 def create_navidrome_playlist(payload: CreatePlaylistRequest):
     user_id = payload.dashboard_user
@@ -305,6 +321,7 @@ def create_navidrome_playlist(payload: CreatePlaylistRequest):
         status="error", reason="Failed to create playlist in Navidrome."
     )
 
+
 def run_generation_task():
     try:
         cf_config = automation_config.get("cf_playlist_config", {})
@@ -322,6 +339,7 @@ def run_generation_task():
     except Exception as e:
         print(f"Background generation failed: {e}")
 
+
 @router.get("/api/lb-cf/config")
 async def fetch_lb_cf_config():
     try:
@@ -332,6 +350,7 @@ async def fetch_lb_cf_config():
         }
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
 
 @router.post("/api/lb-cf/config")
 async def save_lb_cf_config(payload: LBCFConfigPayload):
@@ -344,6 +363,7 @@ async def save_lb_cf_config(payload: LBCFConfigPayload):
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
 
 @router.post("/api/lb-cf/generate")
 async def generate_lb_cf_playlist():
@@ -359,6 +379,7 @@ async def generate_lb_cf_playlist():
     except Exception as e:
         return {"status": "error", "reason": str(e)}
 
+
 @router.get("/api/lb-cf/has-token")
 async def check_lb_token(user: str):
     try:
@@ -373,6 +394,7 @@ async def check_lb_token(user: str):
 
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
 
 @router.post("/api/lb-cf/set-token")
 async def set_lb_token(payload: SetTokenRequest):
@@ -391,12 +413,14 @@ async def set_lb_token(payload: SetTokenRequest):
         conn.commit()
         conn.close()
         print("stating auto lb cf")
-        BackgroundTasks(Auto_LB_CF(False))
-
+        # BackgroundTasks(Auto_LB_CF(False))
+        background = threading.Thread(target=Auto_LB_CF(False), daemon=True)
+        background.start()
         return {"status": "ok"}
 
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
 
 @router.get("/api/lb-cf/library")
 async def fetch_lb_library_recommendations():

@@ -15,6 +15,9 @@ from navidrome.state import automation_config, save_automation_config
 from playlists.playlist import API_push_playlist
 from pydantic import BaseModel
 from scrobble.listenBrainz import batchMatchNavidromeTracks
+from rich.console import Console
+
+console = Console()
 
 router = APIRouter(tags=["listenbrainz"])
 
@@ -400,11 +403,12 @@ async def check_lb_token(user: str):
 async def set_lb_token(payload: SetTokenRequest):
     try:
         encrypted_token = encrypt_token(payload.token)
-
+        username = resolve_lb_username(payload.token)
         conn = get_db_connection_usr()
+        console.print("[bold red]Saving username : " , username)
         conn.execute(
-            "UPDATE user SET LB_token=? WHERE username=?",
-            (encrypted_token, payload.user),
+            "UPDATE user SET LB_token=? , LB_username=? WHERE username=?",
+            (encrypted_token, username , payload.user),
         )
         if conn.total_changes == 0:
             conn.close()
@@ -412,8 +416,7 @@ async def set_lb_token(payload: SetTokenRequest):
 
         conn.commit()
         conn.close()
-        print("stating auto lb cf")
-        # BackgroundTasks(Auto_LB_CF(False))
+        console.print("[bold yellow]starting auto lb cf")
         background = threading.Thread(target=Auto_LB_CF(False), daemon=True)
         background.start()
         return {"status": "ok"}

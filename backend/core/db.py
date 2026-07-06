@@ -465,16 +465,14 @@ def migrate_playlist_primary_key():
         """)
         conn.execute("DROP TABLE playlist")
         conn.execute("ALTER TABLE playlist_new RENAME TO playlist")
-        console.print(
-            "[bold green]Migrated playlist table primary key to (username, song_id, type)[/bold green]"
-        )
+        # console.print(
+        #     "[bold green]Migrated playlist table primary key to (username, song_id, type)[/bold green]"
+        # )
     except Exception as e:
         console.print(f"[red]Playlist migration error: {e}[/red]")
     conn.commit()
     conn.close()
 
-
-import sqlite3
 
 
 def init_db_MB():

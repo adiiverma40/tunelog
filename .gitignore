@@ -96,4 +96,7 @@ dist-ssr
 
 
 #user profile pic
-config/users/
+config/
+
+#master key
+*.key

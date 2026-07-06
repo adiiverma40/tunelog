@@ -57,7 +57,6 @@ interface Config {
   jam_only_host_clear_queue: boolean;
   jam_only_host_add_queue: boolean;
   lb_enabled: boolean;
-  lb_username: string;
   lb_treat_data_as: TreatDataAs;
   lb_pool_interval: number;
   lb_for_users: string[];
@@ -113,7 +112,6 @@ const DEFAULTS: Config = {
   jam_only_host_clear_queue: true,
   jam_only_host_add_queue: false,
   lb_enabled: false,
-  lb_username: "",
   lb_treat_data_as: "partial",
   lb_pool_interval: 1,
   lb_for_users: [],
@@ -173,7 +171,6 @@ const mapApiToState = (api: any): Config => ({
   jam_only_host_clear_queue: api.jam?.only_host_clear_queue ?? true,
   jam_only_host_add_queue: api.jam?.only_host_add_queue ?? false,
   lb_enabled: api.listenbrainz?.enabled ?? false,
-  lb_username: api.listenbrainz?.username ?? "",
   lb_treat_data_as: api.listenbrainz?.treat_data_as ?? "partial",
   lb_pool_interval: api.listenbrainz?.pool_listen_brainz ?? 1,
   lb_for_users: api.listenbrainz?.for_users ?? [],
@@ -247,7 +244,6 @@ const mapStateToApi = (state: Config): any => ({
   },
   listenbrainz: {
     enabled: state.lb_enabled,
-    username: state.lb_username,
     treat_data_as: state.lb_treat_data_as,
     pool_listen_brainz: state.lb_pool_interval,
     for_users: state.lb_for_users,
@@ -1437,18 +1433,6 @@ export default function Config() {
               label=""
               defaultChecked={cfg.lb_enabled}
               onChange={(v) => set("lb_enabled", v)}
-            />
-          </ConfigRow>
-          <ConfigRow
-            label="ListenBrainz username"
-            desc="Public ListenBrainz account to fetch listens from"
-          >
-            <input
-              type="text"
-              value={cfg.lb_username}
-              onChange={(e) => set("lb_username", e.target.value)}
-              placeholder="e.g. adiiverma40"
-              className="w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </ConfigRow>
           <ConfigRow

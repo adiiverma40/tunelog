@@ -150,7 +150,7 @@ DEFAULT_CONFIG = {
         "for_users": [],
         "enabled": False,
         "dedup_window_seconds": 30,
-        "PushLovedSongs" : False
+        "PushLovedSongs": False,
     },
 }
 
@@ -177,11 +177,7 @@ DEFAULT_AUTO_CONFIG = {
     },
 }
 
-DEFAULT_SKIP_CONFIG = {
-    "base_path" : "",
-    "type" : "",
-    "action" : "move"
-}
+DEFAULT_SKIP_CONFIG = {"base_path": "", "type": "", "action": "move"}
 
 config_lock = threading.Lock()
 
@@ -265,7 +261,7 @@ tune_config = load_generic_config(CONFIG_FILE_PATH, DEFAULT_CONFIG)
 automation_config = load_generic_config(
     AUTOMATION_CONFIG_FILE_PATH, DEFAULT_AUTO_CONFIG
 )
-skip_config = load_generic_config(SKIPPED_CONFIG_FILE_PATH , DEFAULT_SKIP_CONFIG)
+skip_config = load_generic_config(SKIPPED_CONFIG_FILE_PATH, DEFAULT_SKIP_CONFIG)
 
 
 def save_config(new_config_data: dict) -> Tuple[bool, str]:
@@ -284,6 +280,9 @@ def save_automation_config(new_config_data: dict) -> Tuple[bool, str]:
         "Automation Configuration",
     )
 
-def save_skip_config(newconfigdata : dict  ) -> Tuple[bool , str] :
+
+def save_skip_config(newconfigdata: dict) -> Tuple[bool, str]:
     global skip_config
-    return save_generic_config(SKIPPED_CONFIG_FILE_PATH , newconfigdata , skip_config , "skipConfig")
+    return save_generic_config(
+        SKIPPED_CONFIG_FILE_PATH, newconfigdata, skip_config, "skipConfig"
+    )

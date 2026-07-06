@@ -437,6 +437,7 @@ def MusicbrainzSeeding():
 
 
 def musicBrainzThread():
+    console.print("[bold blue]Waiting 10 Sec to initialize other things")
     with console.status("[dim]Starting Musicbrainz song fetching[/dim]"):
         try:
             MusicbrainzThread = threading.Thread(target=MusicbrainzSeeding, daemon=True)
@@ -686,14 +687,14 @@ def main():
     is_lb_syncing = False
     last_lb_sync_timestamp = None
 
-    console.print("[bold blue]Starting Library Sync")
-    syncThread = threading.Thread(target=library.sync_library)
+    console.print("[bold blue]Starting Library Sync(10 sec delay)")
+    syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()
     syncThread.join()
 
     if tune_config["listenbrainz"]["PushLovedSongs"]:
-        console.print("[bold blue]Pushing Starred Song to Listenbrainz")
-        pushThread = threading.Thread(target=pushStarredToListenBrainz, daemon=True)
+        console.print("[bold blue]Pushing Starred Song to Listenbrainz(5 sec delay)")
+        pushThread = threading.Timer(5, pushStarredToListenBrainz)
         pushThread.start()
     else:
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")

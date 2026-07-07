@@ -26,13 +26,11 @@ LB_HEADERS = {
 LB_BASE = "https://api.listenbrainz.org"
 
 
-
-def _get_authed_headers(decrypted_token: str) -> dict:
+def get_authed_headers(decrypted_token: str) -> dict:
     return {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
 
 
-
-def _load_lb_users() -> List[Dict[str, str]]:
+def load_lb_users() -> List[Dict[str, str]]:
     usr_conn = get_db_connection_usr()
     cursor = usr_conn.cursor()
     cursor.execute(
@@ -76,7 +74,7 @@ def _load_lb_users() -> List[Dict[str, str]]:
     return resolved
 
 
-def _execute_with_retry(cursor, conn, sql, data, retries=5, delay=2):
+def execute_with_retry(cursor, conn, sql, data, retries=5, delay=2):
     for attempt in range(retries):
         try:
             cursor.executemany(sql, data)
@@ -281,7 +279,7 @@ def batchSave(matched_records, unmatched_records=None):
     console.print("[cyan]Attempting to write to database...[/cyan]")
 
     if insert_data:
-        ok = _execute_with_retry(
+        ok = execute_with_retry(
             cursor,
             conn,
             """
@@ -309,7 +307,7 @@ def batchSave(matched_records, unmatched_records=None):
         )
 
     if lb_log_data:
-        ok = _execute_with_retry(
+        ok = execute_with_retry(
             cursor,
             conn,
             """
@@ -360,7 +358,7 @@ def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
         r = requests.get(
             url,
             params=params,
-            headers=_get_authed_headers(decrypted_token),
+            headers=get_authed_headers(decrypted_token),
             timeout=15,
         )
         r.raise_for_status()
@@ -389,7 +387,7 @@ def deep_history_sync(
     if lb_user:
         lb_username = lb_user["lb_username"]
         decrypted_token = lb_user["decrypted_token"]
-        authed_headers = _get_authed_headers(decrypted_token)
+        authed_headers = get_authed_headers(decrypted_token)
     else:
         fresh_lb_conf = tune_config.get("listenbrainz", {})
         lb_username = fresh_lb_conf.get("username")
@@ -677,7 +675,7 @@ def fuzzyMatchingSong() -> Optional[int]:
         )
     )
 
-    lb_users = _load_lb_users()
+    lb_users = load_lb_users()
 
     if not lb_users:
         console.print("[bold red]No valid LB users found. Aborting.[/bold red]")

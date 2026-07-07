@@ -1,5 +1,13 @@
 # Changelog
 
+## 7th July 2026
+
+### Changes
+
+- Created a worker folder
+- Created a basic priorty queue using asyncio
+- Defined a basic class for the queues 
+
 ## 6th July 2026
 
 ### Changes

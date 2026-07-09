@@ -4,29 +4,41 @@ The idea of worker is to create a centrerlized queue and then a worker in which 
 
 ### Algo 
 
-The Idea is to use the `Asyncio.priortyQueue` to create a priorty queue, and Assign 0 For heighest, 1 for normal And 2 for low priorty task for the workers.
+The Idea is to use the `Queue.priortyQueue` to create a priorty queue, and Assign 0 For heighest, 1 for normal And 2 for low priorty task for the workers. For Now I havent Implemented the Priority as there is no serverice that needs data imideatly
+
 
 Every worker will have a dedicated class for the queue. Why? 'Cause I wanted to practice OOPS. 
 
 ```python
 
 class ListenbrainzQueue:
-    work : dict
     def __init__(self) -> None:
-        self.lbQueue = asyncio.PriorityQueue()
+        self.lbQueue = PriorityQueue()
         self.counter = itertools.count()
-        
-    async def addWork(self , priority , work):
-        await self.lbQueue.put((priority,next(self.counter),  work))
 
-    async def getWork(self):
-        _, _, work = await self.lbQueue.get()
-        return work 
+    def addWork(self, priority, work: lbWork):
+        return_queue = Queue()
+        work.response_queue = return_queue
+        self.lbQueue.put_nowait((priority, next(self.counter), work))
+        print("work added")
+        result = return_queue.get()
+
+        return result
+
+    def getWork(self):
+        _, _, work = self.lbQueue.get()
+        return work
 
     def size(self):
         return self.lbQueue.qsize()
-    pass
+
+
+LB_queue = ListenbrainzQueue()
+
 ```
+### Explanation:
+
+Here A shared Object `LB_queue` gets shared accross the `Producer` And `Consumer`. When Producer Adds a Queue, It creates a temp queue using `queue` Module, Using the pointer of the object. When the `Worker` Proccess the task it `PUT` Response in that Queue. And then That Queue Dilivers the response to the producer and Closing the loop
 
 ### WHYS?
 
@@ -48,17 +60,50 @@ Currently listenbrainz does these :
 
 Queue will look like :
 
-'''json
-{
-"type" : "get/post",
-"endpoint":"/song/star"
-"after":"update db"
-}
+```python
+class lbWork(BaseModel):
+    method: str         # GET/POST
+    endpoint: str
+    params : Optional[dict] = None
+    username: Optional[str] = None
+    token : Optional[str] = None
+    after: Optional[int] = None
+    response_queue: Any = None
 
-'''
 
-This is just a basic idea.
+```
 
-I will add a status code or something to the `after`, like 1 for update db, 2 for do nothing, 3, for something something, 
+Using BaseModel to confine the Incomming data, I created 1st prototype of the worker
 
-I dont think this is the best idea, but this is what i have right now.
+
+```python
+
+def func_A():
+    print("1st function adding work")
+    result = LB_queue.addWork(1, lbWork(type="work 1"))
+
+    print("1st work done ", result)
+
+
+def func_B():
+    print("2nd function adding work")
+    result = LB_queue.addWork(1, lbWork(type="work 2"))
+
+    print("2nd work done ", result)
+
+
+def worker():
+    print("in worker")
+    size = LB_queue.size()
+    # for i in range(size):
+    while True:
+        time.sleep(1)
+        work = LB_queue.getWork()
+        print("working on ", work)
+        time.sleep(2)
+        if work.response_queue:
+            work.response_queue.put(f"SUCCESSFUL DATA FOR {work.type}")
+```
+
+> For A quick Explaination : A producer creates a Task using the shared object, then that func creates a temp queue. when the worker process the data it puts back the response in the temp Queue. Using that it delivers the data to the producer
+

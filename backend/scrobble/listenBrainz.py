@@ -5,7 +5,6 @@ import time
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-import requests
 from core.crypto import decrypt_token
 from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
 from navidrome.state import tune_config
@@ -14,20 +13,14 @@ from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
+from Workers.worker_queue import LB_queue, lbWork
 
 console = Console()
 
 listenBrainzConf = tune_config.get("listenbrainz", {})
 behaviour = tune_config.get("behavioral_scoring", {})
 
-LB_HEADERS = {
-    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-}
-LB_BASE = "https://api.listenbrainz.org"
-
-
-def get_authed_headers(decrypted_token: str) -> dict:
-    return {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+LB_DEFAULT_PRIORITY = 5
 
 
 def load_lb_users() -> List[Dict[str, str]]:
@@ -330,6 +323,10 @@ def batchSave(matched_records, unmatched_records=None):
 
 
 def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
+    """
+    PRODUCER: builds an lbWork item and hands it to LB_queue, then blocks
+    on the work's response_queue until LB_Worker fulfills it.
+    """
     lb_username = lb_user["lb_username"]
     decrypted_token = lb_user["decrypted_token"]
 
@@ -351,32 +348,42 @@ def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
         f"[blue]Syncing since: {datetime.datetime.fromtimestamp(since)}[/blue]"
     )
 
-    url = f"{LB_BASE}/1/user/{lb_username}/listens"
+    endpoint = f"1/user/{lb_username}/listens"
     params = {"min_ts": since, "count": 100}
 
-    try:
-        r = requests.get(
-            url,
-            params=params,
-            headers=get_authed_headers(decrypted_token),
-            timeout=15,
-        )
-        r.raise_for_status()
-        listens = r.json().get("payload", {}).get("listens", [])
+    work = lbWork(
+        method="GET",
+        endpoint=endpoint,
+        params=params,
+        username=lb_username,
+        token=decrypted_token,
+    )
 
-        if listens:
-            console.print(
-                f"[green]✓ Fetched {len(listens)} new tracks for '{lb_username}'.[/green]"
-            )
-            return listens
-        else:
-            console.print(
-                f"[white]No new tracks for '{lb_username}' since last sync.[/white]"
-            )
-            return []
+    try:
+        result = LB_queue.addWork(LB_DEFAULT_PRIORITY, work)
     except Exception as e:
         console.print(
-            f"[bold red]Error fetching listens for '{lb_username}': {e}[/bold red]"
+            f"[bold red]Error queuing work for '{lb_username}': {e}[/bold red]"
+        )
+        return []
+
+    if result.get("status") != "success":
+        console.print(
+            f"[bold red]Error fetching listens for '{lb_username}': "
+            f"{result.get('error_msg')}[/bold red]"
+        )
+        return []
+
+    listens = result.get("data", {}).get("payload", {}).get("listens", [])
+
+    if listens:
+        console.print(
+            f"[green]✓ Fetched {len(listens)} new tracks for '{lb_username}'.[/green]"
+        )
+        return listens
+    else:
+        console.print(
+            f"[white]No new tracks for '{lb_username}' since last sync.[/white]"
         )
         return []
 
@@ -384,14 +391,17 @@ def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
 def deep_history_sync(
     pagination: int = 20, lb_user: Dict[str, str] = None
 ) -> List[dict]:
+    """
+    PRODUCER: same idea as getListenBrainzResponse, but loops, paging
+    backwards through history via max_ts, submitting one lbWork per page.
+    """
     if lb_user:
         lb_username = lb_user["lb_username"]
         decrypted_token = lb_user["decrypted_token"]
-        authed_headers = get_authed_headers(decrypted_token)
     else:
         fresh_lb_conf = tune_config.get("listenbrainz", {})
         lb_username = fresh_lb_conf.get("username")
-        authed_headers = LB_HEADERS
+        decrypted_token = None
 
     if not lb_username:
         console.print(
@@ -409,44 +419,55 @@ def deep_history_sync(
 
     all_listens = []
     ceiling_ts = None
-    url = f"{LB_BASE}/1/user/{lb_username}/listens"
+    endpoint = f"1/user/{lb_username}/listens"
 
     while True:
         params = {"count": pagination}
         if ceiling_ts is not None:
             params["max_ts"] = ceiling_ts
 
+        work = lbWork(
+            method="GET",
+            endpoint=endpoint,
+            params=params,
+            username=lb_username,
+            token=decrypted_token,
+        )
+
         try:
-            r = requests.get(url, params=params, headers=authed_headers, timeout=15)
-            r.raise_for_status()
-
-            listens = r.json().get("payload", {}).get("listens", [])
-
-            if not listens:
-                console.print("[yellow]No more history found.[/yellow]")
-                break
-
-            all_listens.extend(listens)
-            console.print(
-                f"[bold green]  ↳ Fetched {len(all_listens)} total for '{lb_username}'...[/bold green]"
-            )
-
-            ceiling_ts = listens[-1]["listened_at"] - 1
-            time.sleep(0.5)
-
-            if len(listens) < pagination:
-                console.print(
-                    f"[bold green]✓ All history fetched for '{lb_username}'[/bold green]"
-                )
-                return all_listens
-
+            result = LB_queue.addWork(LB_DEFAULT_PRIORITY, work)
         except Exception as e:
             console.print(
-                f"[bold red]Deep Sync API Error for '{lb_username}':[/bold red] {e}"
+                f"[bold red]Deep Sync queue error for '{lb_username}':[/bold red] {e}"
             )
-            if hasattr(e, "response") and e.response is not None:
-                console.print(f"[bold red]LB says:[/bold red] {e.response.text}")
             break
+
+        if result.get("status") != "success":
+            console.print(
+                f"[bold red]Deep Sync API Error for '{lb_username}':[/bold red] "
+                f"{result.get('error_msg')}"
+            )
+            break
+
+        listens = result.get("data", {}).get("payload", {}).get("listens", [])
+
+        if not listens:
+            console.print("[yellow]No more history found.[/yellow]")
+            break
+
+        all_listens.extend(listens)
+        console.print(
+            f"[bold green]  ↳ Fetched {len(all_listens)} total for '{lb_username}'...[/bold green]"
+        )
+
+        ceiling_ts = listens[-1]["listened_at"] - 1
+        time.sleep(0.5)
+
+        if len(listens) < pagination:
+            console.print(
+                f"[bold green]✓ All history fetched for '{lb_username}'[/bold green]"
+            )
+            return all_listens
 
     return all_listens
 

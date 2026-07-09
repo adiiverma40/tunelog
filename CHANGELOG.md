@@ -1,5 +1,14 @@
 # Changelog
 
+## 9th July 2026
+
+### Changes
+- As it turns out i dont need asyncio.queue Normal queue works fine
+- Changes Scoble/Listenbrainz to use Consumer/Producer model
+- Implemented basic Worker Model
+- In LB_worker switched to request.session for long handshakes and multiple 
+- Added a tiny 0.2 wait for every worker requests
+
 ## 7th July 2026
 
 ### Changes

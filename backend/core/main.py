@@ -60,6 +60,7 @@ from playlists.playlist import (
 )
 from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
+from Workers.LB_Worker import LB_Worker
 
 from .config import build_url, event_queue
 
@@ -608,14 +609,10 @@ def main():
         except Exception:
             traceback.print_exc()
             raise
-            # status_registry.update("Db", status="crashed", error=e)
-            # console.print(f"[red]✗ Database initialization failed:[/red] {e}")
-            # sys.exit(1)
     console.print("[green]✓ Database ready[/green]")
 
     with console.status("[dim]Starting API and proxy...[/dim]"):
         try:
-            # print("api router")
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
                 args=("api.api_entry:socket_app",),
@@ -688,6 +685,8 @@ def main():
     last_lb_sync_timestamp = None
 
     console.print("[bold blue]Starting Library Sync(10 sec delay)")
+    workerThread = threading.Thread(target=LB_Worker)
+    workerThread.start()
     syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()
     syncThread.join()
@@ -854,15 +853,12 @@ def main():
                     try:
                         lb_conf = tune_config.get("listenbrainz", {})
 
-                        # UPDATED: We no longer check for lb_conf.get("username")
-                        # We only check if the sync is enabled globally in the config
                         if not lb_conf.get("enabled"):
                             console.print(
                                 "[yellow]⚠ ListenBrainz sync skipped: disabled in config.[/yellow]"
                             )
                             return
 
-                        # fuzzyMatchingSong() handles fetching all DB users now
                         LatestTimeStamp = fuzzyMatchingSong()
 
                         if LatestTimeStamp:

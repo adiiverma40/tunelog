@@ -37,7 +37,7 @@ threading.excepthook = global_thread_handler
 def supervisor_loop():
     timeouts = {
         "SSE": 120,
-        "uvicorn": 30,
+        "uvicorn": 120,
         "sync": 300,
     }
 

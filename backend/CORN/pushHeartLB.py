@@ -1,21 +1,18 @@
-from core.db import get_db_connection_lib, get_db_connection_usr
-from core.crypto import decrypt_token
-from rich.console import Console
-from rich.panel import Panel
-from rich import box
-import requests
 import sqlite3
 import time
 
+from core.crypto import decrypt_token
+from core.db import get_db_connection_lib, get_db_connection_usr
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from Workers.worker_queue import LB_queue, lbWork
+
 console = Console()
 
-LB_HEADERS = {
-    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)"
-}
-LB_BASE = "https://api.listenbrainz.org"
-
 pending_done_queue: list[tuple] = []
-task_queue: list[dict] = [] 
+task_queue: list[dict] = []
+
 
 def populateTask():
     conn = get_db_connection_lib()
@@ -60,17 +57,16 @@ def getToken() -> list[dict]:
             console.print(f"  [red]✗ Decrypt failed for '{db_username}': {e}[/red]")
             continue
 
-        resolved.append({
-            "db_username": db_username,
-            "decrypted_token": decrypted,
-        })
+        resolved.append(
+            {
+                "db_username": db_username,
+                "decrypted_token": decrypted,
+            }
+        )
         console.print(f"  [green]✓ Token loaded for '{db_username}'[/green]")
 
     return resolved
 
-
-def get_authed_headers(decrypted_token: str) -> dict:
-    return {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
 
 def mark_done_with_retry(song_id: str, retries: int = 5, delay: int = 2) -> bool:
     global pending_done_queue
@@ -123,33 +119,25 @@ def mark_done_with_retry(song_id: str, retries: int = 5, delay: int = 2) -> bool
         )
     return False
 
-def push_love_primary(song_id: str, mbz_id: str, token: str) -> bool:
-    url = f"{LB_BASE}/1/feedback/recording-feedback"
+
+Queuepriority = 5
+
+
+def push_love_primary(song_id: str, mbz_id: str, token: str):
     payload = {
         "recording_mbid": mbz_id,
         "score": 1,
     }
-    try:
-        r = requests.post(
-            url,
-            json=payload,
-            headers=get_authed_headers(token),
-            timeout=10,
-        )
-        if r.status_code == 200:
-            console.print(
-                f"[bold green]-- Love pushed via MBZ ID: {mbz_id}[/bold green]"
-            )
-            return True
-        console.print(
-            f"[yellow]-- Primary push failed (HTTP {r.status_code}): {r.text[:120]}[/yellow]"
-        )
-        return False
-    except Exception as e:
-        console.print(f"[yellow]-- Primary push exception: {e}[/yellow]")
-        return False
-
-
+    LB_queue.addBackgroundTask(
+        priority=Queuepriority,
+        work=lbWork(
+            method="POST",
+            endpoint="/1/feedback/recording-feedback",
+            params=payload,
+            token=token,
+            on_success=lambda: mark_done_with_retry(song_id),
+        ),
+    )
 
 def get_pending_tasks() -> None:
     global task_queue
@@ -160,7 +148,9 @@ def get_pending_tasks() -> None:
     ).fetchall()
     conn.close()
     task_queue = [{"song_id": row[0], "mbz_id": row[1] or ""} for row in rows]
-    console.print(f"[cyan]Loaded {len(task_queue)} pending task(s) into memory queue.[/cyan]")
+    console.print(
+        f"[cyan]Loaded {len(task_queue)} pending task(s) into memory queue.[/cyan]"
+    )
 
 
 def pushStarredToListenBrainz():
@@ -178,7 +168,7 @@ def pushStarredToListenBrainz():
         console.print("[bold red]No valid tokens. Aborting.[/bold red]")
         return
 
-    get_pending_tasks()  
+    get_pending_tasks()
 
     if not task_queue:
         console.print("[bold green]-- No pending starred tracks to push.[/bold green]")
@@ -190,14 +180,11 @@ def pushStarredToListenBrainz():
     )
 
     while task_queue:
-        task = task_queue.pop(0) 
+        task = task_queue.pop(0)
         song_id = task["song_id"]
         mbz_id = task["mbz_id"]
 
-        console.print(f"\n[bold blue]── Processing: {song_id}[/bold blue]")
-
-        all_users_ok = True
-
+        console.print(f"\n[bold blue]─> Added Songs In queue : {song_id}[/bold blue]")
         for user in users:
             token = user["decrypted_token"]
             db_username = user["db_username"]
@@ -205,25 +192,9 @@ def pushStarredToListenBrainz():
             console.print(f"  [dim]-- Pushing for user '{db_username}'...[/dim]")
 
             if mbz_id:
-                success = push_love_primary(song_id, mbz_id, token)
-                time.sleep(1.5)
+                push_love_primary(song_id, mbz_id, token)
+
             else:
                 console.print(
                     f"  [yellow]-- No MBZ ID for {song_id}, skipping.[/yellow]"
                 )
-                success = False
-
-            if not success:
-                console.print(
-                    f"  [bold red]-- All methods failed for '{db_username}' "
-                    f"on song {song_id}. Skipping mark-done.[/bold red]"
-                )
-                all_users_ok = False
-
-        if all_users_ok:
-            mark_done_with_retry(song_id)
-        else:
-            console.print(
-                f"[yellow]-- Skipping done-mark for {song_id} "
-                f"(at least one user failed).[/yellow]"
-            )

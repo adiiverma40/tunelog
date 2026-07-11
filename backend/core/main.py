@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from Workers.worker_queue import LB_queue
 import metadata.library as library
 import requests
 import uvicorn

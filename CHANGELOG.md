@@ -1,5 +1,11 @@
 # Changelog
 
+## 12th July 2026
+- Changed PushStarLB to use worker
+- Added a `Background Worker Queue` for task that doesnt need imideate response
+- I discovered `Python's GIL`, Increasing Reporting `Timeout` of `uvicorn` server from 30 to 120 as other `threads` were not giving time to report back hence exiting the program
+- Added `POST` and `on_success` in `LB_worker`
+
 ## 9th July 2026
 
 ### Changes

@@ -44,7 +44,7 @@ class BaseQueue(Generic[WorkModel]):
         return_queue = Queue()
         work.response_queue = return_queue
         self.BaseQueue.put_nowait((0, next(self.counter), work))
-        self.printQueue()
+        # self.printQueue()
         result = return_queue.get()
         return result
 
@@ -53,8 +53,8 @@ class BaseQueue(Generic[WorkModel]):
         if priority == 0:
             priority += 1
         self.BaseQueue.put_nowait((priority, next(self.counter), work))
-        print("Background Task Added")
-        self.printQueue()
+        # print("Background Task Added")
+        # self.printQueue()
         # self.printQueue()
 
     def getWork(self, timeout=None):

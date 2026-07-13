@@ -101,7 +101,7 @@ def method_post(work, session):
 
 def LB_Worker():
     console.print(
-        "[bold blue][WORKER] Starting Listenbrainz Worker, Waiting For Work...[/bold blue]"
+        "[bold blue][WORKER][ListenBrainz] Starting ... Worker, Waiting For Work...[/bold blue]"
     )
     session = requests.Session()
     while True:

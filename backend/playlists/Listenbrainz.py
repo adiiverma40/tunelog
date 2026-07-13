@@ -1,28 +1,32 @@
-import requests
 import time
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
+from core.crypto import decrypt_token
+from core.db import (
+    DB_PATH_MB,
+    get_db_connection_lib,
+    get_db_connection_Musicbrainz,
+    get_db_connection_usr,
+)
+from rich import box
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
 from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
-    BarColumn,
     TextColumn,
     TimeElapsedColumn,
-    MofNCompleteColumn,
 )
-from rich.panel import Panel
-from rich import box
-from core.db import (
-    get_db_connection_lib,
-    get_db_connection_usr,
-    get_db_connection_Musicbrainz,
-    DB_PATH_MB,
-)
-from core.crypto import decrypt_token
+from rich.table import Table
+from rich.text import Text
 from scrobble.listenBrainz import batchMatchNavidromeTracks
-from typing import Any, Dict, List, Tuple
-from dataclasses import dataclass
+from Workers.worker_queue import LB_queue, MB_queue, MBWork, lbWork
+
 from .playlist import analyze_user_ratios
 
 console = Console()
@@ -37,12 +41,15 @@ MAX_COUNT = 1000
 
 
 def resolve_lb_username(decrypted_token: str) -> str | None:
-    url = f"{LB_BASE}/1/validate-token"
-    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
+        r = LB_queue.addWork(
+            work=lbWork(
+                method="GET", endpoint="/1/validate-token", token=decrypted_token
+            )
+        )
+
+        if r.get("status_code") == 200 and r.get("status") == "success":
+            data = r.get("data", {})
             if data.get("valid"):
                 return data.get("user_name")
             else:
@@ -52,41 +59,53 @@ def resolve_lb_username(decrypted_token: str) -> str | None:
                 return None
         else:
             console.print(
-                f"    [red]✗ validate-token returned HTTP {r.status_code}[/red]"
+                f"    [red]✗ validate-token returned HTTP {r.get('status_code')}: {r.get('error_msg')}[/red]"
             )
             return None
+
     except Exception as e:
         console.print(f"    [red]✗ validate-token request failed: {e}[/red]")
         return None
 
 
-def fetch_cf_recordings(lb_username: str, decrypted_token: str) -> list[dict]:
-
-    url = f"{LB_BASE}/1/cf/recommendation/user/{lb_username}/recording"
-    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+def fetch_cf_recordings(
+    lb_username: str, decrypted_token: str
+) -> tuple[list, Optional[int]]:
+    url = f"/1/cf/recommendation/user/{lb_username}/recording"
     params = {"count": MAX_COUNT, "offset": 0}
 
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=30)
-        if r.status_code == 200:
-            payload = r.json().get("payload", {})
+        r = LB_queue.addWork(
+            work=lbWork(
+                method="GET", endpoint=url, params=params, token=decrypted_token
+            )
+        )
+
+        status_code = r.get("status_code")
+
+        if status_code == 200 and r.get("status") == "success":
+            payload = r.get("data", {}).get("payload", {})
             mbids = payload.get("mbids", [])
             total = payload.get("total_mbid_count", len(mbids))
             cf_last_updated = payload.get("last_updated", int(time.time()))
+
             console.print(
                 f"    [cyan]↳ Total CF tracks available: {total} | Fetched: {len(mbids)}[/cyan]"
             )
             return mbids, cf_last_updated
-        elif r.status_code == 404:
+
+        elif status_code == 404:
             console.print(
                 f"    [yellow]⚠ No CF recommendations found for '{lb_username}' (404 — model may not have run yet)[/yellow]"
             )
             return [], None
+
         else:
             console.print(
-                f"    [red]✗ CF fetch returned HTTP {r.status_code}: {r.text[:200]}[/red]"
+                f"    [red]✗ CF fetch returned HTTP {status_code}: {r.get('error_msg')}[/red]"
             )
             return [], None
+
     except Exception as e:
         console.print(f"    [red]✗ CF fetch request failed: {e}[/red]")
         return [], None
@@ -183,74 +202,6 @@ def fillMusicBrainzDB():
     return inserted
 
 
-MB_BASE = "https://musicbrainz.org/ws/2"
-MB_HEADERS = {
-    "User-Agent": "TuneLog/1.0 (https://github.com/adiiverma40/tunelog; adiiverma40@gmail.com)",
-    "Accept": "application/json",
-}
-
-RATE_LIMIT_DELAY = 1.1
-BATCH_SIZE = 50
-
-
-def fetch_recording(mbid: str, max_retries: int = 3) -> dict | None:
-    url = f"{MB_BASE}/recording/{mbid}"
-    params = {"inc": "artists releases release-groups", "fmt": "json"}
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            time.sleep(RATE_LIMIT_DELAY)
-            response = requests.get(
-                url,
-                params=params,
-                headers=MB_HEADERS,
-                timeout=15,
-            )
-
-            if 400 <= response.status_code < 500:
-                console.print(
-                    f"  [red]✗ {mbid[:8]}… HTTP {response.status_code} "
-                    f"(permanent, marking FAILED)[/red]"
-                )
-                return None
-
-            response.raise_for_status()
-            return response.json()
-
-        except requests.exceptions.Timeout:
-            console.print(
-                f"  [yellow]⚠ {mbid[:8]}… timeout "
-                f"(attempt {attempt}/{max_retries})[/yellow]"
-            )
-
-        except requests.exceptions.ConnectionError as e:
-            console.print(
-                f"  [yellow]⚠ {mbid[:8]}… connection error "
-                f"(attempt {attempt}/{max_retries}): {e}[/yellow]"
-            )
-
-        except requests.exceptions.HTTPError as e:
-            status = e.response.status_code if e.response is not None else "?"
-            console.print(
-                f"  [yellow]⚠ {mbid[:8]}… HTTP {status} "
-                f"(attempt {attempt}/{max_retries})[/yellow]"
-            )
-
-        except Exception as e:
-            console.print(
-                f"  [red]✗ {mbid[:8]}… unexpected error "
-                f"(attempt {attempt}/{max_retries}): {e}[/red]"
-            )
-
-        if attempt < max_retries:
-            backoff = 2**attempt
-            console.print(f"  [dim]  retrying in {backoff}s...[/dim]")
-            time.sleep(backoff)
-
-    console.print(f"  [red]✗ {mbid[:8]}… exhausted retries, marking FAILED.[/red]")
-    return None
-
-
 def parse_recording(data: dict) -> dict:
     title = data.get("title")
     duration_ms = data.get("length")
@@ -328,7 +279,7 @@ def update_row(conn, mbid: str, parsed: dict | None):
         )
 
 
-def fetchPendingSongs(max_retries: int = 3, limit: int | None = None):
+def fetchPendingSongs(limit: int | None = None):
     conn = get_db_connection_Musicbrainz()
     cursor = conn.cursor()
 
@@ -337,69 +288,70 @@ def fetchPendingSongs(max_retries: int = 3, limit: int | None = None):
         query += f" LIMIT {limit}"
     cursor.execute(query)
     pending = [row["recording_mbid"] for row in cursor.fetchall()]
+    conn.close()
 
     total = len(pending)
     if not total:
         console.print("[yellow]⚠ No PENDING rows in hydration_cache.[/yellow]")
-        conn.close()
         return
 
     console.print(
         Panel.fit(
             f"[bold cyan]MusicBrainz Hydration[/bold cyan]\n"
-            f"[white]{total} PENDING rows to process[/white]",
+            f"[white]{total} tasks dispatched to background worker[/white]",
             box=box.DOUBLE_EDGE,
         )
     )
 
-    done = 0
-    failed = 0
-    BATCH_SIZE = 5
+    params = {"inc": "artists releases release-groups", "fmt": "json"}
 
-    for index, mbid in enumerate(pending, start=1):
-        raw = fetch_recording(mbid, max_retries=max_retries)
-        parsed = parse_recording(raw) if raw else None
+    for mbid in pending:
+        url = f"/recording/{mbid}"
+        MB_queue.addBackgroundTask(
+            priority=4,
+            work=MBWork(
+                method="GET",
+                endpoint=url,
+                params=params,
+                on_success=lambda data, m_id=mbid: handle_mb_success(data, m_id),
+                on_error=lambda err, m_id=mbid: handle_mb_error(err, m_id),
+            ),
+        )
 
-        if not parsed:
-            console.print(
-                f"  [yellow]↻ Retrying {mbid[:8]}… ({index}/{total})[/yellow]"
-            )
-            time.sleep(2)
-            raw = fetch_recording(mbid, max_retries=max_retries)
-            parsed = parse_recording(raw) if raw else None
 
-        update_row(conn, mbid, parsed)
+def handle_mb_success(raw_data: dict, mbid: str):
+    """Fired by the worker when it gets a 200 OK from MusicBrainz."""
+    parsed = parse_recording(raw_data) if raw_data else None
+    conn = get_db_connection_Musicbrainz()
 
-        if parsed:
-            done += 1
-            artist = parsed.get("artist") or "Unknown"
-            title = parsed.get("title") or "Unknown"
-            console.print(
-                f"  [green]✓[/green] [dim]{mbid[:8]}…[/dim] "
-                f"[white]{artist} — {title}[/white] "
-                f"[dim]({index}/{total})[/dim]"
-            )
-        else:
-            failed += 1
-            console.print(
-                f"  [red]✗[/red] [dim]{mbid[:8]}…[/dim] "
-                f"[red]FAILED[/red] "
-                f"[dim]({index}/{total})[/dim]"
-            )
+    update_row(conn, mbid, parsed)
+    conn.commit()
+    conn.close()
 
-        if index % BATCH_SIZE == 0:
-            conn.commit()
+    if parsed:
+        artist = parsed.get("artist") or "Unknown"
+        title = parsed.get("title") or "Unknown"
+        console.print(
+            f"  [green]✓[/green] [dim]{mbid[:8]}…[/dim] [white]{artist} — {title}[/white]"
+        )
+    else:
+        console.print(f"  [red]✗[/red] [dim]{mbid[:8]}…[/dim] [red]Parse FAILED[/red]")
 
+
+def handle_mb_error(error_msg: str, mbid: str):
+    """Fired by the worker if the API times out or 404s."""
+    conn = get_db_connection_Musicbrainz()
+
+    now = datetime.utcnow().isoformat(sep=" ", timespec="seconds")
+    conn.execute(
+        "UPDATE hydration_cache SET fetch_status = 'FAILED', last_synced = ? WHERE recording_mbid = ?",
+        (now, mbid),
+    )
     conn.commit()
     conn.close()
 
     console.print(
-        Panel.fit(
-            f"[bold green]✓ Done : {done}[/bold green]   "
-            f"[bold red]✗ Failed : {failed}[/bold red]   "
-            f"[dim]Total : {total}[/dim]",
-            box=box.ROUNDED,
-        )
+        f"  [red]✗[/red] [dim]{mbid[:8]}…[/dim] [red]API Error: {error_msg}[/red]"
     )
 
 
@@ -432,48 +384,20 @@ def retryFailedSongs(max_retries: int = 3, limit: int | None = None):
         [(mbid,) for mbid in failed_rows],
     )
     conn.commit()
-
-    done = 0
-    still_failed = 0
-    BATCH_SIZE = 5
+    params = {"inc": "artists releases release-groups", "fmt": "json"}
 
     for index, mbid in enumerate(failed_rows, start=1):
-        raw = fetch_recording(mbid, max_retries=max_retries)
-        parsed = parse_recording(raw) if raw else None
-
-        update_row(conn, mbid, parsed)
-
-        if parsed:
-            done += 1
-            artist = parsed.get("artist") or "Unknown"
-            title = parsed.get("title") or "Unknown"
-            console.print(
-                f"  [green]✓[/green] [dim]{mbid[:8]}…[/dim] "
-                f"[white]{artist} — {title}[/white] "
-                f"[dim]({index}/{total})[/dim]"
-            )
-        else:
-            still_failed += 1
-            console.print(
-                f"  [red]✗[/red] [dim]{mbid[:8]}…[/dim] "
-                f"[red]Still FAILED[/red] "
-                f"[dim]({index}/{total})[/dim]"
-            )
-
-        if index % BATCH_SIZE == 0:
-            conn.commit()
-
-    conn.commit()
-    conn.close()
-
-    console.print(
-        Panel.fit(
-            f"[bold green]✓ Recovered : {done}[/bold green]   "
-            f"[bold red]✗ Still Failed : {still_failed}[/bold red]   "
-            f"[dim]Total retried : {total}[/dim]",
-            box=box.ROUNDED,
+        url = f"/recording/{mbid}"
+        MB_queue.addBackgroundTask(
+            priority=4,
+            work=MBWork(
+                method="GET",
+                endpoint=url,
+                params=params,
+                on_success=lambda data, m_id=mbid: handle_mb_success(data, m_id),
+                on_error=lambda err, m_id=mbid: handle_mb_error(err, m_id),
+            ),
         )
-    )
 
 
 BATCH_SIZE = 100
@@ -598,11 +522,6 @@ def match_and_update_nvid(batch_size: int = BATCH_SIZE):
         )
     )
 
-
-from rich.console import Console
-from rich.table import Table
-from rich.text import Text
-from rich import box
 
 _console = Console()
 
@@ -917,14 +836,13 @@ def build_LB_CF_playlist(
     return final_ids[:size], song_signals, new_heard_score, new_unheard_score
 
 
-
-
 def fetch_top_similar_user(lb_username: str, decrypted_token: str) -> str | None:
-    url = f"{LB_BASE}/1/user/{lb_username}/similar-users"
-    headers = {**LB_HEADERS, "Authorization": f"Token {decrypted_token}"}
+    url = f"/1/user/{lb_username}/similar-users"
 
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        r = LB_queue.addWork(
+            work=lbWork(method="GET", endpoint=url, token=decrypted_token)
+        )
 
         if r.status_code == 200:
             payload = r.json().get("payload", [])
@@ -1009,7 +927,9 @@ def FetchCF():
             decrypted = decrypt_token(raw_token)
         except Exception as e:
             console.print(f"  [red]✗ Token decryption failed: {e}[/red]")
-            summary.add_row(db_username, "—", "—", "0", "0", "[red]Decrypt failed[/red]")
+            summary.add_row(
+                db_username, "—", "—", "0", "0", "[red]Decrypt failed[/red]"
+            )
             continue
 
         console.print("  [dim]→ Validating token + resolving LB username...[/dim]")
@@ -1025,7 +945,9 @@ def FetchCF():
                 console.print(
                     f"  [red]✗ Could not determine LB username for '{db_username}'. Skipping.[/red]"
                 )
-                summary.add_row(db_username, "—", "—", "0", "0", "[red]No LB username[/red]")
+                summary.add_row(
+                    db_username, "—", "—", "0", "0", "[red]No LB username[/red]"
+                )
                 continue
 
         console.print(
@@ -1070,9 +992,14 @@ def FetchCF():
                 f"  [yellow]⚠ No similar user found for '{lb_username}', skipping similar CF.[/yellow]"
             )
             summary.add_row(
-                db_username, lb_username, "—",
-                str(own_saved), "0",
-                "[green]✓ Own only[/green]" if own_saved else "[yellow]No data[/yellow]"
+                db_username,
+                lb_username,
+                "—",
+                str(own_saved),
+                "0",
+                "[green]✓ Own only[/green]"
+                if own_saved
+                else "[yellow]No data[/yellow]",
             )
             inserted = own_saved
             continue
@@ -1091,7 +1018,9 @@ def FetchCF():
             task = progress.add_task(
                 f"  Fetching CF for {similar_username}...", total=None
             )
-            sim_mbids, sim_cf_last_updated = fetch_cf_recordings(similar_username, decrypted)
+            sim_mbids, sim_cf_last_updated = fetch_cf_recordings(
+                similar_username, decrypted
+            )
             progress.update(task, completed=True)
 
         if not sim_mbids:

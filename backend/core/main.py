@@ -61,7 +61,9 @@ from playlists.playlist import (
 )
 from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
-from Workers.LB_Worker import LB_Worker
+# from Workers.LB_Worker import LB_Worker
+# from Workers.MB_Worker import MB_Worker as LB_Worker
+from Workers.Luffy import Sanji
 
 from .config import build_url, event_queue
 
@@ -686,7 +688,7 @@ def main():
     last_lb_sync_timestamp = None
 
     console.print("[bold blue]Starting Library Sync(10 sec delay)")
-    workerThread = threading.Thread(target=LB_Worker)
+    workerThread = threading.Thread(target=Sanji.Robin)  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
     workerThread.start()
     syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()

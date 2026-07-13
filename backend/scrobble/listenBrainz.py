@@ -360,7 +360,7 @@ def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
     )
 
     try:
-        result = LB_queue.addWork(LB_DEFAULT_PRIORITY, work)
+        result = LB_queue.addWork(work=work)
     except Exception as e:
         console.print(
             f"[bold red]Error queuing work for '{lb_username}': {e}[/bold red]"
@@ -435,7 +435,7 @@ def deep_history_sync(
         )
 
         try:
-            result = LB_queue.addWork(LB_DEFAULT_PRIORITY, work)
+            result = LB_queue.addWork(work=work)
         except Exception as e:
             console.print(
                 f"[bold red]Deep Sync queue error for '{lb_username}':[/bold red] {e}"

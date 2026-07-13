@@ -9,41 +9,48 @@ The Idea is to use the `Queue.priortyQueue` to create a priorty queue, and Assig
 
 Every worker will have a dedicated class for the queue. Why? 'Cause I wanted to practice OOPS. 
 
+Now, other queues inheirt from a `BaseQueue` class 
+
 ```python
 
-class ListenbrainzQueue:
+class BaseQueue(Generic[WorkModel]):
     def __init__(self) -> None:
-        self.lbQueue = PriorityQueue()
+        self.BaseQueue = PriorityQueue()
         self.counter = itertools.count()
 
-    def addWork(self, priority  , work: lbWork):
-        # A queue where the response needed imdediately, Default priority = 0 
+    def addWork(self, work: WorkModel):
+        # A queue where the response needed imdediately, Default priority = 0
         return_queue = Queue()
         work.response_queue = return_queue
-        self.lbQueue.put_nowait((0 , next(self.counter), work))
+        self.BaseQueue.put_nowait((0, next(self.counter), work))
         self.printQueue()
         result = return_queue.get()
         return result
-    def addBackgroundTask(self , priority , work : lbWork):
-        # Make sure the priority is not 0 
-        if priority == 0 :
+
+    def addBackgroundTask(self, priority, work: lbWork):
+        # Make sure the priority is not 0
+        if priority == 0:
             priority += 1
-        self.lbQueue.put_nowait((priority , next(self.counter) , work))
+        self.BaseQueue.put_nowait((priority, next(self.counter), work))
         print("Background Task Added")
         self.printQueue()
+        # self.printQueue()
 
-    def getWork(self):
-        _, _, work = self.lbQueue.get()
+    def getWork(self, timeout=None):
+        if timeout is not None:
+            _, _, work = self.BaseQueue.get(timeout=timeout)
+        else:
+            _, _, work = self.BaseQueue.get()
         return work
 
     def size(self):
-        return self.lbQueue.qsize()
-        
+        return self.BaseQueue.qsize()
+
     def printQueue(self):
-        print(list(self.lbQueue.queue))
+        print(list(self.BaseQueue.queue))
 
-
-LB_queue = ListenbrainzQueue()
+class ListenbrainzQueue(BaseQueue[lbWork]):
+    pass
 
 ```
 ### Explanation:
@@ -74,16 +81,23 @@ Currently listenbrainz does these :
 
 Queue will look like :
 
+All other work model inhearts from `BaseWork` Model
+
 ```python
 
-class lbWork(BaseModel):
-    method: str         # GET/POST
-    endpoint: str
-    params : Optional[dict] = None
-    username: Optional[str] = None
-    token : Optional[str] = None
+class BaseWork(BaseModel):
     response_queue: Any = None
-    on_success : Optional[Callable] = None
+    on_success: Optional[Callable] = None
+    max_retries : int = 3
+    attempts : int = 0 
+
+
+class lbWork(BaseWork):
+    method: str  # GET/POST
+    endpoint: str
+    params: Optional[dict] = None
+    username: Optional[str] = None
+    token: Optional[str] = None
 
 ```
 
@@ -131,3 +145,46 @@ def LB_Worker():
 > For A quick Explaination : A producer creates a Task using the shared object, then that func creates a temp queue. when the worker process the data it puts back the response in the temp Queue. Using that it delivers the data to the producer
 > Here, The function passed by the On_success callable is called when the api returns a success status after an task is done. Usin Try and Except for the error in case a function is passed that doesnt exist
 
+
+
+## Workers Thread Manager(Luffy)
+
+To manage Multiple thread, I implemented a basic manager, Its checks for the `queue size` of every queue and then if the queue is greater then 0 and thread is dead then it creates a new thread, 
+
+> Though i wonder, once a thread is dead, For example. 1st LB gets intialized then its dead, then Namy creates a new LB thread, then Robin checks for the LB thread doesnt this give dead? cause its the og thread and thats dead. I am confused
+
+```python
+
+class luffy:  # Class for the worker manager
+
+    def __init__(self) -> None:  # Zoro
+        self.LB = threading.Thread(target=LB_Worker, daemon=True)
+        self.MB = threading.Thread(target=MB_Worker, daemon=True)
+
+    def Namy(self, worker=None):  # wakes every worker
+        if worker is None:
+                    self.LB.start()
+                    self.MB.start()
+        elif worker == "LB":
+            self.LB = threading.Thread(target=LB_Worker, daemon=True)
+            self.LB.start()
+        elif worker == "MB":
+            self.MB = threading.Thread(target=MB_Worker, daemon=True)
+            self.MB.start()
+
+    def Robin(self):  # Monitors who is up
+        self.Namy()
+        while True:
+            if LB_queue.size() != 0 and not self.LB.is_alive():
+                self.Namy("LB")
+                
+            if MB_queue.size() != 0 and not self.MB.is_alive():
+                self.Namy("MB")
+
+            time.sleep(2)
+
+
+Sanji = luffy()  # Our COOK
+
+
+```

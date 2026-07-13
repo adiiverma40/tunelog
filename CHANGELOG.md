@@ -1,5 +1,16 @@
 # Changelog
 
+## 14th July 2026
+### Implementation
+- `Luffy` as a manager to manage the worker threads
+- `MB_worker`
+- Inherit a `BaseQueue` class to other class
+
+### Changes
+- refactoring existing way to pool listenbrainz and musicbrainz to Worker 
+
+> The code are in a mess, I would mind if it doesnt fail. 
+
 ## 12th July 2026
 - Changed PushStarLB to use worker
 - Added a `Background Worker Queue` for task that doesnt need imideate response

@@ -1,3 +1,4 @@
+import queue
 import time
 
 import requests
@@ -103,55 +104,59 @@ def method_post(work, session):
 
 def MB_Worker():
     console.print(
-        "[bold blue][WORKER][Musicbrainz] Starting... Worker, Waiting For Work...[/bold blue]"
+        "[bold blue][WORKER][Musicbrainz]Starting Worker[/bold blue]"
     )
     session = requests.Session()
-
+    timeout = 600
     while True:
-        work = MB_queue.getWork(timeout=60)
-        result = None
-
-        if work.method.lower() == "get":
-            result = method_get(work, session)
-
-        elif work.method.lower() == "post":
-            result = method_post(work, session)
-
-        else:
-            result = {
-                "status": "error",
-                "error_msg": f"Unsupported method: {work.method}",
-            }
-
         try:
-            if result.get("status") == "success":
-                if work.response_queue:
-                    work.response_queue.put(result)
+            work = MB_queue.getWork(timeout=timeout)
+            result = None
 
-                elif work.on_success and result.get("status") == "success":
-                    work.on_success(result.get("data"))
-                elif work.on_error and result.get("status") == "error":
-                    work.on_error(result.get("error_msg"))
+            if work.method.lower() == "get":
+                result = method_get(work, session)
 
-            elif result.get("status") == "error":
-                err_msg = str(result.get("error_msg", ""))
-                console.print(f"[bold red][WORKER](ERROR) : {err_msg}")
+            elif work.method.lower() == "post":
+                result = method_post(work, session)
 
-                if "503" in err_msg or "502" in err_msg:
-                    if work.attempts < work.max_retries:
-                        work.attempts += 1
-                        console.print(
-                            f"[yellow]⚠ 503 Overload. Re-queueing task "
-                            f"(Attempt {work.attempts}/{work.max_retries}) "
-                        )
-                        MB_queue.addBackgroundTask(priority=10, work=work)
-                    else:
-                        console.print(
-                            f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
-                        )
-        
+            else:
+                result = {
+                    "status": "error",
+                    "error_msg": f"Unsupported method: {work.method}",
+                }
 
+                if result.get("status") == "success":
+                    if work.response_queue:
+                        work.response_queue.put(result)
+
+                    elif work.on_success and result.get("status") == "success":
+                        work.on_success(result.get("data"))
+                    elif work.on_error and result.get("status") == "error":
+                        work.on_error(result.get("error_msg"))
+
+                elif result.get("status") == "error":
+                    err_msg = str(result.get("error_msg", ""))
+                    console.print(f"[bold red][WORKER](ERROR) : {err_msg}")
+
+                    if "503" in err_msg or "502" in err_msg:
+                        if work.attempts < work.max_retries:
+                            work.attempts += 1
+                            console.print(
+                                f"[yellow]⚠ 503 Overload. Re-queueing task "
+                                f"(Attempt {work.attempts}/{work.max_retries}) "
+                            )
+                            MB_queue.addBackgroundTask(priority=10, work=work)
+                        else:
+                            console.print(
+                                f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
+                            )
+
+            time.sleep(0.5)
+
+        except queue.Empty:
+            console.print(
+                f"[bold red][WORKER][Musicbrainz](ERR) The queue is empty for {timeout}sec. Exiting "
+            )
+            break
         except Exception as e:
             console.print(f"[bold red][LB WORKER] (ERR) : {e}")
-
-        time.sleep(0.5)

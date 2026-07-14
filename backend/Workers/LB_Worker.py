@@ -1,3 +1,4 @@
+import queue
 import time
 from curses import ERR
 
@@ -52,7 +53,9 @@ def method_get(work, session):
 
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response is not None else 500
-        console.print(f"[bold red]Worker API HTTP Error ({status_code}): {e}[/bold red]")
+        console.print(
+            f"[bold red]Worker API HTTP Error ({status_code}): {e}[/bold red]"
+        )
         result = {"status": "error", "status_code": status_code, "error_msg": str(e)}
 
     except requests.exceptions.RequestException as e:
@@ -60,6 +63,7 @@ def method_get(work, session):
         result = {"status": "error", "status_code": 500, "error_msg": str(e)}
 
     return result
+
 
 def method_post(work, session):
     url = f"{LB_BASE}/{work.endpoint.lstrip('/')}"
@@ -101,26 +105,28 @@ def method_post(work, session):
 
 def LB_Worker():
     console.print(
-        "[bold blue][WORKER][ListenBrainz] Starting ... Worker, Waiting For Work...[/bold blue]"
+        "[bold blue][WORKER][ListenBrainz]Starting Worker[/bold blue]"
     )
     session = requests.Session()
+    timeout = 600
+
     while True:
-        work = LB_queue.getWork(timeout=60)
-        result = None
-
-        if work.method.lower() == "get":
-            result = method_get(work, session)
-
-        elif work.method.lower() == "post":
-            result = method_post(work, session)
-
-        else:
-            result = {
-                "status": "error",
-                "error_msg": f"Unsupported method: {work.method}",
-            }
-
         try:
+            work = LB_queue.getWork(timeout=timeout)
+            result = None
+
+            if work.method.lower() == "get":
+                result = method_get(work, session)
+
+            elif work.method.lower() == "post":
+                result = method_post(work, session)
+
+            else:
+                result = {
+                    "status": "error",
+                    "error_msg": f"Unsupported method: {work.method}",
+                }
+
             if result.get("status") == "success":
                 if work.response_queue:
                     work.response_queue.put(result)
@@ -144,6 +150,8 @@ def LB_Worker():
                         console.print(
                             f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
                         )
-
+        except queue.Empty:
+            console.print(f'[bold red][WORKER][Listenbrainz](ERR) The queue is empty for {timeout}sec. Exiting ')
+            break
         except Exception as e:
             console.print(f"[bold red][LB WORKER] (ERR) : {e}")

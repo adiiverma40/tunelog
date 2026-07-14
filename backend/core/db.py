@@ -94,7 +94,8 @@ def init_db():
             percent_played REAL,
             signal         TEXT,
             timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP,
-            user_id        TEXT DEFAULT 'default'
+            user_id        TEXT DEFAULT 'default',
+            score          INTEGER
         )
     """)
     cursor.execute("""
@@ -142,6 +143,7 @@ def init_db():
             "signal": "TEXT",
             "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP",
             "user_id": "TEXT DEFAULT 'default'",
+            "score" : "INTEGER"
         },
     )
 

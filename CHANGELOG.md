@@ -5,6 +5,11 @@
 - `Luffy` as a manager to manage the worker threads
 - `MB_worker`
 - Inherit a `BaseQueue` class to other class
+- Increased worker timeout to 10 min
+- Added try..execpt block and error boundary for `queue.Empty()` 
+- Changed the `watcher` and `log_history` from main to `navidrome.watcher` 
+- Added `score` row in `tunelog.db`
+- Added logic to Add `score` of listens(read in ALGO.md)
 
 ### Changes
 - refactoring existing way to pool listenbrainz and musicbrainz to Worker 

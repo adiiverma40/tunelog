@@ -1,30 +1,31 @@
-from datetime import datetime, datetime, timedelta, timezone
-import requests
-import random
 import heapq
-from rich.console import Console
-from rich.table import Table
+import json
+import random
+import re
+from datetime import datetime, timedelta, timezone
+
+import requests
+from core.config import build_url, build_url_for_user, getAllUser
+from core.db import (
+    DB_PATH_LOG,
+    get_db_connection,
+    get_db_connection_lib,
+    get_db_connection_playlist,
+    get_db_connection_usr,
+)
 from metadata.genre import readJson as readJSON
 from misc.misc import (
     log,
-    log_scores,
-    log_slot,
-    log_wildcard,
     log_genre_injection,
     log_pool,
+    log_scores,
+    log_slot,
     log_summary,
+    log_wildcard,
 )
-import json
-from core.db import (
-    get_db_connection,
-    get_db_connection_lib,
-    get_db_connection_usr,
-    get_db_connection_playlist,
-    DB_PATH_LOG,
-)
-from core.config import build_url, build_url_for_user, getAllUser
 from navidrome.state import notification_status, tune_config
-import re
+from rich.console import Console
+from rich.table import Table
 
 pat = DB_PATH_LOG
 
@@ -605,7 +606,6 @@ def build_playlist(
 
     genre_songs = []
     if injection:
-
         heard_so_far = set(song_signals.keys()) | all_time_heard
 
         adjusted_unheard_size = unheard_size + leftover

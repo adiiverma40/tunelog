@@ -9,6 +9,13 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - `Playlist` Page was re written using claude ai
 ## Updates
 
+### Changed Singal Weights
+> The Singal weights used to dictate how much score a `signal` will get, But now it is chanaged to affect only the next `listen` 
+
+
+To better explain, Now I am implementing a dynamic scoring system in which, The higher the `listen Count` the lower the score. 
+I am doing this to counter the #18 issue. In which if a song is listened multiple times, that songs get so much high score that new songs dont get place in the playlist
+
 ### New Push Star Feature 
 - Lets user update the local heart songs to listenbrainz
 

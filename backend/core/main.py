@@ -6,7 +6,6 @@ import traceback
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from Workers.worker_queue import LB_queue
 import metadata.library as library
 import requests
 import uvicorn
@@ -61,199 +60,19 @@ from playlists.playlist import (
 )
 from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
+
 # from Workers.LB_Worker import LB_Worker
 # from Workers.MB_Worker import MB_Worker as LB_Worker
 from Workers.Luffy import Sanji
+from Workers.worker_queue import LB_queue
 
+from navidrome.watcher import Watcher 
 from .config import build_url, event_queue
 
 load_dotenv()
 console = Console()
-active = {}
 
 CURRENT_VERSION = "0.001"
-
-
-def format_ms(ms):
-    total_seconds = ms // 1000
-    minutes, seconds = divmod(total_seconds, 60)
-    return f"{minutes} min {seconds} sec"
-
-
-def navidrome_url(endpoint):
-    url = build_url(endpoint)
-    response = requests.get(url)
-    return response.json()
-
-
-class PlaybackTracker:
-    def __init__(self):
-        self.is_playing = False
-        self.anchor_time = 0.0
-        self.anchor_position_ms = 0.0
-
-    def sync_state(self, state: str, position_ms: float):
-        if state == "starting":
-            self.is_playing = True
-            self.anchor_position_ms = position_ms
-            self.anchor_time = time.monotonic()
-
-        elif state == "playing":
-            self.is_playing = True
-            self.anchor_position_ms = position_ms
-            self.anchor_time = time.monotonic()
-
-        elif state in ["paused", "stopped"]:
-            self.is_playing = False
-            self.anchor_position_ms = position_ms
-
-    def get_projected_time(self) -> float:
-        if not self.is_playing:
-            return self.anchor_position_ms
-
-        elapsed_real_time_ms = (time.monotonic() - self.anchor_time) * 1000
-        return self.anchor_position_ms + elapsed_real_time_ms
-
-
-def make_entry(entry, positionMs):
-    return {
-        "song_id": entry["id"],
-        "user_id": entry["username"],
-        "title": entry.get("title", ""),
-        "album": entry.get("album", ""),
-        "artist": normalise_artist(entry.get("artist", "")),
-        "genre": normalise_genre(entry.get("genre")),
-        "duration": entry["duration"],
-        "positionMs": positionMs,
-        "state": entry["state"],
-        "playbackRate": 1,
-        "tracker": PlaybackTracker(),
-    }
-
-
-def Watcher():
-    url_response = navidrome_url("getNowPlaying")
-    entries = url_response["subsonic-response"].get("nowPlaying", {}).get("entry", [])
-
-    for entry in entries:
-        user_id = entry["username"]
-        song_id = entry["id"]
-        state = entry["state"]
-        positionMs = entry["positionMs"]
-        if user_id not in active:
-            active[user_id] = make_entry(entry, positionMs)
-            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
-            console.print(
-                f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
-                f"[purple]Started: {entry['title']}[/purple] at "
-                f"[bold green]{format_ms(positionMs)}[/bold green] "
-                f"[bold red][STATE]: {state}"
-            )
-
-        elif song_id == active[user_id]["song_id"]:
-            active[user_id]["positionMs"] = positionMs
-            active[user_id]["state"] = state
-            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
-            console.print(
-                f"[bold blue][SAME][/bold blue] [green]{user_id}[/green] "
-                f"[purple]playing: {entry['title']}[/purple] at "
-                f"[bold green]{format_ms(positionMs)}[/bold green] "
-                f"[bold red][STATE]: {state}"
-            )
-
-        else:
-            log_history(active.pop(user_id))
-            active[user_id] = make_entry(entry, positionMs)
-            active[user_id]["tracker"].sync_state(state=state, position_ms=positionMs)
-            console.print(
-                f"[bold yellow][NEW][/bold yellow] [green]{user_id}[/green] "
-                f"[purple]Started: {entry['title']}[/purple] at "
-                f"[bold green]{format_ms(positionMs)}[/bold green] "
-                f"[bold red][STATE]: {state}"
-            )
-
-    current_users = {entry["username"] for entry in entries}
-    for user_id in list(active.keys()):
-        if user_id not in current_users:
-            stopped_entry = active.pop(user_id)
-            log_history(stopped_entry)
-            notification_status.songState.append(
-                {
-                    "username": user_id,
-                    "song": stopped_entry["title"],
-                    "state": "stopped",
-                }
-            )
-            console.print(f"[bold red][STOP] {user_id} stopped")
-
-
-def log_history(song):
-    played_ms = song["tracker"].get_projected_time()
-    played = min(played_ms / 1000, song["duration"])
-    percent_played = min(round((played / song["duration"]) * 100), 100)
-    signal = signal_system(percent_played, song["song_id"], song["user_id"])
-    console.print(
-        f"[bold blue] {song['user_id']} [/bold blue] Listened  [red]: [/red] [green] {song['title']} [/green]  [red]: [/red] "
-        f"[purple]{format_ms(played * 1000)} [red] :  [/red]{percent_played} % [red] : [/red] {signal} "
-    )
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO listens(
-            song_id, title, artist, album, genre, duration, played, percent_played, signal, user_id
-        )
-        VALUES (?,?,?,?,?,?,?,?,?,?)
-        """,
-        (
-            song["song_id"],
-            song["title"],
-            song["artist"],
-            song["album"],
-            song["genre"],
-            song["duration"],
-            played,
-            percent_played,
-            signal,
-            song["user_id"],
-        ),
-    )
-    conn.commit()
-    conn.close()
-    push_star(song, signal)
-
-
-def signal_system(percent_played, song_id, user_id):
-    scoring = tune_config["behavioral_scoring"]
-    if percent_played <= scoring["skip_threshold_pct"]:
-        base = "skip"
-    elif percent_played < scoring["positive_threshold_pct"]:
-        base = "partial"
-    else:
-        base = "positive"
-
-    if base == "positive":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        window = scoring["repeat_time_window_min"]
-
-        cursor.execute(
-            """
-            SELECT COUNT(*) FROM listens
-            WHERE song_id = ? AND user_id = ?
-            AND signal IN ('positive', 'repeat')
-            AND timestamp > datetime('now', '-{window} minutes')
-        """,
-            (song_id, user_id),
-        )
-
-        valid_prior_positives = cursor.fetchone()[0]
-        conn.close()
-
-        if valid_prior_positives > 0:
-            base = "repeat"
-
-    return base
 
 
 def autoSyncWithFallback():
@@ -688,7 +507,9 @@ def main():
     last_lb_sync_timestamp = None
 
     console.print("[bold blue]Starting Library Sync(10 sec delay)")
-    workerThread = threading.Thread(target=Sanji.Robin)  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
+    workerThread = threading.Thread(
+        target=Sanji.Robin
+    )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
     workerThread.start()
     syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()

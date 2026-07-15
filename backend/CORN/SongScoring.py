@@ -1,10 +1,9 @@
 # CRON JOB FOR UPDATING SCORE IN DB
 from sqlite3.dbapi2 import Cursor
 
-from numpy._core.umath import trunc
-
 from core.db import get_db_connection
 from navidrome.watcher import calculate_dynamic_score
+from numpy._core.umath import trunc
 from rich.console import Console
 from rich.table import Table
 
@@ -16,9 +15,15 @@ def cp(args: str):
 
 
 def FetchUniqueEntery(cursor, username):
-    # fetches unique song and its count
     raw = cursor.execute(
-        "SELECT distinct song_id, COUNT(*) from listens where user_id = ? group by song_id order by COUNT(*) desc",
+        """
+        SELECT song_id, COUNT(*)
+        FROM listens
+        WHERE user_id = ?
+        GROUP BY song_id
+        HAVING SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) > 0
+        ORDER BY COUNT(*) DESC
+        """,
         (username,),
     ).fetchall()
     song_counts = {row[0]: row[1] for row in raw}
@@ -70,6 +75,7 @@ def songScoringCorn_IDK_WHAT_TO_NAME_THE_FUNCTION():
     users = FetchUniqueUser(cursor)
     cp(f"[dim green][CORN] Found Users {users}")
 
+    scoreDict = {}
     for user in users:
         cp(f"[bold blue][CORN] Fetching Unique Songs Listened to by {user}")
         uniqueSongs = FetchUniqueEntery(cursor, user)
@@ -97,7 +103,6 @@ def songScoringCorn_IDK_WHAT_TO_NAME_THE_FUNCTION():
             table.add_column("Row ID", justify="center")
             table.add_column("Score", justify="right", style="green")
 
-            scoreDict = {}
             listenCount = 0
             pastScore = 0
 
@@ -112,24 +117,21 @@ def songScoringCorn_IDK_WHAT_TO_NAME_THE_FUNCTION():
 
             console.print(table)
 
-            cp("[bold blue][CORN] Updating Database...")
-            UpdateScore(cursor, scoreDict)
 
+    cp("[bold blue][CORN] Updating Database...")
+    UpdateScore(cursor, scoreDict)
     conn.commit()
     conn.close()
     cp("[bold green][CORN] Scoring Complete. Database Updated![/bold green]")
 
 
-
-
 # for new songs, that are imported from listenbrainz
-# 
+#
 # The ALGO will look like this
 # after lb listens fetch, run the func to check if there is any row where score is null
 # if there is , then run songScoringCorn again
-# 
-# 
-# 
+
+
 
 def newNullScore(cursor):
     raw = cursor.execute(
@@ -142,6 +144,6 @@ def songScoringCorn():
     conn = get_db_connection()
     cursor = conn.cursor()
     if not newNullScore(cursor):
-        cp('[bold red]\\[CORN]No song to score')
+        cp("[bold red]\\[CORN]No song to score")
         return
     songScoringCorn_IDK_WHAT_TO_NAME_THE_FUNCTION()

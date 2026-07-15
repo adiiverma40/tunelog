@@ -5,6 +5,8 @@
 - CORN JOB FOR SCORING 
 - CORN JOB to Save scoring 
 - Changed Playlist generation to use Score From DB instead of calculating dynamically
+- Added better logic for scoring
+- Added better logic to find song with Null as score
 
 
 ## 14th July 2026

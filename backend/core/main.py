@@ -699,6 +699,7 @@ def main():
                         save_config(tune_config)
                         console.print("[green]✓ ListenBrainz sync complete.[/green]")
                         run_lb_fuzzy_matching()
+                        songScoringCorn()
 
                     except Exception as e:
                         console.print(f"[red]✗ ListenBrainz sync failed:[/red] {e}")
@@ -708,6 +709,7 @@ def main():
 
                 lbSyncThread = threading.Thread(target=run_lb_sync, daemon=True)
                 lbSyncThread.start()
+                # scoringThread.start()
 
         try:
             event = event_queue.get(timeout=2)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 15th July 2026
+### Implementation
+- CORN JOB FOR SCORING 
+- CORN JOB to Save scoring 
+- Changed Playlist generation to use Score From DB instead of calculating dynamically
+
+
 ## 14th July 2026
 ### Implementation
 - `Luffy` as a manager to manage the worker threads

@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from core.crypto import decrypt_token
 from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
+from CORN.SongScoring import songScoringCorn
 from navidrome.state import tune_config
 from rapidfuzz import fuzz, process
 from rich import box
@@ -323,10 +324,7 @@ def batchSave(matched_records, unmatched_records=None):
 
 
 def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
-    """
-    PRODUCER: builds an lbWork item and hands it to LB_queue, then blocks
-    on the work's response_queue until LB_Worker fulfills it.
-    """
+
     lb_username = lb_user["lb_username"]
     decrypted_token = lb_user["decrypted_token"]
 
@@ -391,10 +389,7 @@ def getListenBrainzResponse(lb_user: Dict[str, str]) -> List[dict]:
 def deep_history_sync(
     pagination: int = 20, lb_user: Dict[str, str] = None
 ) -> List[dict]:
-    """
-    PRODUCER: same idea as getListenBrainzResponse, but loops, paging
-    backwards through history via max_ts, submitting one lbWork per page.
-    """
+
     if lb_user:
         lb_username = lb_user["lb_username"]
         decrypted_token = lb_user["decrypted_token"]
@@ -768,6 +763,7 @@ def fuzzyMatchingSong() -> Optional[int]:
                 )
 
         batchSave(matched_records, unmatched_records=final_garbage)
+        # songScoringCorn()
 
     return global_newest_ts
 

@@ -98,6 +98,7 @@ def getDataFromDb():
                 "signal": row[9],
                 "timestamp": row[10],
                 "user_id": row[11],
+                 "score": row[12],
             }
         )
 
@@ -128,6 +129,11 @@ def score_batch(user_id, song_ids, history_dict):
 
             scores[sid]["score"] += signal_weight
             scores[sid]["signal"] = signal
+
+        # NEW: user_listens is sorted newest-first, so index 0 is the most recent.
+        latest_db_score = user_listens[0].get("score")
+        if latest_db_score is not None:
+            scores[sid]["score"] = latest_db_score
 
     return scores
 
@@ -177,6 +183,12 @@ def score_song(user_id, library_dict, history_dict):
             signal_contributions[sid][signal] = (
                 signal_contributions[sid].get(signal, 0) + weighted
             )
+
+        # NEW: use the most recent DB-stored score instead of the computed sum.
+        # `listens` is sorted ascending by id, so the last entry is the most recent.
+        latest_db_score = listens[-1].get("score")
+        if latest_db_score is not None:
+            scores[sid]["score"] = latest_db_score
 
     for sid in scores:
         contribs = signal_contributions[sid]

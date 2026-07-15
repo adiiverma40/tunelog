@@ -35,7 +35,7 @@ from navidrome.state import (
     status_registry,
     tune_config,
 )
-from navidrome.watcher import start_sse
+from navidrome.watcher import Watcher, start_sse
 from playlists.Listenbrainz import (
     FetchCF,
     build_LB_CF_playlist,
@@ -65,8 +65,7 @@ from scrobble.listenBrainz import fuzzyMatchingSong
 # from Workers.MB_Worker import MB_Worker as LB_Worker
 from Workers.Luffy import Sanji
 from Workers.worker_queue import LB_queue
-
-from navidrome.watcher import Watcher 
+from CORN.SongScoring import songScoringCorn
 from .config import build_url, event_queue
 
 load_dotenv()
@@ -514,6 +513,9 @@ def main():
     syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()
     syncThread.join()
+    console.print("[bold blue]Starting Scoring CORN JOB(1m delay)")
+    scoringThread = threading.Timer(60, songScoringCorn)
+    scoringThread.start()
 
     if tune_config["listenbrainz"]["PushLovedSongs"]:
         console.print("[bold blue]Pushing Starred Song to Listenbrainz(5 sec delay)")

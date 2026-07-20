@@ -1,5 +1,10 @@
 # Changelog
 
+## 20th July 2026
+- Cleaning Up playlist generation 
+- Diffrentiating playlist based on type to sepearate files 
+
+
 ## 15th July 2026
 ### Implementation
 - CORN JOB FOR SCORING 

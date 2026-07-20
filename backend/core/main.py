@@ -7,7 +7,6 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import metadata.library as library
-import requests
 import uvicorn
 from core.db import (
     get_db_connection,
@@ -18,55 +17,51 @@ from core.db import (
     init_db_playlist,
     init_db_usr,
     init_search_db,
-    # migrate_playlist_ids
     migrate_playlist_primary_key,
 )
 from CORN.pushHeartLB import pushStarredToListenBrainz
+from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
-from metadata.library import normalise_artist, normalise_genre, sync_library
-from misc.misc import push_star
+from metadata.library import sync_library
 from navidrome.state import (
     automation_config,
-    false,
-    notification_status,
     save_automation_config,
     save_config,
     status_registry,
     tune_config,
 )
 from navidrome.watcher import Watcher, start_sse
-from playlists.Listenbrainz import (
+from playlists.base_playlist import (
+    get_translation_maps,
+    getDataFromDb,
+    push_playlist,
+)
+from playlists.blend_playlist import (
+    build_playlist,
+    get_unheard_songs,
+    get_wildcard_songs,
+    readJSON,
+    score_song,
+)
+from playlists.discovery_playlist import (
+    build_discovery_playlist,
+    get_discovery_pool,
+    resolve_date_window,
+)
+from playlists.listenbrainz_playlist import (
     FetchCF,
     build_LB_CF_playlist,
     fetchPendingSongs,
     fillMusicBrainzDB,
-    filter_pool_by_genre,
     match_and_update_nvid,
     retryFailedSongs,
 )
-from playlists.playlist import (
-    build_discovery_playlist,
-    build_playlist,
-    get_discovery_pool,
-    get_translation_maps,
-    get_unheard_songs,
-    get_wildcard_songs,
-    getDataFromDb,
-    push_playlist,
-    readJSON,
-    resolve_date_window,
-    score_song,
-)
 from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
-
-# from Workers.LB_Worker import LB_Worker
-# from Workers.MB_Worker import MB_Worker as LB_Worker
 from Workers.Luffy import Sanji
-from Workers.worker_queue import LB_queue
-from CORN.SongScoring import songScoringCorn
-from .config import build_url, event_queue
+
+from .config import event_queue
 
 load_dotenv()
 console = Console()

@@ -1,9 +1,8 @@
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import requests
 from core.crypto import decrypt_token
 from core.db import (
     DB_PATH_MB,
@@ -27,7 +26,7 @@ from rich.text import Text
 from scrobble.listenBrainz import batchMatchNavidromeTracks
 from Workers.worker_queue import LB_queue, MB_queue, MBWork, lbWork
 
-from .playlist import analyze_user_ratios
+from .base_playlist import analyze_user_ratios
 
 console = Console()
 

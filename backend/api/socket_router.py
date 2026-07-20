@@ -2,8 +2,6 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 
-from rich.console import Console
-
 from api.api_entry import sio
 from jam import (
     AddQueue,
@@ -14,13 +12,14 @@ from jam import (
     sendSongPayload,
 )
 from navidrome.state import tune_config
-from playlists.playlist import (
+from playlists.base_playlist import getDataFromDb
+from playlists.blend_playlist import (
     build_playlist,
-    getDataFromDb,
     get_unheard_songs,
     get_wildcard_songs,
     score_song,
 )
+from rich.console import Console
 
 console = Console()
 

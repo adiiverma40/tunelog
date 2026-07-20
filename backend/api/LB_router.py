@@ -12,11 +12,12 @@ from core.db import (
 from core.main import Auto_LB_CF, generate_listenbrainz_playlist
 from fastapi import APIRouter, Query
 from navidrome.state import automation_config, save_automation_config
-from playlists.playlist import API_push_playlist
+from playlists.base_playlist import API_push_playlist
 from pydantic import BaseModel
-from scrobble.listenBrainz import batchMatchNavidromeTracks
 from rich.console import Console
+from scrobble.listenBrainz import batchMatchNavidromeTracks
 
+# from rich.co
 console = Console()
 
 router = APIRouter(tags=["listenbrainz"])
@@ -405,10 +406,10 @@ async def set_lb_token(payload: SetTokenRequest):
         encrypted_token = encrypt_token(payload.token)
         username = resolve_lb_username(payload.token)
         conn = get_db_connection_usr()
-        console.print("[bold red]Saving username : " , username)
+        console.print("[bold red]Saving username : ", username)
         conn.execute(
             "UPDATE user SET LB_token=? , LB_username=? WHERE username=?",
-            (encrypted_token, username , payload.user),
+            (encrypted_token, username, payload.user),
         )
         if conn.total_changes == 0:
             conn.close()

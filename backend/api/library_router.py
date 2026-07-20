@@ -1,7 +1,6 @@
 import os
 import re
 import shutil
-import string
 import tempfile
 from threading import Thread
 
@@ -16,33 +15,34 @@ from misc.scripts.fishScript import FishScript
 from misc.scripts.macScript import MacShellScript
 from misc.scripts.powershellScript import PowerShellScript
 from navidrome.state import app_state, save_skip_config, skip_config
-from playlists.importPlaylist import fuzzymatching
+from playlists.import_playlist import fuzzymatching
 from pydantic import BaseModel
 from rich.console import Console
 
 console = Console()
 
-router = APIRouter(
-    tags=["library"]
-)
+router = APIRouter(tags=["library"])
 
 VALID_EXPLICIT = {"explicit", "cleaned", "notExplicit"}
+
 
 class UpdateMarkingPayload(BaseModel):
     song_id: str
     explicit: str
 
+
 class generateScriptPayload(BaseModel):
-      song_ids: list[str]
-      shell: str
-      base_path: str
-      action: str
+    song_ids: list[str]
+    shell: str
+    base_path: str
+    action: str
 
 
 class ScriptSettingsPayload(BaseModel):
     shell: str
     basePath: str
     action: str
+
 
 def GetGenre():
     conn = get_db_connection_lib()
@@ -109,6 +109,7 @@ def GetGenreFromDb():
     data = GetGenre()
     return data
 
+
 @router.get("/api/genre/auto")
 def autoMatchGenre():
     data = readJson()
@@ -116,7 +117,6 @@ def autoMatchGenre():
     # sync_database_to_json()
     remaining_data = GetGenre()
     return {"unmapped": remaining_data, "genre_updated": update}
-
 
 
 @router.get("/api/sync/stop")
@@ -233,7 +233,6 @@ def updateMarking(payload: UpdateMarkingPayload):
     return {"status": "ok", "song_id": payload.song_id, "explicit": payload.explicit}
 
 
-
 @router.post("/api/sync/fallback")
 def syncByFallback(tries: int = 500):
     console.log(f"[cyan]Fallback Sync Triggered[/cyan] (Tries: {tries})")
@@ -272,6 +271,7 @@ def syncByFallback(tries: int = 500):
     Thread(target=run, daemon=True).start()
     return {"status": "ok", "total": len(songs)}
 
+
 @router.get("/api/sync/fallback/status")
 def fallbackStatus():
     return {
@@ -286,10 +286,12 @@ def fallbackStatus():
         ),
     }
 
+
 @router.get("/api/sync/fallback/stop")
 def stopFallback():
     app_state.fallback_stop = True
     return {"status": "ok"}
+
 
 @router.post("/api/import/csv")
 async def import_csv(file: UploadFile = File(...)):
@@ -367,24 +369,23 @@ def get_skipped_songs():
         }
 
 
-
 @router.put("/api/library/script-settings")
 def update_script_settings(payload: ScriptSettingsPayload):
     new_config_data = {
         "base_path": payload.basePath,
         "type": payload.shell,
-        "action": payload.action
+        "action": payload.action,
     }
 
     success, error_msg = save_skip_config(new_config_data)
 
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error_msg
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
         )
 
     return Response(status_code=status.HTTP_200_OK)
+
 
 @router.get("/api/library/script-settings")
 def getSkipSetting():
@@ -393,14 +394,14 @@ def getSkipSetting():
     frontend_payload = {
         "shell": settings.get("type", ""),
         "basePath": settings.get("base_path", ""),
-        "action": settings.get("action", "move")
+        "action": settings.get("action", "move"),
     }
 
     return frontend_payload
 
 
 @router.post("/api/library/generate-script")
-def generateSkipSetting(settings : generateScriptPayload):
+def generateSkipSetting(settings: generateScriptPayload):
     songs = settings.song_ids
     shell = settings.shell
     script = ""
@@ -413,7 +414,7 @@ def generateSkipSetting(settings : generateScriptPayload):
         script = MacShellScript(songs)
     elif shell == "powershell":
         script = PowerShellScript(songs)
-    else :
+    else:
         return "error : unknow shell type"
 
     return script

@@ -8,30 +8,32 @@ from core.db import (
 )
 from fastapi import APIRouter
 from metadata.genre import readJson as readJSON
-from playlists.playlist import (
+from playlists.base_playlist import (
     API_push_playlist,
-    appendPlaylist,
-    build_discovery_playlist,
-    build_playlist,
-    get_discovery_pool,
     get_translation_maps,
-    get_unheard_songs,
-    get_wildcard_songs,
     getDataFromDb,
     push_playlist,
-    resolve_date_window,
+)
+from playlists.blend_playlist import (
+    appendPlaylist,
+    build_playlist,
+    get_unheard_songs,
+    get_wildcard_songs,
     score_song,
     signalWeights,
     songSlots,
+)
+from playlists.discovery_playlist import (
+    build_discovery_playlist,
+    get_discovery_pool,
+    resolve_date_window,
 )
 from pydantic import BaseModel
 from rich.console import Console
 
 console = Console()
 
-router = APIRouter(
-    tags=['playlist']
-)
+router = APIRouter(tags=["playlist"])
 
 
 class PlaylistOptions(BaseModel):
@@ -41,6 +43,7 @@ class PlaylistOptions(BaseModel):
     slots: Optional[dict] = None
     weights: Optional[dict] = None
     injection: bool
+
 
 class DiscoveryQueueModel(BaseModel):
     username: str
@@ -52,12 +55,11 @@ class DiscoveryQueueModel(BaseModel):
     backtrack: bool = False
     explicit_filter: str
 
+
 class CsvPlaylist(BaseModel):
     username: list[str]
     song_ids: list[str]
     playlist_name: str
-
-
 
 
 @router.get("/api/playlist/songs")
@@ -214,8 +216,6 @@ def discoveryPlaylistId(username: str):
         return {"status": "error", "id": None}
 
 
-
-
 @router.post("/generateDiscoveryQueue")
 def generateDiscoveryQueue(data: DiscoveryQueueModel):
     console.print(
@@ -287,4 +287,3 @@ def csvPlaylist(data: CsvPlaylist):
     except Exception as e:
         console.log(f"[red]Error pushing CSV playlist:[/red] {e}")
         return {"status": str(e)}
-

@@ -522,8 +522,10 @@ def main():
     console.print("Checking Musicbrainz Remaining Seedings")
 
     musicBrainzThread()
-
+    last_watcher_call = time.time()
     while True:
+        now_finall = time.time()
+        
         Auto_LB_CF()
 
         if library._startSyncSong and not library._isSyncing:
@@ -709,7 +711,9 @@ def main():
         try:
             event = event_queue.get(timeout=2)
             if event == "nowPlaying":
-                Watcher()
+                if now_finall - last_watcher_call >= 1:
+                    last_watcher_call = now_finall
+                    Watcher()
             elif event == "librarySync":
                 sync_library()
                 console.print("[green]✓ Library sync complete.[/green]")

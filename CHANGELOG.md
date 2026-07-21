@@ -1,4 +1,7 @@
 # Changelog
+## 21st July 2026
+- Added a timeout of 1 sec before next watcher gets called, before it was firing multiple times(3), it was not bad but it was annyoing to see in the logs 
+
 
 ## 20th July 2026
 - Cleaning Up playlist generation 

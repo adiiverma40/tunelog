@@ -152,6 +152,10 @@ DEFAULT_CONFIG = {
         "dedup_window_seconds": 30,
         "PushLovedSongs": False,
     },
+    "timeout": {
+        "skip_count": 3,
+        "timeout": 30,
+    },
 }
 
 true = True

@@ -1,4 +1,9 @@
 # Changelog
+
+## 24th July 2026
+- Added `timeout` table to database
+- Added function to Add `timeout` to database
+
 ## 23rd July 2026
 - Removed the timeout of 1 sec. This timeout casue to incorrectly report pause and play if user play and pause within a sec 
 

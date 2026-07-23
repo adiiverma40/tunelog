@@ -111,6 +111,25 @@ def init_db():
             timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS timeout (
+            song_id        TEXT NOT NULL,
+            timeout        TIMESTAMP,
+            user_id        TEXT DEFAULT 'default',
+            reason        TEXT,
+            PRIMARY KEY (user_id, song_id)
+        )
+    """)
+    _ensure_columns(
+        cursor,
+        "timeout",
+        {
+            "song_id": "TEXT NOT NULL",
+            "timeout": "TIMESTAMP",
+            "user_id": "TEXT DEFAULT 'default'",
+            "reason": "TEXT"
+        },
+    )
     _ensure_columns(
         cursor,
         "listenbrainz",

@@ -1,17 +1,18 @@
-from core.config import build_url_for_user, getAllUser
-import requests
-from core.db import get_db_connection, get_db_connection_lib, db_supervisor
-from navidrome.state import status_registry
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-import sqlite3
-from datetime import datetime
-import os
 import json
+import os
+import sqlite3
 import sys
+from datetime import datetime
+
+import requests
+from core.config import build_url_for_user, getAllUser
+from core.db import db_supervisor, get_db_connection, get_db_connection_lib
 from loguru import logger
-from navidrome.state import notification_status, tune_config
+from misc.timeout import timeout_song
+from navidrome.state import notification_status, status_registry, tune_config
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 console = Console()
 
@@ -73,14 +74,15 @@ def push_star(song, signal):
         return
 
     rows = _fetch_recent_listens(cursor, user_id, song_id)
-    conn.close()
 
     if rows is None:
         console.print(
             f"[bold red]push star: Failed to fetch listens for {song['title']}[/bold red]"
         )
         return
-
+    timeout_song(user_id, song_id, rows, cursor)
+    conn.commit()
+    conn.close()
     totalListens = len(rows)
     minListen = tune_config["behavioral_scoring"]["min_listens_for_star"]
     if totalListens < minListen:
@@ -101,7 +103,6 @@ def push_star(song, signal):
     rowSongScore = 0
     decay = tune_config["behavioral_scoring"]["historical_decay_factor"]
     for i, row in enumerate(rows):
-
         weightage = decay**i
         rowSignal = row["signal"]
         rating = star_map.get(rowSignal, 0)
@@ -146,7 +147,9 @@ def push_star(song, signal):
             else (
                 "green"
                 if row_signal == "positive"
-                else "cyan" if row_signal == "repeat" else "white"
+                else "cyan"
+                if row_signal == "repeat"
+                else "white"
             )
         )
 
@@ -441,10 +444,10 @@ def crossCheckDatabase(data):
         cursor.executemany(
             """
             UPDATE listens
-            SET title = ?, 
-                artist = ?, 
+            SET title = ?,
+                artist = ?,
                 album = ?,
-                genre = ? 
+                genre = ?
             WHERE song_id = ?
         """,
             data,

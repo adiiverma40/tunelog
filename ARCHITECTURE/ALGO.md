@@ -26,6 +26,17 @@ Some Things to keep in mind:
 - **Always overwrite** : If a Song has any missing score, drop every other score and calculate again, why? cause of data inconsistancy
 - **Run As bg Corn**
 
+## n Skip timeout
+The work of this Algo is to timeout a song after n(3) skips interaction.
+This is to prevent the song from high listen count and score to get many skips to stay out of the Playlist, If a song has 50 score, it would need to be skipped 25 times
+
+The minimum listen count required for timeout is 10 listens. 
+
+1. Added `timeout` table to database
+2. Added `timeout` function to write to database
+
+
+
 
 ## PLAYLIST: TUNELOG
 

@@ -100,3 +100,6 @@ config/
 
 #master key
 *.key
+
+
+compose.yaml

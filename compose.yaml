@@ -1,3 +1,5 @@
+# This compose file is for testing, use ghcr-compose.yml
+
 services:
   backend:
     build:

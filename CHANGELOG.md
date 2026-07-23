@@ -1,4 +1,7 @@
 # Changelog
+## 23rd July 2026
+- Removed the timeout of 1 sec. This timeout casue to incorrectly report pause and play if user play and pause within a sec 
+
 ## 21st July 2026
 - Added a timeout of 1 sec before next watcher gets called, before it was firing multiple times(3), it was not bad but it was annyoing to see in the logs 
 

@@ -320,6 +320,8 @@ def fetchPendingSongs(limit: int | None = None):
 
 def handle_mb_success(raw_data: dict, mbid: str):
     """Fired by the worker when it gets a 200 OK from MusicBrainz."""
+    console.print(f"  [green]✓[/green] [dim]{mbid[:8]}…[/dim] [white]Fetching…[/white]")
+    
     parsed = parse_recording(raw_data) if raw_data else None
     conn = get_db_connection_Musicbrainz()
 

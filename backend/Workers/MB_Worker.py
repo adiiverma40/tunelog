@@ -124,32 +124,35 @@ def MB_Worker():
                     "status": "error",
                     "error_msg": f"Unsupported method: {work.method}",
                 }
+            # print(result.get("status"))
+            if result.get("status") == "success":
+                if work.response_queue:
+                    # print("putting in repesonse queue")
+                    work.response_queue.put(result)
 
-                if result.get("status") == "success":
-                    if work.response_queue:
-                        work.response_queue.put(result)
+                elif work.on_success and result.get("status") == "success":
+                    # print("calling on_success ")
+                    # print(result.get("status"))
+                    work.on_success(result.get("data"))
+                elif work.on_error and result.get("status") == "error":
+                    work.on_error(result.get("error_msg"))
 
-                    elif work.on_success and result.get("status") == "success":
-                        work.on_success(result.get("data"))
-                    elif work.on_error and result.get("status") == "error":
-                        work.on_error(result.get("error_msg"))
+            elif result.get("status") == "error":
+                err_msg = str(result.get("error_msg", ""))
+                console.print(f"[bold red][WORKER](ERROR) : {err_msg}")
 
-                elif result.get("status") == "error":
-                    err_msg = str(result.get("error_msg", ""))
-                    console.print(f"[bold red][WORKER](ERROR) : {err_msg}")
-
-                    if "503" in err_msg or "502" in err_msg:
-                        if work.attempts < work.max_retries:
-                            work.attempts += 1
-                            console.print(
-                                f"[yellow]⚠ 503 Overload. Re-queueing task "
-                                f"(Attempt {work.attempts}/{work.max_retries}) "
-                            )
-                            MB_queue.addBackgroundTask(priority=10, work=work)
-                        else:
-                            console.print(
-                                f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
-                            )
+                if "503" in err_msg or "502" in err_msg:
+                    if work.attempts < work.max_retries:
+                        work.attempts += 1
+                        console.print(
+                            f"[yellow]⚠ 503 Overload. Re-queueing task "
+                            f"(Attempt {work.attempts}/{work.max_retries}) "
+                        )
+                        MB_queue.addBackgroundTask(priority=10, work=work)
+                    else:
+                        console.print(
+                            f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
+                        )
 
             time.sleep(0.5)
 
@@ -158,5 +161,4 @@ def MB_Worker():
                 f"[bold red][WORKER][Musicbrainz](ERR) The queue is empty for {timeout}sec. Exiting "
             )
             break
-        except Exception as e:
-            console.print(f"[bold red][LB WORKER] (ERR) : {e}")
+

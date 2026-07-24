@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from profile import run
 from typing import Optional
 
 from core.db import (
@@ -28,6 +29,7 @@ from playlists.discovery_playlist import (
     get_discovery_pool,
     resolve_date_window,
 )
+from playlists.entry_point import run_tier
 from pydantic import BaseModel
 from rich.console import Console
 
@@ -286,4 +288,22 @@ def csvPlaylist(data: CsvPlaylist):
             return {"status": "success"}
     except Exception as e:
         console.log(f"[red]Error pushing CSV playlist:[/red] {e}")
+        return {"status": str(e)}
+
+
+class TierPlaylist(BaseModel):
+    size: int = 100
+    username: str
+
+
+@router.post("/api/import/tierPlaylist")
+def tierPlaylist(data: TierPlaylist):
+    try:
+        size = data.size
+        username = data.username
+        console.log(f"[cyan]Creating Tier Playlist:[/cyan] {size}")
+        run_tier(username, size)
+        return {"status": "success"}
+    except Exception as e:
+        console.log(f"[red]Error pushing tier playlist:[/red] {e}")
         return {"status": str(e)}

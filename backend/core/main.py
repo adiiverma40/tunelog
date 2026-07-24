@@ -4,6 +4,7 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from profile import run
 from zoneinfo import ZoneInfo
 
 import metadata.library as library
@@ -49,6 +50,7 @@ from playlists.discovery_playlist import (
     get_discovery_pool,
     resolve_date_window,
 )
+from playlists.entry_point import run_tier
 from playlists.listenbrainz_playlist import (
     FetchCF,
     build_LB_CF_playlist,
@@ -520,7 +522,7 @@ def main():
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     console.print("Checking Musicbrainz Remaining Seedings")
-
+    
     musicBrainzThread()
     # last_watcher_call = time.time()//
     while True:

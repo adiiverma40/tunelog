@@ -16,12 +16,12 @@ from .discovery_playlist import (
 )
 from .import_playlist import fuzzymatching
 from .listenbrainz_playlist import FetchCF, build_LB_CF_playlist
+from .tier_playlist import tierPlaylist
 
 
 def run_blend(
     user_id, password, explicit_filter="notExplicit", size=None, injection=True
 ):
-    """Build + push the 'Blend' playlist for a single user."""
     size = size or tune_config["playlist_generation"]["playlist_size"]
     return appendPlaylist(user_id, password, explicit_filter, size, injection)
 
@@ -35,7 +35,6 @@ def run_discovery(
     days_to=None,
     backtrack=True,
 ):
-    """Build + push the 'Discovery' playlist for a single user."""
     window_start, window_end = resolve_date_window(
         date_from, date_to, days_from, days_to
     )
@@ -54,7 +53,6 @@ def run_discovery(
 
 
 def run_listenbrainz_cf(user_id, cf_config):
-    """Refresh ListenBrainz CF data, then build + push the CF playlist."""
     FetchCF()
     library, history = getDataFromDb()
     alias_to_cat = get_translation_maps(readJSON())
@@ -69,13 +67,16 @@ def run_listenbrainz_cf(user_id, cf_config):
 
 
 def run_import(user_id, csv_path, playlist_name="New CSV Playlist"):
-    """Fuzzy-match a CSV export against the library and push it as a playlist."""
     result = fuzzymatching(csv_path)
     if result is None:
         return None
 
     API_push_playlist(result["matched_ids"], user_id, playlist_name)
     return result
+
+
+def run_tier(user_id, size):
+    tierPlaylist(size, user_id)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 24th July 2026
+### Added:
+- Tier Playlist v1
+- A simple Ui to create tier playlists
 - Added `timeout` table to database
 - Added function to Add `timeout` to database
 

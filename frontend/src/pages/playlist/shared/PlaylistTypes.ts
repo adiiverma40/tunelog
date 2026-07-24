@@ -66,6 +66,13 @@ export const PLAYLIST_TYPE_REGISTRY: PlaylistTypeConfig[] = [
     gradient: "linear-gradient(135deg, #EB743B 0%, #C45520 100%)",
     icon: "music",
   },
+  {
+    value: "tunelog_tier",
+    label: "Tier Playlist",
+    description: "Playlist ranked and grouped by tier",
+    accentColor: "#7F77DD",
+    icon: "music", 
+  },
 ];
 
 export const SIGNAL_CONFIG: Record<

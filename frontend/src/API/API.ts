@@ -331,10 +331,7 @@ export interface PlaylistCreateRequest {
 }
 
 export type AutoGenerateExplicit =
-  | "all"
-  | "cleaned"
-  | "explicit"
-  | "notExplicit";
+  "all" | "cleaned" | "explicit" | "notExplicit";
 
 export type TreatDataAs = "partial" | "complete" | "skip";
 
@@ -1202,7 +1199,6 @@ export interface SkippedSong {
   user_id: string | null;
 }
 
-
 export type ShellType = "bash" | "mac" | "powershell";
 export type ScriptAction = "delete" | "move";
 
@@ -1244,17 +1240,20 @@ export async function getSkippedSongs(): Promise<SkippedSong[]> {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok)
-    throw new Error(`Failed to fetch skipped songs: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch skipped songs: ${res.status} ${res.statusText}`,
+    );
   return res.json() as Promise<SkippedSong[]>;
 }
-
 
 export async function getRecommendedDeletes(): Promise<RecommendedSong[]> {
   const res = await fetch(`${BASE_URL}/api/library/recommend-delete`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok)
-    throw new Error(`Failed to fetch recommendations: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch recommendations: ${res.status} ${res.statusText}`,
+    );
   return res.json() as Promise<RecommendedSong[]>;
 }
 
@@ -1270,10 +1269,11 @@ export async function generateScript(
     body: JSON.stringify(req),
   });
   if (!res.ok)
-    throw new Error(`Failed to generate script: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to generate script: ${res.status} ${res.statusText}`,
+    );
   return res.json() as Promise<GenerateScriptResponse>;
 }
-
 
 export interface SkippedSettings {
   shell: ShellType;
@@ -1285,21 +1285,25 @@ export async function getScriptSettings(): Promise<SkippedSettings | null> {
   const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  
+
   if (res.status === 404) {
     return null;
   }
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch script settings: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch script settings: ${res.status} ${res.statusText}`,
+    );
   }
-  
+
   return res.json() as Promise<SkippedSettings>;
 }
 
-export async function saveScriptSettings(settings: SkippedSettings): Promise<void> {
+export async function saveScriptSettings(
+  settings: SkippedSettings,
+): Promise<void> {
   const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
-    method: "PUT", 
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${getToken()}`,
       "Content-Type": "application/json",
@@ -1308,6 +1312,44 @@ export async function saveScriptSettings(settings: SkippedSettings): Promise<voi
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to save script settings: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to save script settings: ${res.status} ${res.statusText}`,
+    );
   }
+}
+
+export interface TierPlaylist {
+  username: string;
+  size: number;
+}
+
+export interface TierPlaylistResponse {
+  status: string;
+}
+
+export async function tierPlaylist(
+  data: TierPlaylist,
+): Promise<TierPlaylistResponse> {
+  const res = await fetch(`${BASE_URL}/api/import/tierPlaylist`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Failed to create tier playlist: ${res.status} ${res.statusText}`,
+    );
+  }
+
+  const result: TierPlaylistResponse = await res.json();
+
+  if (result.status !== "success") {
+    throw new Error(result.status);
+  }
+
+  return result;
 }

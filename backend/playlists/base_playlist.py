@@ -214,7 +214,7 @@ def push_playlist(
     if not password:
         log(
             "error",
-            f"No credentials found for user",
+            "No credentials found for user",
             source="playlist",
             user_id=user_id,
             event="error",

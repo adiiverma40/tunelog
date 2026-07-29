@@ -48,7 +48,7 @@ class BaseQueue(Generic[WorkModel]):
         return_queue = Queue()
         work.response_queue = return_queue
         self.BaseQueue.put_nowait((0, next(self.counter), work))
-        self.printQueue()
+        # self.printQueue()
         result = return_queue.get()
         return result
 

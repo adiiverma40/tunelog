@@ -118,7 +118,6 @@ def ND_Worker():
                 result = method_get(work, session)
 
             elif work.method.lower() == "post":
-                print("post method")
                 result = method_post(work, session)
 
             else:

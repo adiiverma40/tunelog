@@ -1,6 +1,9 @@
 # Changelog
 
 ## 29th July 2026
+### Bug Fix:
+- Added proper integration of `ND Worker`
+
 ### Added:
 - Added Navidrome worker `ND_worker`
 - Check for cred in `.env` 

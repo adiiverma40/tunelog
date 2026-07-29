@@ -48,16 +48,24 @@ def getJWT(admin_username=Navidrome_admin, admin_password=navidrome_password):
                 params={"username": admin_username, "password": admin_password},
             )
         )
-        if res.status_code == 200:
-            return res.json().get("token")
-        return None
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        console.log("[yellow]Warning: Navidrome is currently unreachable.[/yellow]")
-        return None
-    except Exception as e:
-        console.log(f"[red]API Error (getJWT):[/red] {e}")
+        
+        if res.get("status") == "success":
+            return res.get("data", {}).get("token")
+        
+        elif res.get("status") == "error":
+            error_msg = str(res.get("error_msg", ""))
+            
+            if "ConnectionError" in error_msg or "Timeout" in error_msg or "Max retries" in error_msg:
+                console.log("[yellow]Warning: Navidrome is currently unreachable.[/yellow]")
+            else:
+                console.log(f"[red]API Error (getJWT):[/red] {error_msg}")
+            return None
+
         return None
 
+    except Exception as e:
+        console.log(f"[red]Unexpected Error (getJWT):[/red] {e}")
+        return None
 
 # This function checks the credintial provided in .env file and save it to Database
 def checkCred_SaveCred(

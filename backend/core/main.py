@@ -63,7 +63,7 @@ from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
 from Workers.Luffy import Sanji
 
-from .config import event_queue
+from .config import checkCred_SaveCred, event_queue
 
 load_dotenv()
 console = Console()
@@ -406,6 +406,9 @@ def Auto_LB_CF(thread=True):
             fetch_worker()
 
 
+from Workers.worker_queue import ND_queue, NDWork
+
+
 def main():
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
 
@@ -428,6 +431,20 @@ def main():
             traceback.print_exc()
             raise
     console.print("[green]✓ Database ready[/green]")
+
+    workerThread = threading.Thread(
+        target=Sanji.Robin
+    )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
+    workerThread.start()
+
+    console.print("[bold blue]Checking .env Cred")
+    cred = checkCred_SaveCred()
+    if cred:
+        console.print("[bold blue]Success!")
+    else:
+        console.print(
+            "[bold red]Cred is wrong, Correct the cred or some feature might not work"
+        )
 
     with console.status("[dim]Starting API and proxy...[/dim]"):
         try:
@@ -503,10 +520,7 @@ def main():
     last_lb_sync_timestamp = None
 
     console.print("[bold blue]Starting Library Sync(10 sec delay)")
-    workerThread = threading.Thread(
-        target=Sanji.Robin
-    )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
-    workerThread.start()
+
     syncThread = threading.Timer(10, library.sync_library)
     syncThread.start()
     syncThread.join()
@@ -522,11 +536,9 @@ def main():
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     console.print("Checking Musicbrainz Remaining Seedings")
-    
     musicBrainzThread()
-    # last_watcher_call = time.time()//
+
     while True:
-        # now_finall = time.time()
 
         Auto_LB_CF()
 

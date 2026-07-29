@@ -318,7 +318,8 @@ def init_db_usr():
             playlistId  TEXT,
             playlistIds TEXT,
             LB_token    TEXT,
-            LB_username TEXT
+            LB_username TEXT,
+            ND_token TEXT
         )
     """)
 
@@ -335,6 +336,7 @@ def init_db_usr():
             "playlistIds": "TEXT",
             "LB_token": "TEXT",
             "LB_username": "TEXT",
+            "ND_token" : "TEXT"
         },
     )
 

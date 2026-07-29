@@ -5,36 +5,45 @@
 
 import threading
 import time
+
 from Workers.LB_Worker import LB_Worker
 from Workers.MB_Worker import MB_Worker
-from Workers.worker_queue import LB_queue, MB_queue
+from Workers.ND_Worker import ND_Worker
+from Workers.worker_queue import LB_queue, MB_queue, ND_queue
 
 
 class luffy:  # Class for the worker manager
-
     def __init__(self) -> None:  # Zoro
         self.LB = threading.Thread(target=LB_Worker, daemon=True)
         self.MB = threading.Thread(target=MB_Worker, daemon=True)
+        self.ND = threading.Thread(target=ND_Worker, daemon=True)
 
     def Namy(self, worker=None):  # wakes every worker
         if worker is None:
-                    self.LB.start()
-                    self.MB.start()
+            self.LB.start()
+            self.MB.start()
+            self.ND.start()
         elif worker == "LB":
             self.LB = threading.Thread(target=LB_Worker, daemon=True)
             self.LB.start()
         elif worker == "MB":
             self.MB = threading.Thread(target=MB_Worker, daemon=True)
             self.MB.start()
+        elif worker == "ND":
+            self.ND = threading.Thread(target=ND_Worker, daemon=True)
+            self.ND.start()
 
     def Robin(self):  # Monitors who is up
         self.Namy()
         while True:
             if LB_queue.size() != 0 and not self.LB.is_alive():
                 self.Namy("LB")
-                
+
             if MB_queue.size() != 0 and not self.MB.is_alive():
                 self.Namy("MB")
+
+            if ND_queue.size() != 0 and not self.ND.is_alive():
+                self.Namy("ND")
 
             time.sleep(2)
 

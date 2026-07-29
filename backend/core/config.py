@@ -1,5 +1,3 @@
-
-
 import os
 import re
 from pathlib import Path
@@ -10,7 +8,9 @@ from urllib.parse import urlencode
 import requests
 from core.db import db_supervisor, get_db_connection_usr
 from dotenv import load_dotenv
+from pandas.io.sql import DatabaseError
 from rich.console import Console
+from Workers.worker_queue import ND_queue, NDWork
 
 console = Console()
 
@@ -39,13 +39,14 @@ def getAllUser():
     return USER_CREDENTIALS
 
 
-
-def getJWT(admin_username, admin_password):
+def getJWT(admin_username=Navidrome_admin, admin_password=navidrome_password):
     try:
-        res = requests.post(
-            f"{Navidrome_url}/auth/login",
-            json={"username": admin_username, "password": admin_password},
-            timeout=5,
+        res = ND_queue.addWork(
+            NDWork(
+                method="post",
+                endpoint="/auth/login",
+                params={"username": admin_username, "password": admin_password},
+            )
         )
         if res.status_code == 200:
             return res.json().get("token")
@@ -57,6 +58,46 @@ def getJWT(admin_username, admin_password):
         console.log(f"[red]API Error (getJWT):[/red] {e}")
         return None
 
+
+# This function checks the credintial provided in .env file and save it to Database
+def checkCred_SaveCred(
+    admin_username=Navidrome_admin, admin_password=navidrome_password
+):
+    try:
+        res = ND_queue.addWork(
+            NDWork(
+                method="post",
+                endpoint="/auth/login",
+                params={"username": admin_username, "password": admin_password},
+            )
+        )
+
+        if res.get("status") == "success":
+            token = res.get("data", {}).get("token")
+
+            if token:
+                conn = get_db_connection_usr()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE user SET ND_token = ? WHERE username = ?",
+                    (token, admin_username),
+                )
+                conn.commit()
+                conn.close()
+                return True
+            else:
+                console.log(
+                    "[yellow]Login succeeded, but no token was returned.[/yellow]"
+                )
+                return False
+        elif res.get("status") == "error":
+            error_msg = res.get("error_msg")
+            console.log(f"[red]API Error (getJWT):[/red] {error_msg}")
+            return None
+
+    except Exception as e:
+        console.log(f"[red]Unexpected Error in checkCred_SaveCred:[/red] {e}")
+        return None
 
 
 # default url to pull data from api

@@ -1,5 +1,12 @@
 # Changelog
 
+## 29th July 2026
+### Added:
+- Added Navidrome worker `ND_worker`
+- Check for cred in `.env` 
+- Save `token` to database
+
+
 ## 24th July 2026
 ### Added:
 - Tier Playlist v1

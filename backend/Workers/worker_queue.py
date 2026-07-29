@@ -1,8 +1,9 @@
 # This file contains queues for the workers
 
 import itertools
+from collections.abc import Callable
 from queue import PriorityQueue, Queue
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import BaseModel
 
@@ -10,8 +11,8 @@ from pydantic import BaseModel
 class BaseWork(BaseModel):
     response_queue: Any = None
     on_success: Optional[Callable] = None
-    max_retries : int = 3
-    attempts : int = 0 
+    max_retries: int = 3
+    attempts: int = 0
 
 
 class lbWork(BaseWork):
@@ -24,6 +25,9 @@ class lbWork(BaseWork):
 
 class MBWork(lbWork):
     on_error: Optional[Callable] = None
+
+
+class NDWork(lbWork):
     pass
 
 
@@ -44,7 +48,7 @@ class BaseQueue(Generic[WorkModel]):
         return_queue = Queue()
         work.response_queue = return_queue
         self.BaseQueue.put_nowait((0, next(self.counter), work))
-        # self.printQueue()
+        self.printQueue()
         result = return_queue.get()
         return result
 
@@ -83,6 +87,13 @@ class MusicBrainzQueue(BaseQueue[MBWork]):
 
 
 MB_queue = MusicBrainzQueue()
+
+
+class NavidromeQueue(BaseQueue[NDWork]):
+    pass
+
+
+ND_queue = NavidromeQueue()
 
 
 class ItunesQueue(BaseQueue[ItunesWork]):

@@ -25,6 +25,7 @@ from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import sync_library
+from navidrome.misc import sync_ND_users
 from navidrome.state import (
     automation_config,
     save_automation_config,
@@ -62,6 +63,7 @@ from playlists.listenbrainz_playlist import (
 from rich.console import Console
 from scrobble.listenBrainz import fuzzyMatchingSong
 from Workers.Luffy import Sanji
+from Workers.worker_queue import ND_queue, NDWork
 
 from .config import checkCred_SaveCred, event_queue
 
@@ -406,9 +408,6 @@ def Auto_LB_CF(thread=True):
             fetch_worker()
 
 
-from Workers.worker_queue import ND_queue, NDWork
-
-
 def main():
     proxyPort = int(os.getenv("PROXY_PORT", 4534))
 
@@ -437,14 +436,16 @@ def main():
     )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
     workerThread.start()
 
-    console.print("[bold blue]Checking .env Cred")
+    console.print("[bold blue]\\[CRED] Checking .env Cred")
     cred = checkCred_SaveCred()
     if cred:
-        console.print("[bold blue]Success!")
+        console.print("[bold blue]\\[CRED] Success!")
     else:
         console.print(
-            "[bold red]Cred is wrong, Correct the cred or some feature might not work"
+            "[bold red]\\[CRED] Cred is wrong, Correct the cred or some feature might not work"
         )
+
+    sync_ND_users()
 
     with console.status("[dim]Starting API and proxy...[/dim]"):
         try:
@@ -539,7 +540,6 @@ def main():
     musicBrainzThread()
 
     while True:
-
         Auto_LB_CF()
 
         if library._startSyncSong and not library._isSyncing:

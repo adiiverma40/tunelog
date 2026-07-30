@@ -23,7 +23,6 @@ def get_authed_headers(decrypted_token: str) -> dict:
         return ND_HEADERS
     return {**ND_HEADERS, "X-Nd-Authorization": f"Bearer {decrypted_token}"}
 
-
 def method_get(work, session):
     url = f"{ND_BASE}/{work.endpoint.lstrip('/')}"
 
@@ -39,21 +38,23 @@ def method_get(work, session):
         if r.status_code == 404:
             return {"status": "error", "error_msg": "404 Not Found"}
 
-        headers = r.headers
-        remaining = int(headers.get("x-ratelimit-remaining", 1))
-        reset_in = int(headers.get("x-ratelimit-reset-in", 0))
-
-        console.print(
-            f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
-        )
-
-        if remaining <= 0:
-            console.print(
-                f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
-            )
-            time.sleep(reset_in)
-        else:
-            time.sleep(0.2)
+        # --- Rate Limit Check Commented Out ---
+        # headers = r.headers
+        # remaining = int(headers.get("x-ratelimit-remaining", 1))
+        # reset_in = int(headers.get("x-ratelimit-reset-in", 0))
+        #
+        # console.print(
+        #     f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
+        # )
+        #
+        # if remaining <= 0:
+        #     console.print(
+        #         f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
+        #     )
+        #     time.sleep(reset_in)
+        # else:
+        #     time.sleep(0.2)
+        # --------------------------------------
 
         result = {"status": "success", "data": r.json()}
 
@@ -75,26 +76,27 @@ def method_post(work, session):
             timeout=15,
         )
 
-
         r.raise_for_status()
         if r.status_code == 404:
             return {"status": "error", "error_msg": "404 Not Found"}
 
-        headers = r.headers
-        remaining = int(headers.get("x-ratelimit-remaining", 1))
-        reset_in = int(headers.get("x-ratelimit-reset-in", 0))
-
-        console.print(
-            f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
-        )
-
-        if remaining <= 0:
-            console.print(
-                f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
-            )
-            time.sleep(reset_in)
-        else:
-            time.sleep(0.2)
+        # --- Rate Limit Check Commented Out ---
+        # headers = r.headers
+        # remaining = int(headers.get("x-ratelimit-remaining", 1))
+        # reset_in = int(headers.get("x-ratelimit-reset-in", 0))
+        #
+        # console.print(
+        #     f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
+        # )
+        #
+        # if remaining <= 0:
+        #     console.print(
+        #         f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
+        #     )
+        #     time.sleep(reset_in)
+        # else:
+        #     time.sleep(0.2)
+        # --------------------------------------
 
         result = {"status": "success", "data": r.json()}
 
@@ -104,9 +106,9 @@ def method_post(work, session):
 
     return result
 
-
+    
 def ND_Worker():
-    console.print("[bold blue][WORKER][Musicbrainz]Starting Worker[/bold blue]")
+    console.print("[bold blue][WORKER][NAVIDROME]Starting Worker[/bold blue]")
     session = requests.Session()
     timeout = 600
     while True:
@@ -151,7 +153,7 @@ def ND_Worker():
                             f"[red]✗ Task exhausted {work.max_retries} retries.[/red]"
                         )
 
-            time.sleep(0.5)
+            time.sleep(2)
 
         except queue.Empty:
             console.print(

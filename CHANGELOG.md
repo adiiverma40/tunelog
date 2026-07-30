@@ -1,5 +1,52 @@
 # Changelog
 
+## 30th July 2026
+### Added:
+- `Misc.py` in Navidrome to Add functions that i dont know where to put
+- Automatic user sync at the startup to sync users with Navidrome and remove hassle of manually Adding users
+
+
+
+### Changes:
+- Rate limit check commented out in `ND_Worker` As the entire Backend depends on Navidrome and Navidrome always reports 1 request per second, It was blocking, SSE Watcher, Auth check from Navidrome to Frontend, and other requests to Navidrome.
+
+
+### Bug:
+- The Frontend checks for login auth, multiple times in less then a sec causing Navidrome to rate limit
+```bash
+tunelog-backend   | Login attempt: 1 :  1785433656.33853
+tunelog-backend   | Login attempt: 2 :  1785433656.3991342
+tunelog-backend   | Worker API Error: 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | [WORKER](ERROR) : 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | Worker API Error: 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | [WORKER](ERROR) : 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | Worker API Error: 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | [WORKER](ERROR) : 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | Login attempt: 3 :  1785433659.8754923
+tunelog-backend   | Worker API Error: 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | [WORKER](ERROR) : 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | Worker API Error: 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+tunelog-backend   | [WORKER](ERROR) : 429 Client Error: Too Many Requests for url: 
+tunelog-backend   | http://navidrome-navidrome-1:4533/auth/login
+
+```
+
+### Fix:
+- Used a cached machanic if time is less then 2 seconds, to avoid multiple login attempts, returning the cached response instead of making a new request 
+- I have planned to Add a proper fix when refactoring Login page. 
+- frontend caching didnt solve it, Adding backend Caching as well
+- Increased time.sleep for navidrome worker to avoid 429 errors
+
+
 ## 29th July 2026
 ### Bug Fix:
 - Added proper integration of `ND Worker`

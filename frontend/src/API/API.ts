@@ -474,14 +474,47 @@ export async function fetchSyncSettings(
   return res.json();
 }
 
+let cachedResponse: LoginResponse | null = null;
+let lastFetchTime: number = 0;
+let pendingRequest: Promise<LoginResponse> | null = null;
+
 export async function fetchLogin(data: LoginRequest): Promise<LoginResponse> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Login failed");
-  return res.json();
+  const now = Date.now();
+  if (cachedResponse && now - lastFetchTime < 2000) {
+    console.log("Returning cached login response");
+    return cachedResponse;
+  }
+  if (pendingRequest) {
+    console.log("Waiting on existing login request");
+    return pendingRequest;
+  }
+
+  pendingRequest = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Login failed");
+
+      const json = await res.json();
+      if (json.status !== "success" || !json.JWT) {
+        throw new Error(json.reason || "Login failed");
+      }
+      const usedLocal = !!localStorage.getItem("tunelog_user");
+      const store = usedLocal ? localStorage : sessionStorage;
+      store.setItem("tunelog_token", json.JWT);
+
+      cachedResponse = json;
+      lastFetchTime = Date.now();
+      return json;
+    } finally {
+      pendingRequest = null;
+    }
+  })();
+
+  return pendingRequest;
 }
 
 export async function fetchCreateUser(

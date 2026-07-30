@@ -1,21 +1,20 @@
 import os
 import shutil
 from pathlib import Path
-from core.config import getJWT
 
 import requests
+from core.config import Navidrome_url, getJWT
+from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from rich.console import Console
-
-from core.config import Navidrome_url
-from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
 
 console = Console()
 router = APIRouter(tags=["user_and_admin"])
 
 CONFIG_DIR = "./config/users"
 SERVER_URL = os.getenv("VITE_API_URL", "http://localhost:8000")
+
 
 class CreateUserData(BaseModel):
     username: str
@@ -27,13 +26,22 @@ class CreateUserData(BaseModel):
     name: str
     isUpdate: bool = False
 
+
 class LoginData(BaseModel):
     username: str
     password: str
 
+
 class AdminAuth(BaseModel):
     admin: str
     adminPD: str
+
+
+times = 0
+import time
+
+AUTH_CACHE = {}
+CACHE_TTL = 3600
 
 
 @router.post("/auth/login")
@@ -41,6 +49,14 @@ def login(data: LoginData):
     try:
         admin = data.username
         password = data.password
+        current_time = time.time()
+        time.sleep(2)
+        if admin in AUTH_CACHE:
+            cached_data = AUTH_CACHE[admin]
+            if (current_time - cached_data["timestamp"]) < CACHE_TTL:
+                console.log(f"[dim]Returning cached login response for: {admin}[/dim]")
+                return cached_data["response"]
+
         res = getJWT(admin, password)
 
         if not res:
@@ -48,6 +64,10 @@ def login(data: LoginData):
                 "status": "failed",
                 "reason": "Invalid credentials or Navidrome offline",
             }
+
+        success_response = {"status": "success", "JWT": res}
+
+        AUTH_CACHE[admin] = {"response": success_response, "timestamp": current_time}
 
         conn = get_db_connection_usr()
         cursor = conn.cursor()
@@ -65,10 +85,11 @@ def login(data: LoginData):
             console.log(f"[green]New User Created:[/green] {admin}")
 
         conn.close()
-        return {"status": "success", "JWT": res}
+
+        return success_response
 
     except Exception as e:
-        console.log(f"[red]Login Route Error:[/red] {e}")
+        console.log(f"[bold red]Login Route Error:[/bold red] {e}")
         return {"status": "failed", "reason": "Internal Error"}
 
 
@@ -95,7 +116,7 @@ async def update_user_profile(
 
             avatar_db_path = f"/avatars/{filename}"
             full_avatar_url = f"{SERVER_URL.rstrip('/')}{avatar_db_path}"
-        
+
         conn = get_db_connection_usr()
         if avatar_db_path:
             conn.execute(
@@ -108,9 +129,7 @@ async def update_user_profile(
                 (displayName, username),
             )
 
-        cursor = conn.execute(
-            "SELECT avatar FROM user WHERE username=?", (username,)
-        )
+        cursor = conn.execute("SELECT avatar FROM user WHERE username=?", (username,))
         row = cursor.fetchone()
         if row and row["avatar"]:
             full_avatar_url = f"{SERVER_URL.rstrip('/')}{row['avatar']}"

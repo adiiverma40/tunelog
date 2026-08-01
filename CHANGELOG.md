@@ -1,5 +1,30 @@
 # Changelog
 
+## 1st August 2026
+### Changes:
+- switching to HttpOnly cookies
+- Changing `vite.config.ts` to use `VITE_URL` env var to set server host and port
+- In `Push playlist` chaning to use token instead of username/password
+- Changed API to use credentials from httpOnly Cookings, 
+
+### Cleanup:
+- Removing commented out code, 
+
+### Bugs:
+There are many bugs thats needs to be fixed, I will do it one by one, But for now, I made it usable. Some features might not work, 
+
+
+
+
+
+
+## 31st July 2026
+### Realisation:
+- I blamed `/auth/login` endpoint but the real culprit was `getJwt` function that was called when getting users data, causing multiple requests simultaneously for n users, like 10 request in less then a sec
+- I was an idiot to just make shift the auth when i was creating frontend..... I am ashamed
+
+
+
 ## 30th July 2026
 ### Added:
 - `Misc.py` in Navidrome to Add functions that i dont know where to put

@@ -208,16 +208,6 @@ export default function LibrarySync() {
   const textMuted = dark ? "#555552" : "#a0a09c";
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-    if (!token) {
-      navigate("/signin");
-      return;
-    }
-  }, []);
-
-  useEffect(() => {
     fetchSyncStatus().then((data) => {
       setSyncData(data);
       setAutoSyncHour(Math.min(Math.max(data.auto_sync ?? 2, 0), 23));
@@ -1216,7 +1206,7 @@ export default function LibrarySync() {
               </div>
             </div>
           </div>
-          
+
           <div style={sectionStyle}>
             <div style={sectionHeadStyle}>
               <div>
@@ -1245,7 +1235,6 @@ export default function LibrarySync() {
                 gap: 0,
               }}
             >
-              
               <div
                 style={{
                   display: "flex",
@@ -1292,7 +1281,6 @@ export default function LibrarySync() {
                   margin: "0 0 18px",
                 }}
               />
-
 
               <div style={{ paddingBottom: 18 }}>
                 <label style={labelStyle}>Timezone</label>

@@ -60,23 +60,19 @@ export interface ParsedData {
 }
 
 export async function getListenbrainzLog(): Promise<ListenBrainzEntry[]> {
-  const token =
-    localStorage.getItem("tunelog_token") ||
-    sessionStorage.getItem("tunelog_token");
   const res = await fetch(`${BASE_URL}/api/listenbrainz`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: "GET",
+    credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch listenbrainz log");
   return res.json();
 }
 
 async function deleteListenbrainzEntry(id: string): Promise<void> {
-  const token =
-    localStorage.getItem("tunelog_token") ||
-    sessionStorage.getItem("tunelog_token");
+
   const res = await fetch(`${BASE_URL}/api/listenbrainz/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to delete entry");
 }
@@ -1064,13 +1060,7 @@ export default function ListenBrainzImport() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-    if (!token) {
-      navigate("/signin");
-      return;
-    }
+
 
     getListenbrainzLog()
       .then((logData) => {

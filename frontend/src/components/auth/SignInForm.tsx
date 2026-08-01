@@ -3,13 +3,11 @@ import { Link, useNavigate } from "react-router";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
-import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { fetchLogin } from "../../API/API";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,16 +19,12 @@ export default function SignInForm() {
     setLoading(true);
     try {
       const res = await fetchLogin({ username, password });
-      if (res.status === "success" && res.JWT) {
-        if (isChecked) {
-          localStorage.setItem("tunelog_token", res.JWT);
-          localStorage.setItem("tunelog_user", username);
-          localStorage.setItem("tunelog_password", password);
-        } else {
-          sessionStorage.setItem("tunelog_token", res.JWT);
-          sessionStorage.setItem("tunelog_user", username);
-          sessionStorage.setItem("tunelog_password", password);
-        }
+      if (res.status === "success") {
+        localStorage.removeItem("tunelog_token");
+        localStorage.removeItem("tunelog_password");
+        sessionStorage.removeItem("tunelog_token");
+        sessionStorage.removeItem("tunelog_password");
+
         navigate("/");
       } else {
         setError(res.reason ?? "Invalid username or password");
@@ -41,7 +35,6 @@ export default function SignInForm() {
       setLoading(false);
     }
   };
-
   return (
     <div className="flex flex-col flex-1">
       <div className="w-full max-w-md pt-10 mx-auto">
@@ -113,12 +106,12 @@ export default function SignInForm() {
                 {error && <p className="text-sm text-error-500">{error}</p>}
 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  {/*<div className="flex items-center gap-3">
                     <Checkbox checked={isChecked} onChange={setIsChecked} />
                     <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
                       Keep me logged in
                     </span>
-                  </div>
+                  </div>*/}
                 </div>
                 <div>
                   <Button className="w-full" size="sm" disabled={loading}>

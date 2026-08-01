@@ -91,32 +91,13 @@ export default function Playlist() {
   const textMuted = dark ? "#555552" : "#a0a09c";
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-    if (!token) {
-      navigate("/signin");
-      return;
-    }
-    const admin =
-      localStorage.getItem("tunelog_user") ??
-      sessionStorage.getItem("tunelog_user") ??
-      "";
-    const adminPD =
-      localStorage.getItem("tunelog_password") ??
-      sessionStorage.getItem("tunelog_password") ??
-      "";
-    fetchLogin({ username: admin, password: adminPD })
-      .catch(() => {})
-      .finally(() => {
-        fetchGetUsers({ admin, adminPD }).then((res) => {
-          if (res.status === "ok" && res.users) {
-            const usernames = res.users.map((u: any) => u.username);
-            setUsers(usernames);
-            if (usernames.length > 0) setSelectedUser(usernames[0]);
-          }
-        });
-      });
+    fetchGetUsers().then((res) => {
+      if (res.status === "ok" && res.users) {
+        const usernames = res.users.map((u: any) => u.username);
+        setUsers(usernames);
+        if (usernames.length > 0) setSelectedUser(usernames[0]);
+      }
+    });
   }, []);
 
   const ActiveComponent = PLAYLIST_COMPONENTS[playlistType];

@@ -1,5 +1,11 @@
-const BASE_URL = import.meta.env.VITE_API_URL;
+// const BASE_URL = import.meta.env.VITE_API_URL;
 
+// Changing how Base Url works, now instead of vite_api_url from .env it uses vite_url and vite_server_port to
+// construct the BASE_URL dynamically from the VITE_URL env var
+
+const viteUrl = new URL(import.meta.env.VITE_URL);
+const BASE_URL = `${viteUrl.protocol}//${viteUrl.hostname}:${import.meta.env.VITE_SERVER_PORT}`;
+export { BASE_URL };
 import { io, Socket } from "socket.io-client";
 
 // socket for jam
@@ -127,7 +133,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   status: "success" | "failed";
-  JWT?: string;
+  message?: string;
   reason?: string;
 }
 
@@ -428,8 +434,63 @@ export interface UpdateConfigResponse {
 
 export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
 
+
+export async function fetchLogin(data: LoginRequest): Promise<LoginResponse> {
+  const formData = new URLSearchParams();
+  formData.append("username", data.username);
+  formData.append("password", data.password);
+
+  const res = await fetch(`${BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: formData,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP error! status: ${res.status}`);
+  }
+
+  const json = await res.json();
+  console.log(json);
+
+  if (json.status !== "success") {
+    throw new Error(json.reason || "Login failed");
+  }
+  console.log("success");
+  return json;
+}
+
+
+export async function CheckAuth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/ping`, {
+      method: "GET",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 export async function fetchPing(): Promise<{ status: string }> {
-  const res = await fetch(`${BASE_URL}/api/ping`);
+  const res = await fetch(`${BASE_URL}/api/ping`, {
+    method: "GET",
+    credentials: "include",
+  });
   if (!res.ok) throw new Error("Ping failed");
   return res.json();
 }
@@ -474,49 +535,6 @@ export async function fetchSyncSettings(
   return res.json();
 }
 
-let cachedResponse: LoginResponse | null = null;
-let lastFetchTime: number = 0;
-let pendingRequest: Promise<LoginResponse> | null = null;
-
-export async function fetchLogin(data: LoginRequest): Promise<LoginResponse> {
-  const now = Date.now();
-  if (cachedResponse && now - lastFetchTime < 2000) {
-    console.log("Returning cached login response");
-    return cachedResponse;
-  }
-  if (pendingRequest) {
-    console.log("Waiting on existing login request");
-    return pendingRequest;
-  }
-
-  pendingRequest = (async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Login failed");
-
-      const json = await res.json();
-      if (json.status !== "success" || !json.JWT) {
-        throw new Error(json.reason || "Login failed");
-      }
-      const usedLocal = !!localStorage.getItem("tunelog_user");
-      const store = usedLocal ? localStorage : sessionStorage;
-      store.setItem("tunelog_token", json.JWT);
-
-      cachedResponse = json;
-      lastFetchTime = Date.now();
-      return json;
-    } finally {
-      pendingRequest = null;
-    }
-  })();
-
-  return pendingRequest;
-}
-
 export async function fetchCreateUser(
   data: CreateUserRequest,
 ): Promise<CreateUserResponse> {
@@ -531,16 +549,14 @@ export async function fetchCreateUser(
 
 const USERS_CACHE_KEY = "tunelog_users_cache";
 
-export async function fetchGetUsers(
-  data: AdminAuthRequest,
-): Promise<GetUsersResponse> {
+export async function fetchGetUsers(): Promise<GetUsersResponse> {
   const cached = localStorage.getItem(USERS_CACHE_KEY);
   const cachedUsers: User[] = cached ? JSON.parse(cached) : [];
 
   const fetchPromise = fetch(`${BASE_URL}/admin/get-users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    credentials: "include",
   })
     .then((res) => {
       if (!res.ok) throw new Error("Failed to get users");
@@ -567,8 +583,10 @@ export async function fetchUserData(
   username: string,
   password: string,
 ): Promise<UserDataResponse> {
-  const query = new URLSearchParams({ username, password }).toString();
-  const res = await fetch(`${BASE_URL}/admin/getUserData?${query}`);
+  const res = await fetch(`${BASE_URL}/admin/getUserData?username=${encodeURIComponent(username)}`, {
+    method: "GET",
+
+  });
   if (!res.ok) throw new Error("Failed to fetch user data");
   return res.json();
 }
@@ -578,7 +596,7 @@ export async function fetchUserProfile(
   password: string,
 ): Promise<UserProfileResponse> {
   const res = await fetch(
-    `${BASE_URL}/api/user/profile?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+    `${BASE_URL}/api/user/profile?username=${encodeURIComponent(username)}`,
   );
   if (!res.ok) throw new Error("Failed to fetch user profile");
   return res.json();

@@ -2,9 +2,15 @@ import os
 from pathlib import Path
 
 import socketio
-
-from api import  library_router, system_router, user_router , playlist_router , LB_router
-from api import analaytic_router
+from api import (
+    LB_router,
+    analaytic_router,
+    auth_router,
+    library_router,
+    playlist_router,
+    system_router,
+    user_router,
+)
 from core.db import init_db, init_db_lib, init_db_usr
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -20,7 +26,9 @@ save_dir.mkdir(parents=True, exist_ok=True)
 SERVER_URL = os.getenv("VITE_API_URL", "http://localhost:8000")
 
 allowedOriginsStr = os.getenv("ALLOWED_ORIGINS", "")
-allowedOrigins = [origin.strip() for origin in allowedOriginsStr.split(",") if origin.strip()]
+allowedOrigins = [
+    origin.strip() for origin in allowedOriginsStr.split(",") if origin.strip()
+]
 if not allowedOrigins:
     allowedOrigins = ["http://localhost:5173"]
 
@@ -40,12 +48,14 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+
 @app.on_event("startup")
 def startup():
     init_db()
     init_db_lib()
     init_db_usr()
 
+app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(library_router.router)
 app.include_router(system_router.router)

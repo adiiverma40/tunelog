@@ -1,48 +1,33 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNavigate } from "react-router";
-
-interface CachedUser {
-  username: string;
-  password: string;
-  isAdmin: boolean;
-  name: string | null;
-  avatarUrl: string | null;
-}
+import { logout } from "../../API/API";
+import { fetchUserMe } from "../../API/user_api";
+import { UserDetails } from "../../API/api_types";
+import { BASE_URL } from "../../API/API";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
-  const storage = localStorage.getItem("tunelog_user")
-    ? localStorage
-    : sessionStorage;
+  const [user, setUser] = useState<UserDetails | null>(null);
 
-  const username = storage.getItem("tunelog_user") ?? "User";
+  useEffect(() => {
+    fetchUserMe()
+      .then((res) => setUser(res))
+      .catch((err) => {
+        console.error("Failed to fetch current user:", err);
+      });
+  }, []);
 
-  const userData = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("tunelog_users_cache");
-      if (!raw) return null;
-
-      const users: CachedUser[] = JSON.parse(raw);
-      return users.find((u) => u.username === username) || null;
-    } catch {
-      return null;
-    }
-  }, [username]);
-
-  const displayName =
-    userData?.name ||
-    localStorage.getItem(`tunelog_displayname_${username}`) ||
-    username;
-
-  const avatarUrl =
-    userData?.avatarUrl || localStorage.getItem(`tunelog_avatar_${username}`);
+  const displayName = user?.name || "User";
+  const username = user?.username || "User";
+  const avatarUrl = `${BASE_URL}${user?.avatar || ""}`;
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   function toggleDropdown() {
-    setIsOpen(!isOpen);
+    setIsOpen((prev) => !prev);
   }
 
   function closeDropdown() {
@@ -50,16 +35,10 @@ export default function UserDropdown() {
   }
 
   function handleSignOut() {
-    localStorage.removeItem("tunelog_token");
-    localStorage.removeItem("tunelog_user");
-    localStorage.removeItem("tunelog_password");
-    sessionStorage.removeItem("tunelog_token");
-    sessionStorage.removeItem("tunelog_user");
-    sessionStorage.removeItem("tunelog_password");
-    navigate("/signin");
+    logout().then(() => {
+      navigate("/signin");
+    });
   }
-
-  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <div className="relative">

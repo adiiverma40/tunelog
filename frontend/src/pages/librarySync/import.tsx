@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
@@ -10,22 +9,9 @@ import Input from "../../components/form/input/InputField";
 import {
   fetchImportCSV,
   fetchCreatePlaylistFromIds,
+  fetchGetUsers,
   ImportResponse,
 } from "../../API/API";
-
-function getUsersFromCache(): string[] {
-  try {
-    const raw = localStorage.getItem("tunelog_users_cache");
-    if (raw) {
-      const parsed = JSON.parse(raw) as { username: string }[];
-      return parsed.map((u) => u.username);
-    }
-  } catch {}
-  const fallback =
-    localStorage.getItem("tunelog_user") ??
-    sessionStorage.getItem("tunelog_user");
-  return fallback ? [fallback] : [];
-}
 
 export default function Import() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,9 +31,17 @@ export default function Import() {
 
   useEffect(() => {
     if (isOpen) {
-      const users = getUsersFromCache();
-      setAllUsers(users);
-      setSelectedUsers(users); 
+      fetchGetUsers()
+        .then((res) => {
+          if (res.status === "ok" && res.users) {
+            const usernames = res.users.map((u) => u.username);
+            setAllUsers(usernames);
+            setSelectedUsers(usernames);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load users for import modal:", err);
+        });
     }
   }, [isOpen]);
 

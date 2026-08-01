@@ -73,7 +73,6 @@ export default function MostPlaysbyUser() {
       try {
         const admin = localStorage.getItem("tunelog_user") || "";
         const adminPD = localStorage.getItem("tunelog_password") || "";
-        if (!admin || !adminPD) return;
 
         const cachedRaw = localStorage.getItem("tunelog_users_cache");
         const cachedUsers: CachedUser[] = cachedRaw

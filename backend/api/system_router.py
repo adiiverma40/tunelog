@@ -1,15 +1,17 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from navidrome.state import _subscribers, notification_status, save_config, tune_config
 from pydantic import BaseModel
 from rich.console import Console
 
-from navidrome.state import _subscribers, notification_status, save_config, tune_config
+from .auth_router import get_current_user
 
 console = Console()
 router = APIRouter(tags=["system"])
+
 
 class configData(BaseModel):
     playlist_generation: dict
@@ -19,13 +21,16 @@ class configData(BaseModel):
     jam: dict
     listenbrainz: dict
 
+
 @router.get("/api/ping")
-def ping():
-    return {"status": "OK"}
+def ping(current_user: str = Depends(get_current_user)):
+    return {"status": "OK", "user": current_user}
+
 
 @router.get("/api/config")
 def SendConfig():
     return tune_config
+
 
 @router.post("/api/config/update")
 def update_config(payload: configData):
@@ -34,6 +39,7 @@ def update_config(payload: configData):
     if not success:
         raise HTTPException(status_code=500, detail=message)
     return {"status": "success", "message": "config.json updated"}
+
 
 @router.get("/notifications/stream")
 async def sse_stream():

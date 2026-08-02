@@ -1,4 +1,5 @@
-import type { NavidromeSong } from "./types";
+// import type { NavidromeSong } from "./types";
+import { BASE_URL } from "./client";
 
 export async function getSong(songId: string): Promise<NavidromeSong | null> {
   try {
@@ -30,21 +31,30 @@ export async function getSong(songId: string): Promise<NavidromeSong | null> {
   }
 }
 
-export function getCoverArtUrl(coverArtId: string): string {
-  const baseUrl = import.meta.env.VITE_NAVIDROME_URL ?? "";
-  const username = localStorage.getItem("tunelog_user") ?? "";
-  const password = localStorage.getItem("tunelog_password") ?? "";
+// export function getCoverArtUrl(coverArtId: string): string {
+//   const baseUrl = import.meta.env.VITE_NAVIDROME_URL ?? "";
+//   const username = localStorage.getItem("tunelog_user") ?? "";
+//   const password = localStorage.getItem("tunelog_password") ?? "";
 
-  const params = new URLSearchParams({
-    u: username,
-    p: password,
-    v: "1.16.1",
-    c: "tunelog",
-    id: coverArtId,
-    size: "80",
-  });
+//   const params = new URLSearchParams({
+//     u: username,
+//     p: password,
+//     v: "1.16.1",
+//     c: "tunelog",
+//     id: coverArtId,
+//     size: "80",
+//   });
 
-  const url = `${baseUrl}/rest/getCoverArt?${params}`;
+//   const url = `${baseUrl}/rest/getCoverArt?${params}`;
+//   console.log(url);
+//   return url;
+// }
+
+
+export function getCoverArt(songId: string): string {
+  const url = `${BASE_URL}/api/coverart/${songId}`;
   console.log(url);
   return url;
 }
+
+

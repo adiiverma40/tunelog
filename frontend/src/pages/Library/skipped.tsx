@@ -4,6 +4,8 @@ import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import MiniPlayer from "../Jam/MiniPlayer";
 import { Modal } from "../../components/ui/modal";
+import { getCoverArt } from "../../API";
+
 import {
   getSkippedSongs,
   getRecommendedDeletes,
@@ -26,7 +28,10 @@ type SortKey = "count" | "title" | "artist" | "album" | "time" | "duration";
 
 function getCoverArtUrl(songId: string | null): string | null {
   if (!songId) return null;
-  return `/api/navidrome/coverart?id=${songId}`;
+  // Updated to use the getCoverArt function from your API
+  const url = getCoverArt(songId);
+  console.log(url);
+  return url;
 }
 
 function formatTime(iso: string) {

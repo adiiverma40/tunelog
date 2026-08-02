@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "react-router";
 import Label from "../../components/form/Label";
 import { Modal } from "../../components/ui/modal";
 import Input from "../../components/form/input/InputField";
-
+import { useState, useEffect, useRef } from "react";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
@@ -11,8 +10,7 @@ import {
   fetchUserProfile,
   fetchUpdateProfile,
   UserProfileResponse,
-  getSong,
-  getCoverArtUrl,
+  getCoverArt,
 } from "../../API";
 
 const formatDate = (raw: string | undefined) => {
@@ -181,23 +179,24 @@ function UserAvatar({
 }
 
 function AlbumArt({
-  coverArtId,
+  songId,
   title,
   size = 40,
 }: {
-  coverArtId: string | null;
+  songId: string | null;
   title: string;
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
+
   useEffect(() => {
     setFailed(false);
-  }, [coverArtId]);
+  }, [songId]);
 
-  if (coverArtId && !failed) {
+  if (songId && !failed) {
     return (
       <img
-        src={getCoverArtUrl(coverArtId)}
+        src={getCoverArt(songId)}
         alt={title}
         onError={() => setFailed(true)}
         className="object-cover rounded-lg flex-shrink-0"
@@ -404,14 +403,12 @@ function EditProfileModal({
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
   const location = useLocation();
-  // const navigate = useNavigate();
   const password = (location.state as { password?: string })?.password ?? "";
   const dark = useDarkMode();
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [coverArtMap, setCoverArtMap] = useState<Record<string, string>>({});
 
   const currentUser = localStorage.getItem("tunelog_user") ?? "";
   const isOwnProfile = currentUser === username;
@@ -444,32 +441,6 @@ export default function UserProfilePage() {
       })
       .catch(() => setLoading(false));
   }, [username, password]);
-
-  useEffect(() => {
-    if (!data) return;
-
-    const topIds = (data.topSongs ?? []).map((s) => s.id).filter(Boolean);
-    const historyIds = (data.recentHistory ?? [])
-      .map((h) => h.id)
-      .filter(Boolean);
-    const uniqueIds = [...new Set([...topIds, ...historyIds])];
-    if (!uniqueIds.length) return;
-
-    Promise.all(
-      uniqueIds.map(async (id) => {
-        const song = await getSong(id);
-        return song?.coverArt
-          ? ([id, song.coverArt] as [string, string])
-          : null;
-      }),
-    ).then((results) => {
-      const map: Record<string, string> = {};
-      results.forEach((r) => {
-        if (r) map[r[0]] = r[1];
-      });
-      setCoverArtMap(map);
-    });
-  }, [data]);
 
   async function handleSaveProfile(newName: string, avatarFile: File | null) {
     if (!username) return;
@@ -790,11 +761,7 @@ export default function UserProfilePage() {
                     <span className="w-5 text-xs text-gray-300 dark:text-gray-600 text-right flex-shrink-0 tabular-nums">
                       {i + 1}
                     </span>
-                    <AlbumArt
-                      coverArtId={coverArtMap[song.id] ?? null}
-                      title={song.title}
-                      size={40}
-                    />
+                    <AlbumArt songId={song.id} title={song.title} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 dark:text-white/90 truncate group-hover:text-brand-500 transition-colors">
                         {song.title}
@@ -887,11 +854,7 @@ export default function UserProfilePage() {
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-3">
-                            <AlbumArt
-                              coverArtId={coverArtMap[h.id] ?? null}
-                              title={h.title}
-                              size={36}
-                            />
+                            <AlbumArt songId={h.id} title={h.title} size={36} />
                             <div className="min-w-0">
                               <p className="font-medium text-gray-800 dark:text-white/90 truncate max-w-[180px] hover:text-brand-500 transition-colors">
                                 {h.title}

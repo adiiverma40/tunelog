@@ -12,7 +12,9 @@ When i was creating the frontend, I rushed it and cramped all the apis in a sing
 - Added new api push playlist
 - Changed to make it so only admin get to see all other users
 - Refactored single API files into separate files, (Used Claude ai to refactor)
-
+- Changing ND worker's get method to return image data properly
+- Changing back to using direct navidrome api call from backend instead of worker, worker is slow
+- changing complete
 
 
 

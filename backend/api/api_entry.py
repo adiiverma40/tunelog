@@ -7,6 +7,7 @@ from api import (
     analaytic_router,
     auth_router,
     library_router,
+    navidrome_router,
     playlist_router,
     system_router,
     user_router,
@@ -55,6 +56,7 @@ def startup():
     init_db_lib()
     init_db_usr()
 
+
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(library_router.router)
@@ -62,3 +64,4 @@ app.include_router(system_router.router)
 app.include_router(analaytic_router.router)
 app.include_router(LB_router.router)
 app.include_router(playlist_router.router)
+app.include_router(navidrome_router.router)

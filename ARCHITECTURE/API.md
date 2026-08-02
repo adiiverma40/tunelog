@@ -40,3 +40,8 @@ For example, if there is three users, `user1`, `user2`, `user3`,  where user2 is
 And another problem, if user1 is trying to create playlist for user3, assuming that user3 has never logged in tunelog, the backend has no token or cred for user3 to create playlist for user3, in this case i can make it so backend uses which ever admin's cred is present, in this case user2's token, 
 
 > What i think is to let frontend not know about other users if its not a admin, and for the other problem, i can do it so that if user3 is never logged in tunelog, then tunelog will not be able to create playlist for user3. 
+
+
+### Navidrome Proxy
+
+Created a proxy for fetching cover art, instead of giving base url, and sending creds for every request. now the frontend will send a get request to backend with song id for cover art. 

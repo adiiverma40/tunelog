@@ -23,6 +23,48 @@ def get_authed_headers(decrypted_token: str) -> dict:
         return ND_HEADERS
     return {**ND_HEADERS, "X-Nd-Authorization": f"Bearer {decrypted_token}"}
 
+# def method_get(work, session):
+#     url = f"{ND_BASE}/{work.endpoint.lstrip('/')}"
+
+#     try:
+#         r = session.get(
+#             url,
+#             params=work.params,
+#             headers=get_authed_headers(work.token),
+#             timeout=15,
+#         )
+
+#         r.raise_for_status()
+#         if r.status_code == 404:
+#             return {"status": "error", "error_msg": "404 Not Found"}
+
+#         # --- Rate Limit Check Commented Out ---
+#         # headers = r.headers
+#         # remaining = int(headers.get("x-ratelimit-remaining", 1))
+#         # reset_in = int(headers.get("x-ratelimit-reset-in", 0))
+#         #
+#         # console.print(
+#         #     f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
+#         # )
+#         #
+#         # if remaining <= 0:
+#         #     console.print(
+#         #         f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
+#         #     )
+#         #     time.sleep(reset_in)
+#         # else:
+#         #     time.sleep(0.2)
+#         # --------------------------------------
+
+#         result = {"status": "success", "data": r.json()}
+
+#     except requests.exceptions.RequestException as e:
+#         console.print(f"[bold red]Worker API Error: {e}[/bold red]")
+#         result = {"status": "error", "error_msg": str(e)}
+
+#     return result
+
+
 def method_get(work, session):
     url = f"{ND_BASE}/{work.endpoint.lstrip('/')}"
 
@@ -38,32 +80,25 @@ def method_get(work, session):
         if r.status_code == 404:
             return {"status": "error", "error_msg": "404 Not Found"}
 
-        # --- Rate Limit Check Commented Out ---
-        # headers = r.headers
-        # remaining = int(headers.get("x-ratelimit-remaining", 1))
-        # reset_in = int(headers.get("x-ratelimit-reset-in", 0))
-        #
-        # console.print(
-        #     f"[dim]API Call Successful. Remaining requests: {remaining}[/dim]"
-        # )
-        #
-        # if remaining <= 0:
-        #     console.print(
-        #         f"[bold yellow]Rate limit hit! Sleeping thread for {reset_in} seconds...[/bold yellow]"
-        #     )
-        #     time.sleep(reset_in)
-        # else:
-        #     time.sleep(0.2)
-        # --------------------------------------
-
-        result = {"status": "success", "data": r.json()}
+        content_type = r.headers.get("Content-Type", "")
+        
+        if content_type.startswith("image/"):
+            result = {
+                "status": "success", 
+                "data": r.content, 
+                "content_type": content_type
+            }
+        else:
+            result = {
+                "status": "success", 
+                "data": r.json()
+            }
 
     except requests.exceptions.RequestException as e:
         console.print(f"[bold red]Worker API Error: {e}[/bold red]")
         result = {"status": "error", "error_msg": str(e)}
 
     return result
-
 
 def method_post(work, session):
     url = f"{ND_BASE}/{work.endpoint.lstrip('/')}"
@@ -115,6 +150,7 @@ def ND_Worker():
         try:
             work = ND_queue.getWork(timeout=timeout)
             result = None
+            print(f"Working on: {work}")
 
             if work.method.lower() == "get":
                 result = method_get(work, session)

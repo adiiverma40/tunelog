@@ -537,7 +537,7 @@ def main():
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     console.print("Checking Musicbrainz Remaining Seedings")
-    musicBrainzThread()
+    # musicBrainzThread()
 
     while True:
         Auto_LB_CF()

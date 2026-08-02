@@ -7,7 +7,7 @@ import {
 } from "../playlist/components/playlistShared";
 import {
   fetchLBLibraryRecommendations,
-  getCoverArtUrl,
+  getCoverArt,
   type LBLibrarySong,
   type LBMissingSong,
 } from "../../API";
@@ -78,7 +78,7 @@ function NavidromeArt({
   if (err || !navidromeId) return <ArtFallback size={size} dark={dark} />;
   return (
     <img
-      src={getCoverArtUrl(navidromeId)}
+      src={getCoverArt(navidromeId)}
       alt={title}
       loading="lazy"
       style={{

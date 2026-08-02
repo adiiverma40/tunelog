@@ -1,4 +1,5 @@
 import json
+from ast import Store
 
 import requests
 from core.config import build_url_for_user, getAllUser
@@ -201,6 +202,31 @@ def createPlaylistIfDeleteByNavidrome(base_url, name, data, user_id):
         return
 
 
+from Workers.worker_queue import ND_queue, NDWork
+
+
+def createPlaylist(token, public, name, comment):
+    payload = {"public": public, "name": name, "comment": comment}
+    # Switching from Subsonic to Navidrome API
+    playlistId = ND_queue.addWork(
+        NDWork(method="post", endpoint="/api/playlist", params=payload, token=token)
+    )
+    return playlistId
+
+
+def push_song_id_to_playlist(playlist_id, song_ids, token):
+    playlod = {"ids": song_ids}
+    result = ND_queue.addWork(
+        NDWork(
+            method="post",
+            endpoint=f"/api/playlist/{playlist_id}/tracks",
+            params=playlod,
+            token=token,
+        )
+    )
+    return result
+
+
 def push_playlist(
     song_ids,
     user_id,
@@ -208,192 +234,272 @@ def push_playlist(
     playname=None,
     newPlaylist=False,
     playlist_type="blend",
+    comment="",
 ):
     USER_CREDENTIALS = getAllUser()
-    password = USER_CREDENTIALS.get(user_id)
-    if not password:
-        log(
-            "error",
-            "No credentials found for user",
-            source="playlist",
-            user_id=user_id,
-            event="error",
+    token = USER_CREDENTIALS.get(user_id)
+    if not token:
+        console.log(
+            f"[bold red]\\[Push playlist]\\[error] No credentials found for user {user_id}"
+        )
+        console.log(
+            f"[bold red]\\[Push playlist]\\[cred] Trying to create playlist for : {user_id} with different credentials"
         )
         return
-
     name = playname if playname else PLAYLIST_NAME.format(user_id)
+    comment = "Playlist Created using Tunelog"
     stored_id = None
 
     if not newPlaylist:
         stored_id = getPlaylistIdForType(user_id, playlist_type)
         if not stored_id:
-            try:
-                fetch_url = build_url_for_user("getPlaylists", user_id, password)
-                r_lists = requests.get(fetch_url).json()
-                playlists = (
-                    r_lists.get("subsonic-response", {})
-                    .get("playlists", {})
-                    .get("playlist", [])
-                )
-                for pl in playlists:
-                    if pl.get("name") == name:
-                        stored_id = pl["id"]
-                        setPlaylistIdForType(user_id, playlist_type, stored_id)
-                        console.print(
-                            f"[yellow]Recovered playlist ID for {user_id}/{playlist_type} via name match[/yellow]"
-                        )
-                        break
-            except Exception as e:
-                console.print(f"[red]Name fallback lookup failed: {e}[/red]")
-
-    base_url = build_url_for_user("createPlaylist", user_id, password)
-    data = [("songId", sid) for sid in song_ids]
-
-    def _do_create_fresh() -> dict | None:
-        try:
-            r = requests.post(f"{base_url}&name={name}", data=data).json()
-            return r
-        except Exception as e:
-            log(
-                "error",
-                f"Failed to create fresh playlist: {e}",
-                source="playlist",
-                user_id=user_id,
-                event="error",
+            console.log(
+                f"[bold red]\\[Push playlist][error] No playlist found for user: {user_id}"
             )
-            return None
+            console.log(
+                f"[bold green]\\[Push playlist][creating]creating new playlist for user:  {user_id}"
+            )
+            stored_id = createPlaylist(token, False, name, comment)
 
     if stored_id:
-        url = f"{base_url}&playlistId={stored_id}"
-    else:
-        url = f"{base_url}&name={name}"
+        name = playname if playname else PLAYLIST_NAME.format(user_id)
+    print(song_ids)
+    result = push_song_id_to_playlist(stored_id, song_ids, token)
+    print(result)
 
-    try:
-        r = requests.post(url, data=data).json()
-        notification_status.playlist.append(
-            {"username": user_id, "size": len(data), "type": "regenerate"}
-        )
-
-        if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
-            error = (
-                r.get("subsonic-response", {})
-                .get("error", {})
-                .get("message", "Unknown error")
-            )
-
-            if stored_id and "not found" in error.lower():
-                console.print(
-                    f"[yellow]Stale playlist ID '{stored_id}' for {user_id}/{playlist_type}. Recreating...[/yellow]"
-                )
-                setPlaylistIdForType(user_id, playlist_type, "")
-                r = _do_create_fresh()
-                if r is None:
-                    return
-                if (
-                    "subsonic-response" not in r
-                    or r["subsonic-response"]["status"] == "failed"
-                ):
-                    log(
-                        "error",
-                        f"Navidrome API failed even after recreate",
-                        source="playlist",
-                        user_id=user_id,
-                        event="error",
-                    )
-                    return
-            else:
-                log(
-                    "error",
-                    f"Navidrome API failed: {error}",
-                    source="playlist",
-                    user_id=user_id,
-                    event="error",
-                )
-                return
-
-        final_id = r["subsonic-response"]["playlist"]["id"]
-        setPlaylistIdForType(user_id, playlist_type, final_id)
-
-        requests.get(
-            build_url_for_user("updatePlaylist", user_id, password)
-            + f"&playlistId={final_id}&public=false"
-        )
-
-    except Exception as e:
-        log(
-            "error",
-            f"Failed to push playlist: {e}",
-            source="playlist",
-            user_id=user_id,
-            event="error",
-        )
-        return
-
-    conn_lib = get_db_connection_lib()
-    placeholders = ",".join("?" * len(song_ids))
-    rows = conn_lib.execute(
-        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
-        song_ids,
-    ).fetchall()
-    conn_lib.close()
-
-    lib_data = {row[0]: row for row in rows}
-    conn = get_db_connection_playlist()
-    cursor = conn.cursor()
-    cursor.execute(
-        "DELETE FROM playlist WHERE username = ? AND type = ?",
-        (user_id, playlist_type),
+    console.log(
+        f"[bold green]\\[Push playlist][success] Playlist {name} pushed successfully"
     )
-
-    insert_data = []
-    for sid in song_ids:
-        row = lib_data.get(sid)
-        if row:
-            insert_data.append(
-                (
-                    user_id,
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    (
-                        song_signals.get(sid, "unheard")
-                        if isinstance(song_signals, dict)
-                        else song_signals
-                    ),
-                    row[4],
-                    playlist_type,
-                )
-            )
-
-    cursor.executemany(
-        "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        insert_data,
-    )
-    conn.commit()
-    conn.close()
 
 
 def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
     USER_CREDENTIALS = getAllUser()
-    password = USER_CREDENTIALS.get(user_id)
-    if not password:
+    token = USER_CREDENTIALS.get(user_id)
+    if not token:
+        console.log(
+            f"[bold red]\\[API Push]\\[error] No credentials found for user {user_id}"
+        )
         return False
-    base_url = build_url_for_user("createPlaylist", user_id, password)
-    url = f"{base_url}&name={playname}"
-    payload = [("songId", sid) for sid in song_ids]
-
+    comment = "Playlist Created via API / CSV Import"
     try:
-        response = requests.post(url, data=payload)
-        r_json = response.json()
-        if (
-            "subsonic-response" in r_json
-            and r_json["subsonic-response"]["status"] == "ok"
-        ):
-            new_id = r_json["subsonic-response"]["playlist"]["id"]
-            update_url = build_url_for_user("updatePlaylist", user_id, password)
-            requests.get(f"{update_url}&playlistId={new_id}&public=false")
+        console.log(
+            f"[bold green]\\[API Push]\\[creating] Creating new playlist '{playname}' for user: {user_id}"
+        )
+        playlist_id = createPlaylist(token, False, playname, comment)
+        if not playlist_id:
+            console.log(
+                f"[bold red]\\[API Push]\\[error] Playlist creation failed for: {playname}"
+            )
+            return False
+        result = push_song_id_to_playlist(playlist_id, song_ids, token)
+        if result and result.get("status") == "success":
+            console.log(
+                f"[bold green]\\[API Push]\\[success] Playlist '{playname}' populated successfully"
+            )
             return True
+        else:
+            console.log(
+                f"[bold red]\\[API Push]\\[error] Failed to add tracks to playlist. Result: {result}"
+            )
+            return False
+    except Exception as e:
+        console.log(f"[bold red]\\[API Push]\\[error] Exception occurred: {e}")
         return False
-    except Exception:
-        return False
+
+
+# def push_playlist(
+#     song_ids,
+#     user_id,
+#     song_signals,
+#     playname=None,
+#     newPlaylist=False,
+#     playlist_type="blend",
+# ):
+#     USER_CREDENTIALS = getAllUser()
+#     token = USER_CREDENTIALS.get(user_id)
+#     if not token:
+#         log(
+#             "error",
+#             "No credentials found for user",
+#             source="playlist",
+#             user_id=user_id,
+#             event="error",
+#         )
+#         return
+
+#     name = playname if playname else PLAYLIST_NAME.format(user_id)
+#     stored_id = None
+
+#     if not newPlaylist:
+#         stored_id = getPlaylistIdForType(user_id, playlist_type)
+#         if not stored_id:
+#             try:
+#                 fetch_url = build_url_for_user("getPlaylists", user_id, password)
+#                 r_lists = requests.get(fetch_url).json()
+#                 playlists = (
+#                     r_lists.get("subsonic-response", {})
+#                     .get("playlists", {})
+#                     .get("playlist", [])
+#                 )
+#                 for pl in playlists:
+#                     if pl.get("name") == name:
+#                         stored_id = pl["id"]
+#                         setPlaylistIdForType(user_id, playlist_type, stored_id)
+#                         console.print(
+#                             f"[yellow]Recovered playlist ID for {user_id}/{playlist_type} via name match[/yellow]"
+#                         )
+#                         break
+#             except Exception as e:
+#                 console.print(f"[red]Name fallback lookup failed: {e}[/red]")
+
+#     base_url = build_url_for_user("createPlaylist", user_id, password)
+#     data = [("songId", sid) for sid in song_ids]
+
+#     def _do_create_fresh() -> dict | None:
+#         try:
+#             r = requests.post(f"{base_url}&name={name}", data=data).json()
+#             return r
+#         except Exception as e:
+#             log(
+#                 "error",
+#                 f"Failed to create fresh playlist: {e}",
+#                 source="playlist",
+#                 user_id=user_id,
+#                 event="error",
+#             )
+#             return None
+
+#     if stored_id:
+#         url = f"{base_url}&playlistId={stored_id}"
+#     else:
+#         url = f"{base_url}&name={name}"
+
+#     try:
+#         r = requests.post(url, data=data).json()
+#         notification_status.playlist.append(
+#             {"username": user_id, "size": len(data), "type": "regenerate"}
+#         )
+
+#         if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
+#             error = (
+#                 r.get("subsonic-response", {})
+#                 .get("error", {})
+#                 .get("message", "Unknown error")
+#             )
+
+#             if stored_id and "not found" in error.lower():
+#                 console.print(
+#                     f"[yellow]Stale playlist ID '{stored_id}' for {user_id}/{playlist_type}. Recreating...[/yellow]"
+#                 )
+#                 setPlaylistIdForType(user_id, playlist_type, "")
+#                 r = _do_create_fresh()
+#                 if r is None:
+#                     return
+#                 if (
+#                     "subsonic-response" not in r
+#                     or r["subsonic-response"]["status"] == "failed"
+#                 ):
+#                     log(
+#                         "error",
+#                         f"Navidrome API failed even after recreate",
+#                         source="playlist",
+#                         user_id=user_id,
+#                         event="error",
+#                     )
+#                     return
+#             else:
+#                 log(
+#                     "error",
+#                     f"Navidrome API failed: {error}",
+#                     source="playlist",
+#                     user_id=user_id,
+#                     event="error",
+#                 )
+#                 return
+
+#         final_id = r["subsonic-response"]["playlist"]["id"]
+#         setPlaylistIdForType(user_id, playlist_type, final_id)
+
+#         requests.get(
+#             build_url_for_user("updatePlaylist", user_id, password)
+#             + f"&playlistId={final_id}&public=false"
+#         )
+
+#     except Exception as e:
+#         log(
+#             "error",
+#             f"Failed to push playlist: {e}",
+#             source="playlist",
+#             user_id=user_id,
+#             event="error",
+#         )
+#         return
+
+#     conn_lib = get_db_connection_lib()
+#     placeholders = ",".join("?" * len(song_ids))
+#     rows = conn_lib.execute(
+#         f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
+#         song_ids,
+#     ).fetchall()
+#     conn_lib.close()
+
+#     lib_data = {row[0]: row for row in rows}
+#     conn = get_db_connection_playlist()
+#     cursor = conn.cursor()
+#     cursor.execute(
+#         "DELETE FROM playlist WHERE username = ? AND type = ?",
+#         (user_id, playlist_type),
+#     )
+
+#     insert_data = []
+#     for sid in song_ids:
+#         row = lib_data.get(sid)
+#         if row:
+#             insert_data.append(
+#                 (
+#                     user_id,
+#                     row[0],
+#                     row[1],
+#                     row[2],
+#                     row[3],
+#                     (
+#                         song_signals.get(sid, "unheard")
+#                         if isinstance(song_signals, dict)
+#                         else song_signals
+#                     ),
+#                     row[4],
+#                     playlist_type,
+#                 )
+#             )
+
+#     cursor.executemany(
+#         "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+#         insert_data,
+#     )
+#     conn.commit()
+#     conn.close()
+
+
+# def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
+#     USER_CREDENTIALS = getAllUser()
+#     password = USER_CREDENTIALS.get(user_id)
+#     if not password:
+#         return False
+#     base_url = build_url_for_user("createPlaylist", user_id, password)
+#     url = f"{base_url}&name={playname}"
+#     payload = [("songId", sid) for sid in song_ids]
+
+#     try:
+#         response = requests.post(url, data=payload)
+#         r_json = response.json()
+#         if (
+#             "subsonic-response" in r_json
+#             and r_json["subsonic-response"]["status"] == "ok"
+#         ):
+#             new_id = r_json["subsonic-response"]["playlist"]["id"]
+#             update_url = build_url_for_user("updatePlaylist", user_id, password)
+#             requests.get(f"{update_url}&playlistId={new_id}&public=false")
+#             return True
+#         return False
+#     except Exception:
+#         return False

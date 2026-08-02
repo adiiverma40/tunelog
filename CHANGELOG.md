@@ -1,5 +1,16 @@
 # Changelog
 
+## 2nd August 2026
+
+### Changes:
+- Switching from Subsonic to Navidrome API For Playlist creation
+- Added new push playlist
+- Added new api push playlist
+- Changed to make it so only admin get to see all other users
+
+
+
+
 ## 1st August 2026
 ### Changes:
 - switching to HttpOnly cookies

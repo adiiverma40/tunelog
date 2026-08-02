@@ -33,7 +33,7 @@ def getAllUser():
     users = conn.execute("SELECT * FROM user").fetchall()
 
     USER_CREDENTIALS = {
-        dict(user)["username"]: dict(user)["password"] for user in users
+        dict(user)["username"]: dict(user)["ND_token"] for user in users
     }
 
     return USER_CREDENTIALS

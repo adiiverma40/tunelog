@@ -10,7 +10,7 @@ import {
   getCoverArtUrl,
   type LBLibrarySong,
   type LBMissingSong,
-} from "../../API/API";
+} from "../../API";
 
 function useTokens(dark: boolean) {
   return {

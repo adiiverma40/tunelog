@@ -6,7 +6,7 @@ import MostSkippedPercentage from "../../components/dashboardItems/MostSkippedPe
 import MostPlaysbyUser from "../../components/dashboardItems/MostPlaysbyUser";
 import MostHeardArtist from "../../components/dashboardItems/MostHeardArtist";
 import PageMeta from "../../components/common/PageMeta";
-import { fetchStats, Stats, fetchGetUsers } from "../../API/API";
+import { fetchStats, Stats, fetchGetUsers } from "../../API";
 import MiniPlayer from "../Jam/MiniPlayer";
 
 export default function Home() {

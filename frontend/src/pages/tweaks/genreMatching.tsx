@@ -10,7 +10,7 @@ import {
   fetchGenres,
   writeGenre,
   autoMatchGenres,
-} from "../../API/API";
+} from "../../API";
 
 interface GenreListResponse {
   status: string;

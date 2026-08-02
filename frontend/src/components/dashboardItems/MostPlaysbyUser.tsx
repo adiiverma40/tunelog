@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchGetUsers, fetchUserData, UserDataResponse } from "../../API/API";
+import { fetchGetUsers, fetchUserData, UserDataResponse } from "../../API";
 
 interface CachedUser {
   username: string;

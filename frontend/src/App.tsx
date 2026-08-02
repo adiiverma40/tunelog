@@ -17,7 +17,7 @@ import Config from "./pages/tweaks/config";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
 import JamUsers from "./pages/Jam/JamUsers";
-import { fetchGetUsers, CheckAuth } from "./API/API";
+import { fetchGetUsers, CheckAuth } from "./API";
 import { useNotificationStream } from "./hooks/Usenotificationstream";
 import ListenBrainzImport from "./pages/scrobble/listenbrainz";
 import ListenbrainzCF from "./pages/playlist/LB_CF";

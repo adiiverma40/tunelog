@@ -1,7 +1,7 @@
 // import PageBreadcrumb from "../components/common/PageBreadCrumb";
 // import PageMeta from "../components/common/PageMeta";
 import { useState, useEffect } from "react";
-import { fetchGetUsers, fetchCreateUser, User } from "../../API/API";
+import { fetchGetUsers, fetchCreateUser, User } from "../../API";
 // import Button from "../components/ui/button/Button";
 // import { Modal } from "../components/ui/modal";
 import { Modal } from "../../components/ui/modal";

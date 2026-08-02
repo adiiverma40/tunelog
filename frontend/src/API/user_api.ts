@@ -1,4 +1,4 @@
-import { BASE_URL } from "./API";
+import { BASE_URL } from ".";
 import { UserDetails } from "./api_types";
 
 export async function fetchUserMe(): Promise<UserDetails> {

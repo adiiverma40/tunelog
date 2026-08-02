@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Stats, UserDataResponse, UserProfileResponse } from "../../API/API";
+import { Stats, UserDataResponse, UserProfileResponse } from "../../API";
 
 interface Props {
   stats: Stats | UserDataResponse | UserProfileResponse | null;

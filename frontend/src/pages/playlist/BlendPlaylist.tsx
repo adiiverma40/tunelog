@@ -15,7 +15,7 @@ import {
   // getCoverArtUrl,
   PlaylistSong,
   PlaylistStats,
-} from "../../API/API";
+} from "../../API";
 
 import {
   ExplicitFilter,

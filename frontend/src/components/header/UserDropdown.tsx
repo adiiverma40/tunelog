@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNavigate } from "react-router";
-import { logout } from "../../API/API";
+import { logout } from "../../API";
 import { fetchUserMe } from "../../API/user_api";
 import { UserDetails } from "../../API/api_types";
-import { BASE_URL } from "../../API/API";
+import { BASE_URL } from "../../API";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);

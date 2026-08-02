@@ -5,8 +5,8 @@ import {
   fetchListenbrainzPlaylistTracks,
   matchTracksWithNavidrome,
   createNavidromePlaylist,
-} from "../../API/API";
-import type { LBPlaylist, LBTrack } from "../../API/API";
+} from "../../API";
+import type { LBPlaylist, LBTrack } from "../../API";
 
 type TabMode = "user" | "created_for_you";
 

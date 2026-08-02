@@ -7,7 +7,7 @@ import {
   updateExplicitTag,
   ManualMarkingSong,
   ExplicitTag,
-} from "../../API/API";
+} from "../../API";
 
 const TAG_STYLE: Record<string, string> = {
   explicit: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",

@@ -11,7 +11,7 @@ import {
   fetchCreatePlaylistFromIds,
   fetchGetUsers,
   ImportResponse,
-} from "../../API/API";
+} from "../../API";
 
 export default function Import() {
   const fileInputRef = useRef<HTMLInputElement>(null);

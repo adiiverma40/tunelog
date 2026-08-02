@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
-import { fetchLogin, fetchGetUsers } from "../../API/API";
+import { fetchLogin, fetchGetUsers } from "../../API";
 
 import {
   PLAYLIST_TYPE_REGISTRY,

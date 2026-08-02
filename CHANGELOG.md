@@ -2,11 +2,16 @@
 
 ## 2nd August 2026
 
+### Shame
+When i was creating the frontend, I rushed it and cramped all the apis in a single API.ts file, i regret that choice but its too big to do it manually, I used Claude ai to refactor the API into separate files, I am ashamed of this
+
+
 ### Changes:
 - Switching from Subsonic to Navidrome API For Playlist creation
 - Added new push playlist
 - Added new api push playlist
 - Changed to make it so only admin get to see all other users
+- Refactored single API files into separate files, (Used Claude ai to refactor)
 
 
 

@@ -12,7 +12,7 @@ import {
   fetchFallbackSyncStatus,
   stopFallbackSync,
   SyncStatus,
-} from "../../API/API";
+} from "../../API";
 
 const SYNC_HOURS = Array.from({ length: 24 }, (_, i) => {
   const h = i % 12 === 0 ? 12 : i % 12;

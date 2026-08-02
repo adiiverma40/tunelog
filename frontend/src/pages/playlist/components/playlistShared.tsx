@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { getCoverArtUrl } from "../../../API/API";
+import { getCoverArtUrl } from "../../../API";
 import {
   SIGNAL_CONFIG,
   SLOT_COLORS,

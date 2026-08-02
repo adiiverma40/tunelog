@@ -6,7 +6,7 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
-import { socket } from "../API/API";
+import { socket } from "../API";
 
 export interface NowPlayingPayload {
   user: string;

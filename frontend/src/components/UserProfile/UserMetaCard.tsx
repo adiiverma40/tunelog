@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { User, fetchUserData, UserDataResponse } from "../../API/API";
+import { User, fetchUserData, UserDataResponse } from "../../API";
 
 interface Props {
   user: User;

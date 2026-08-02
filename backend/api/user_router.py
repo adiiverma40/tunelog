@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+from calendar import c
 from datetime import datetime, timedelta
 from pathlib import Path
 from sqlite3.dbapi2 import Cursor
@@ -63,12 +64,15 @@ times = 0
 AUTH_CACHE = {}
 CACHE_TTL = 3600
 
+
 @router.post("/user/me")
 def get_current_user_me(username: str = Depends(get_current_user)):
     console.log(f"[bold]username: {username}")
     conn = get_db_connection_usr()
     cursor = conn.cursor()
-    user = cursor.execute("SELECT username, name, avatar FROM user WHERE username = ?", (username,)).fetchone()
+    user = cursor.execute(
+        "SELECT username, name, avatar FROM user WHERE username = ?", (username,)
+    ).fetchone()
     if user:
         return {"username": user[0], "name": user[1], "avatar": user[2]}
     return None
@@ -135,7 +139,19 @@ async def update_user_profile(
 def getUsers(current_user: str = Depends(get_current_user)):
 
     conn = get_db_connection_usr()
-    users = conn.execute("SELECT * FROM user").fetchall()
+    users = conn.execute(
+        """
+        SELECT username, name, avatar, isAdmin, LB_username
+        FROM user
+        WHERE
+            username = ?
+            OR (
+                (SELECT isAdmin
+                 FROM user
+                 WHERE username = ?) = 1
+            );""",
+        (current_user, current_user),
+    ).fetchall()
     conn.close()
 
     user_list = []

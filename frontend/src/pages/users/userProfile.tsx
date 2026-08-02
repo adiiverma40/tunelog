@@ -13,7 +13,7 @@ import {
   UserProfileResponse,
   getSong,
   getCoverArtUrl,
-} from "../../API/API";
+} from "../../API";
 
 const formatDate = (raw: string | undefined) => {
   if (!raw || raw === "never") return "No activity";

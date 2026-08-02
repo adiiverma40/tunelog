@@ -1,4 +1,4 @@
-import { Stats } from "../../API/API";
+import { Stats } from "../../API";
 
 interface Props {
   stats: Stats | null;

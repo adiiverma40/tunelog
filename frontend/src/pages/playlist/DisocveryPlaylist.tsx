@@ -10,7 +10,7 @@ import {
   getSong,
   generateDiscoveryQueue,
   fetchDiscoveryPlaylistId,
-} from "../../API/API";
+} from "../../API";
 import {
   ExplicitFilter,
   SortKey,

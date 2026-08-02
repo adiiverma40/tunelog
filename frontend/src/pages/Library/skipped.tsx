@@ -10,14 +10,14 @@ import {
   generateScript,
   getScriptSettings,
   saveScriptSettings,
-} from "../../API/API";
+} from "../../API";
 import type {
   SkippedSong,
   RecommendedSong,
   ShellType,
   ScriptAction,
   SkippedSettings,
-} from "../../API/API";
+} from "../../API";
 
 const PAGE_SIZE = 10;
 const WIKI_URL = "https://github.com/adiiverma40/tunelog/wiki/Skip-Page";

@@ -522,7 +522,7 @@ def main():
 
     console.print("[bold blue]Starting Library Sync(10 sec delay)")
 
-    syncThread = threading.Timer(10, library.sync_library)
+    syncThread = threading.Timer(60, library.sync_library)
     syncThread.start()
     syncThread.join()
     console.print("[bold blue]Starting Scoring CORN JOB(1m delay)")
@@ -531,7 +531,7 @@ def main():
 
     if tune_config["listenbrainz"]["PushLovedSongs"]:
         console.print("[bold blue]Pushing Starred Song to Listenbrainz(5 sec delay)")
-        pushThread = threading.Timer(5, pushStarredToListenBrainz)
+        pushThread = threading.Timer(65, pushStarredToListenBrainz)
         pushThread.start()
     else:
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")

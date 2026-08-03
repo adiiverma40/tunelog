@@ -5,6 +5,7 @@ from calendar import c
 from datetime import datetime, timedelta
 from pathlib import Path
 from sqlite3.dbapi2 import Cursor
+from webbrowser import get
 
 import requests
 from core.config import Navidrome_url, getJWT
@@ -78,11 +79,48 @@ def get_current_user_me(username: str = Depends(get_current_user)):
     return None
 
 
+@router.get("/api/user/profile/{username}")
+def get_user_profile(
+    username: str,
+    auth: str = Depends(get_current_user),
+):
+    conn = get_db_connection_usr()
+
+    user = conn.execute(
+        """
+        SELECT username, name, avatar
+        FROM user
+        WHERE username = ?
+        """,
+        (username,),
+    ).fetchone()
+
+    conn.close()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+        )
+
+    avatar_url = f"{SERVER_URL.rstrip('/')}{user['avatar']}" if user["avatar"] else None
+
+    return {
+        "status": "ok",
+        "user": {
+            "username": user["username"],
+            "name": user["name"],
+            "avatar": avatar_url,
+        },
+    }
+
+
 @router.post("/api/user/profile/update")
 async def update_user_profile(
     username: str = Form(...),
     displayName: str = Form(...),
     avatar: UploadFile = File(None),
+    auth: str = Depends(get_current_user),
 ):
     try:
         save_dir = Path(CONFIG_DIR)
@@ -325,7 +363,7 @@ def createUser(data: CreateUserData):
 
 
 @router.get("/api/user/profile")
-def getUserProfile(username: str = ""):
+def getUserProfile(username: str = "", auth: str = Depends(get_current_user)):
     conn_listen = get_db_connection()
     conn_library = get_db_connection_lib()
     lc = conn_listen.cursor()

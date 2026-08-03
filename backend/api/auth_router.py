@@ -26,13 +26,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 OAUTH2_SCHEME = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-def get_ND_Token(username:str):
+
+def get_ND_Token(username: str):
     conn = get_db_connection_usr()
     cursor = conn.cursor()
-    token = cursor.execute("SELECT ND_token FROM user WHERE username = ?", (username,)).fetchone()
+    token = cursor.execute(
+        "SELECT ND_token FROM user WHERE username = ?", (username,)
+    ).fetchone()
     if token is not None:
         token = token[0]
-    
+
     conn.close()
     return token
 
@@ -55,7 +58,7 @@ async def get_current_user(access_token: str = Cookie(None)):
     try:
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        print("auth check username", username)
+        # print("auth check username", username)
         if username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,7 +85,7 @@ def login(response: Response, data: OAuth2PasswordRequestForm = Depends()):
         user = cursor.execute(
             "SELECT username, password FROM user WHERE username = ?", (admin,)
         ).fetchone()
-        print(user)
+        # print(user)
         if user:
             try:
                 decrypted_db_pw = decrypt_token(user["password"])
@@ -116,10 +119,12 @@ def login(response: Response, data: OAuth2PasswordRequestForm = Depends()):
             access_token = create_access_token(data={"sub": admin})
             cursor.execute(
                 """
-                INSERT INTO user (username, password) VALUES (?, ?)
-                ON CONFLICT(username) DO UPDATE SET password = excluded.password
+                INSERT INTO user (username, password, ND_token) VALUES (?, ?, ?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password = excluded.password,
+                    ND_token = excluded.ND_token
                 """,
-                (admin, encrypted_password),
+                (admin, encrypted_password, token),
             )
             conn.commit()
             response.set_cookie(

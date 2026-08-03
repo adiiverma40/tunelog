@@ -20,7 +20,14 @@ export interface UpdateProfileResponse {
     avatarUrl: string | null;
   };
 }
-
+export interface UserProfileDetailsResponse {
+  status: string;
+  user: {
+    username: string;
+    name: string;
+    avatar: string | null;
+  };
+}
 // ---- Discovery queue ---------------------------------------------
 
 export interface DiscoveryQueueParams {

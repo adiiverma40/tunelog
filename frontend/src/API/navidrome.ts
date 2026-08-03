@@ -53,7 +53,7 @@ export async function getSong(songId: string): Promise<NavidromeSong | null> {
 
 export function getCoverArt(songId: string): string {
   const url = `${BASE_URL}/api/coverart/${songId}`;
-  console.log(url);
+  // console.log(url);
   return url;
 }
 

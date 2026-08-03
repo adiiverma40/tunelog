@@ -14,6 +14,9 @@ To do this, Navidrome uses `delete` method to `/api/playlist/{id}/tracks?id=1` e
 - Changed discovery playlist to use new way to fetch playlist
 - Adding `delete` method in navidrome worker
 - Adding regenreat option in new push playlist
+- Added ND token saving in user db
+- Added user profile api for user profie fetching such as name, username, avatar
+- fixed user profile not loading image
 
 
 ## 2nd August 2026

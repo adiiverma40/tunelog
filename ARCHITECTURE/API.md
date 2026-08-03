@@ -32,6 +32,15 @@ The old code needed `username` and `password` to be sent to Navidrome as subsoni
 One way to solve this is just by decrypting the password from db and send it as old, but this creates a security risk and futher more,  I am thinking of switching from subsonic to Navidrome API for everything. I am Planning to make it Navidrome only.
 I will have to remap whole push playlist func
 
+### Frontend Playlist Fetching
+
+Before the make shift playlist fetching was using diffrent ways to fetch in every diffrent playlist types. Like blend was fetching from backend's database, discovery was fetching from Navidrome API after fetching playlist id from backend's database.
+Now changing it to so that every playlist type fetches in a single unified way.
+
+1st, the Frontend will fetch playlist ids from backend, then using playlist id, it will fetch playlist tracks from backend using `/api/playlists/{playlist_id}/tracks`
+
+
+
 
 ### Descision 
 

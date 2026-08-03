@@ -11,7 +11,6 @@ import {
   fetchPlaylistGenerate,
   appendPlaylist,
   fetchGetConfig,
-  getSong,
   // getCoverArtUrl,
   PlaylistSong,
   PlaylistStats,
@@ -64,7 +63,6 @@ export default function BlendPlaylist({
   const [songs, setSongs] = useState<PlaylistSong[]>([]);
   const [stats, setStats] = useState<PlaylistStats | null>(null);
   const [loadingSongs, setLoadingSongs] = useState(false);
-  const [coverArtMap, setCoverArtMap] = useState<Record<string, string>>({});
 
   const [playlistSize, setPlaylistSize] = useState(40);
   const [explicitFilter, setExplicitFilter] = useState<ExplicitFilter>("all");
@@ -168,23 +166,6 @@ export default function BlendPlaylist({
       })
       .finally(() => setLoadingSongs(false));
   }, [selectedUser]);
-
-  useEffect(() => {
-    if (!songs.length) return;
-    const uniqueIds = [...new Set(songs.map((s) => s.song_id).filter(Boolean))];
-    Promise.all(
-      uniqueIds.map(async (id) => {
-        const song = await getSong(id);
-        return song ? { id, coverArt: song.coverArt } : null;
-      }),
-    ).then((results) => {
-      const map: Record<string, string> = {};
-      results.forEach((r) => {
-        if (r?.coverArt) map[r.id] = r.coverArt;
-      });
-      setCoverArtMap(map);
-    });
-  }, [songs]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1032,7 +1013,7 @@ export default function BlendPlaylist({
 
           <SongTable
             songs={sortedSongs}
-            coverArtMap={coverArtMap}
+            coverArtMap={{}}
             dark={dark}
             isMobile={isMobile}
             loading={loadingSongs}

@@ -9,7 +9,8 @@ import Switch from "../../components/form/switch/Switch";
 import {
   getSong,
   generateDiscoveryQueue,
-  fetchDiscoveryPlaylistId,
+  fetchUserPlaylistIds,
+  fetchPlaylistTracks,
 } from "../../API";
 import {
   ExplicitFilter,
@@ -23,7 +24,6 @@ import {
   useThemeTokens,
   SongTable,
   SharedSettingsPanel,
-  fetchPlaylistFromNavidrome,
 } from "./components/playlistShared";
 
 const MONTH_NAMES = [
@@ -494,10 +494,19 @@ export default function DiscoveryPlaylist({
     setLoadingSongs(true);
     setCurrentPage(1);
     setInfiniteCount(INFINITE_BATCH);
-    fetchDiscoveryPlaylistId(selectedUser)
+
+    // Using the unified endpoint approach
+    fetchUserPlaylistIds()
       .then(async (idRes) => {
-        if (idRes.status === "success" && idRes.id) {
-          setNavidromeSongs(await fetchPlaylistFromNavidrome(idRes.id));
+        if (idRes.status === "success" && idRes.ids?.discovery) {
+          const songs = await fetchPlaylistTracks(idRes.ids.discovery);
+          // Ensuring we set an array to state
+          // setNavidromeSongs(Array.isArray(songs) ? songs : songs?.tracks || songs?.entry || []);
+          setNavidromeSongs(
+            Array.isArray(songs)
+              ? songs
+              : songs?.data || songs?.tracks || songs?.entry || [],
+          );
         } else {
           setNavidromeSongs([]);
         }
@@ -509,7 +518,7 @@ export default function DiscoveryPlaylist({
   useEffect(() => {
     if (!navidromeSongs.length) return;
     const uniqueIds = [
-      ...new Set(navidromeSongs.map((s) => s.id).filter(Boolean)),
+      ...new Set(navidromeSongs.map((s) => s.mediaFileId).filter(Boolean)),
     ];
     Promise.all(
       uniqueIds.map(async (id) => {
@@ -563,13 +572,19 @@ export default function DiscoveryPlaylist({
         payload.date_from = toISODate(calFrom);
         payload.date_to = toISODate(calTo);
       }
+
       const res = await generateDiscoveryQueue(payload);
       if (res.status === "ok") {
-        const idRes = await fetchDiscoveryPlaylistId(selectedUser);
-        if (idRes.status === "success" && idRes.id) {
-          const songs = await fetchPlaylistFromNavidrome(idRes.id);
-          setNavidromeSongs(songs);
-          setGenerateMsg(`✓ Synced ${songs.length} songs from Navidrome`);
+        const idRes = await fetchUserPlaylistIds();
+
+        if (idRes.status === "success" && idRes.ids?.discovery) {
+          const songs = await fetchPlaylistTracks(idRes.ids.discovery);
+          const trackArray = Array.isArray(songs)
+            ? songs
+            : songs?.tracks || songs?.entry || [];
+
+          setNavidromeSongs(trackArray);
+          setGenerateMsg(`✓ Synced ${trackArray.length} songs from Navidrome`);
           setCurrentPage(1);
           setInfiniteCount(INFINITE_BATCH);
         } else {
@@ -604,7 +619,7 @@ export default function DiscoveryPlaylist({
   }, [INFINITE_BATCH]);
 
   const rawSongs = navidromeSongs.map((s) => ({
-    song_id: s.id,
+    song_id: s.mediaFileId,
     title: s.title,
     artist: s.artist,
     genre: s.genre,

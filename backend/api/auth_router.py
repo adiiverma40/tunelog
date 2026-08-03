@@ -26,6 +26,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 OAUTH2_SCHEME = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+def get_ND_Token(username:str):
+    conn = get_db_connection_usr()
+    cursor = conn.cursor()
+    token = cursor.execute("SELECT ND_token FROM user WHERE username = ?", (username,)).fetchone()
+    if token is not None:
+        token = token[0]
+    
+    conn.close()
+    return token
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()

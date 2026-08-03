@@ -1,5 +1,14 @@
 # Changelog
 
+## 3rd August 2026
+
+### Changes:
+- Removed getSong Api from frontend.
+- Added playlist id fetch instead of only discovery id 
+- Added playlist fetch from navidrome in backend
+- Added playlist tracks fetch from navidrome in backend
+- Changed discovery playlist to use new way to fetch playlist
+
 ## 2nd August 2026
 
 ### Shame

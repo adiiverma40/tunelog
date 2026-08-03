@@ -115,3 +115,20 @@ export async function tierPlaylist(
 
   return result;
 }
+
+
+
+
+export async function fetchUserPlaylistIds() {
+  const res = await fetch(`${BASE_URL}/api/user/playlist-ids`, {
+    method: "GET",
+    credentials: "include",
+  }); 
+  return res.json(); }
+
+export async function fetchPlaylistTracks(playlistId: string) {
+  const res = await fetch(`${BASE_URL}/api/playlist/${playlistId}/tracks`, {
+    credentials: "include",
+  });
+  return res.json();
+}

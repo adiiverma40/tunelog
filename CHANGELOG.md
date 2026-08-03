@@ -1,13 +1,20 @@
 # Changelog
 
 ## 3rd August 2026
+### BUG:
+- The old way to `push playlist` was using subsonic api, now i am shifted to navidrome, unlike subsonic, navidrome doesnt provide a way to regenerate playlist, so you will have to delete the songs in playlist then repush new songs. 
+To do this, Navidrome uses `delete` method to `/api/playlist/{id}/tracks?id=1` endpoint
 
+- The navidrome internal api returns status code `500` instead of `404` for not found, changing worker to handle it.
 ### Changes:
 - Removed getSong Api from frontend.
 - Added playlist id fetch instead of only discovery id 
 - Added playlist fetch from navidrome in backend
 - Added playlist tracks fetch from navidrome in backend
 - Changed discovery playlist to use new way to fetch playlist
+- Adding `delete` method in navidrome worker
+- Adding regenreat option in new push playlist
+
 
 ## 2nd August 2026
 

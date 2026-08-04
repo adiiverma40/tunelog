@@ -2,6 +2,9 @@
 
 ## 4th August 2026
 
+### Working
+I am starting to work in the `migration` code for `navidrome`'s version greater then `v0.63.2`. According to Issue [#21](https://github.com/adiiverma40/tunelog/issues/21)
+
 ### Changes:
 - Changed cred and user sync to verify and sync all the user for which password is present not only the admin
 - removed unsed function from frotnend code

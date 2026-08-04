@@ -1,0 +1,1 @@
+# Migration code for navidrome v0.63.2

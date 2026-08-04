@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import Switch from "../../components/form/switch/Switch";
 import {
-  getSong,
   generateDiscoveryQueue,
   fetchUserPlaylistIds,
   fetchPlaylistTracks,
@@ -435,7 +434,6 @@ export default function DiscoveryPlaylist({
   const INFINITE_BATCH = PAGE_SIZE;
 
   const [navidromeSongs, setNavidromeSongs] = useState<any[]>([]);
-  const [coverArtMap, setCoverArtMap] = useState<Record<string, string>>({});
   const [dynamicStats, setDynamicStats] = useState({
     total: 0,
     dateFrom: "—",
@@ -500,8 +498,6 @@ export default function DiscoveryPlaylist({
       .then(async (idRes) => {
         if (idRes.status === "success" && idRes.ids?.discovery) {
           const songs = await fetchPlaylistTracks(idRes.ids.discovery);
-          // Ensuring we set an array to state
-          // setNavidromeSongs(Array.isArray(songs) ? songs : songs?.tracks || songs?.entry || []);
           setNavidromeSongs(
             Array.isArray(songs)
               ? songs
@@ -516,35 +512,29 @@ export default function DiscoveryPlaylist({
   }, [selectedUser]);
 
   useEffect(() => {
-    if (!navidromeSongs.length) return;
-    const uniqueIds = [
-      ...new Set(navidromeSongs.map((s) => s.mediaFileId).filter(Boolean)),
-    ];
-    Promise.all(
-      uniqueIds.map(async (id) => {
-        const song = await getSong(id);
-        return song
-          ? { id, coverArt: song.coverArt, created: song.created }
-          : null;
-      }),
-    ).then((results) => {
-      const map: Record<string, string> = {};
-      const dates: number[] = [];
-      results.forEach((r) => {
-        if (r) {
-          if (r.coverArt) map[r.id] = r.coverArt;
-          if (r.created) dates.push(new Date(r.created).getTime());
-        }
-      });
-      setCoverArtMap(map);
-      if (dates.length > 0) {
-        setDynamicStats({
-          total: navidromeSongs.length,
-          dateFrom: new Date(Math.min(...dates)).toISOString().slice(0, 10),
-          dateTo: new Date(Math.max(...dates)).toISOString().slice(0, 10),
-        });
-      }
+    if (!navidromeSongs.length) {
+      setDynamicStats({ total: 0, dateFrom: "—", dateTo: "—" });
+      return;
+    }
+
+    const dates: number[] = [];
+    navidromeSongs.forEach((s) => {
+      if (s.created) dates.push(new Date(s.created).getTime());
     });
+
+    if (dates.length > 0) {
+      setDynamicStats({
+        total: navidromeSongs.length,
+        dateFrom: new Date(Math.min(...dates)).toISOString().slice(0, 10),
+        dateTo: new Date(Math.max(...dates)).toISOString().slice(0, 10),
+      });
+    } else {
+      setDynamicStats({
+        total: navidromeSongs.length,
+        dateFrom: "—",
+        dateTo: "—",
+      });
+    }
   }, [navidromeSongs]);
 
   useEffect(() => {
@@ -1073,7 +1063,6 @@ export default function DiscoveryPlaylist({
         >
           <SongTable
             songs={sortedSongs}
-            coverArtMap={coverArtMap}
             dark={dark}
             isMobile={isMobile}
             loading={loadingSongs}

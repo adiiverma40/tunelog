@@ -1,5 +1,13 @@
 # Changelog
 
+## 4th August 2026
+
+### Changes:
+- Changed cred and user sync to verify and sync all the user for which password is present not only the admin
+- removed unsed function from frotnend code
+- removed old covermap system
+- removed old coverart fetching 
+
 ## 3rd August 2026
 ### BUG:
 - The old way to `push playlist` was using subsonic api, now i am shifted to navidrome, unlike subsonic, navidrome doesnt provide a way to regenerate playlist, so you will have to delete the songs in playlist then repush new songs. 

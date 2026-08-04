@@ -25,6 +25,7 @@ from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import sync_library
+from navidrome.auth import checkCred_SaveCred
 from navidrome.misc import sync_ND_users
 from navidrome.state import (
     automation_config,
@@ -65,7 +66,7 @@ from scrobble.listenBrainz import fuzzyMatchingSong
 from Workers.Luffy import Sanji
 from Workers.worker_queue import ND_queue, NDWork
 
-from .config import checkCred_SaveCred, event_queue
+from .config import event_queue
 
 load_dotenv()
 console = Console()
@@ -436,7 +437,7 @@ def main():
     )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
     workerThread.start()
 
-    console.print("[bold blue]\\[CRED] Checking .env Cred")
+    console.print("[bold blue]\\[CRED] Checking users credentials")
     cred = checkCred_SaveCred()
     if cred:
         console.print("[bold blue]\\[CRED] Success!")
@@ -520,9 +521,9 @@ def main():
     is_lb_syncing = False
     last_lb_sync_timestamp = None
 
-    console.print("[bold blue]Starting Library Sync(10 sec delay)")
+    console.print("[bold blue]Starting Library Sync(20 sec delay)")
 
-    syncThread = threading.Timer(60, library.sync_library)
+    syncThread = threading.Timer(20, library.sync_library)
     syncThread.start()
     syncThread.join()
     console.print("[bold blue]Starting Scoring CORN JOB(1m delay)")
@@ -531,7 +532,7 @@ def main():
 
     if tune_config["listenbrainz"]["PushLovedSongs"]:
         console.print("[bold blue]Pushing Starred Song to Listenbrainz(5 sec delay)")
-        pushThread = threading.Timer(65, pushStarredToListenBrainz)
+        pushThread = threading.Timer(5, pushStarredToListenBrainz)
         pushThread.start()
     else:
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")

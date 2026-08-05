@@ -1,14 +1,41 @@
 # Changelog
 
 ## 5th August 2026
+## Side note
+
+I fucking spend 30 minutes styling the terminal logs, i hate it, yet i dont regret it 
+
+
+colors : purple
+```bash
+[Migration](v0.63.2):: Migration Starting ::
+[Migration](v0.63.2):: Fetching ND song :: Freestyle #2
+[Migration](v0.63.2):: ND returned :: 4 responses
+[Migration](v0.63.2):: Matching Responses ::
+[Migration](v0.63.2):: S5PGda4hMEA9Asrvotx5pi :: WYM Freestyle :: Doja Cat
+[Migration](v0.63.2):: score: 72.0
+[Migration](v0.63.2):: egvYZuzMQRluW5XE2n1TCz :: Freestyle (#2) (live at Tramps,
+New York, 1999) :: Eminem  
+[Migration](v0.63.2):: score: 40.67796610169492
+[Migration](v0.63.2):: tEQLEjlEocngDm8AAJbw3W :: 2009 BET Hip Hop Awards 
+Freestyle :: Eminem  
+[Migration](v0.63.2):: score: 40.0
+[Migration](v0.63.2):: MvOdbDJGEfRAydNx6fAZJS :: Freestyle #2 :: Eminem  
+[Migration](v0.63.2):: score: 100.0
+[Migration](v0.63.2):: Match Found :: 
+:: ND: MvOdbDJGEfRAydNx6fAZJS :: DB: MvOdbDJGEfRAydNx6fAZJS :: 100.0%
+```
+
+>  I am proud of it, but there is some imporvementes that can be done, i will do it later 
 
 ## Bug:
 - when the 1st user, probably admin login, there is no `isAdmin:true` in user db, so auth fails. 
+- LB token not being saved correctly, cause frontend doesnt send user of the logged in user
 
 ## Fix:
 - For now, i made it so db returns, a `nd token`, its only being used to fetch other users details form navidrome. So it doesnt matter if its not admin's token. 
 - Its a hacky fix, i will fix it better later, right now the deadline is apporaching, the navidrome migration is the main focus.
-
+- LB token fixed, by sending httponly cookie and getting username of logged in user from there
 ## 4th August 2026
 I reinstalled arch, my whole time went there..
 

@@ -143,9 +143,10 @@ export async function setLBToken(
   const user = getCurrentUser();
   const res = await fetch(`${BASE_URL}/api/lb-cf/set-token`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
+      // Authorization: `Bearer ${getToken()}`,
     },
     body: JSON.stringify({ user, token: lbToken }),
   });

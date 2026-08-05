@@ -25,6 +25,7 @@ from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import sync_library
+from migration.v_0_63_2 import v_0_63_2_migrate
 from navidrome.auth import checkCred_SaveCred
 from navidrome.misc import sync_ND_users
 from navidrome.state import (
@@ -492,6 +493,8 @@ def main():
     console.print(
         f"[green]✓ API ready on port 8000 · Proxy ready on port {proxyPort}[/green]"
     )
+    print('error here')
+    v_0_63_2_migrate()
 
     with console.status("[dim]Starting watcher...[/dim]"):
         try:

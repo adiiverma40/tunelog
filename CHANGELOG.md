@@ -1,6 +1,19 @@
 # Changelog
 
+## 5th August 2026
+
+## Bug:
+- when the 1st user, probably admin login, there is no `isAdmin:true` in user db, so auth fails. 
+
+## Fix:
+- For now, i made it so db returns, a `nd token`, its only being used to fetch other users details form navidrome. So it doesnt matter if its not admin's token. 
+- Its a hacky fix, i will fix it better later, right now the deadline is apporaching, the navidrome migration is the main focus.
+
 ## 4th August 2026
+I reinstalled arch, my whole time went there..
+
+
+
 
 ### Working
 I am starting to work in the `migration` code for `navidrome`'s version greater then `v0.63.2`. According to Issue [#21](https://github.com/adiiverma40/tunelog/issues/21)

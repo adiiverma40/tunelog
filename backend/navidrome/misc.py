@@ -9,7 +9,7 @@ console = Console()
 
 def get_ND_token(cursor):
     cursor.execute(
-        "SELECT ND_token FROM user WHERE isAdmin = 1 AND ND_token IS NOT NULL LIMIT 1"
+        "SELECT ND_token FROM user WHERE ND_token IS NOT NULL LIMIT 1"
     )
     row = cursor.fetchone()
 

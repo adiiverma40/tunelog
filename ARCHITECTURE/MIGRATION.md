@@ -34,8 +34,18 @@ we can detect the migration by using two methods,
 
 **Better version**: We can combine methods 1 and 2 to detect the migration. we can first check sever verison if its greater then `0.63.2`, then we can assume that either migration is running or has already occurred. we can futher be more sure by checking the song_id format.
 
-## After detection
+## File Structure
 
+```text
+.
+├── Migration
+│   ├── __init__.py
+│   ├── runner.py
+│   └── v0_63_2.py
+```
+
+**Runner.py**
+Runner file will contain the manin function that will run the migration and the be imported by the main file.
 
 
 
@@ -54,3 +64,21 @@ The migration will work like this:
 9. Now, using library db as source of truth, we can updated the rest of dbs using old_song_id to map the new song id, This will be faster then fetching from ND for each song.
 
 
+### Migration table
+
+Instead of adding a new column in `library` table i will create temp table, cause i can alter it without affecting the running system. 
+After creating new table, i will copy songID from library to new table as `old_song_id`. And then Run the library sync script. 
+
+
+### Problem
+
+After filling the migration table with old song id and fetching the new song id from ND, how will we know which old id belongs to which new id?
+We can not use `mbzid` cause Every song might not have a `mbzid`.
+Instead, i have thought of using `path` of the song as identifier, This solves the problems but introduces a new problem that if any file moves it will crash.
+
+### Path edge case
+
+We can Solve the new problem by using `tunelog.db` as the source of truth for songs that get messed up, meaning, if a song's path changes, That song id will not have new songid. 
+After the migration table is filled, we can use tunelogdb to get title, artist and album of that song,
+1. If tunelog doesnt have that entry meaning the song is new and we can skip
+2. if tunelog has it, we can use it to query library db to get new song id. 

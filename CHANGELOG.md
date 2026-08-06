@@ -1,5 +1,15 @@
 # Changelog
 
+## 6th August 2026
+
+## Migration
+Migration script is ready. its the 1st version so there will be some ineficncies. I will fix those in future versions.
+
+## Changes
+- Implmented Migration
+- Added code for migrating database
+- Clean up. 
+
 ## 5th August 2026
 ## Side note
 

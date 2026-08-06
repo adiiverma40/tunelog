@@ -20,6 +20,7 @@ loguru==0.7.3
 markdown-it-py==4.2.0
 mdurl==0.1.2
 numpy==2.5.1
+packaging==26.3
 pandas==3.0.2
 passlib==1.7.4
 pyaes==1.6.1

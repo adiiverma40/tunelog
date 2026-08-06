@@ -5,6 +5,7 @@ import time
 import traceback
 from datetime import datetime
 from profile import run
+from socket import getservbyname
 from zoneinfo import ZoneInfo
 
 import metadata.library as library
@@ -25,6 +26,7 @@ from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import sync_library
+from migration.runner import run_migration_v_0_63_2
 from migration.v_0_63_2 import v_0_63_2_migrate
 from navidrome.auth import checkCred_SaveCred
 from navidrome.misc import sync_ND_users
@@ -493,8 +495,9 @@ def main():
     console.print(
         f"[green]✓ API ready on port 8000 · Proxy ready on port {proxyPort}[/green]"
     )
-    print('error here')
-    v_0_63_2_migrate()
+    # print("error here")
+    # v_0_63_2_migrate()
+    # 
 
     with console.status("[dim]Starting watcher...[/dim]"):
         try:
@@ -518,7 +521,7 @@ def main():
             console.print(f"[red]✗ Watcher startup failed:[/red] {e}")
             sys.exit(1)
     console.print("[green]✓ Watcher running[/green]")
-
+    run_migration_v_0_63_2()
     last_auto_sync_day = None
     isGenerated = False
     is_lb_syncing = False

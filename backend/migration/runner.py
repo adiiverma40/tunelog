@@ -49,6 +49,8 @@ def get_server_version(cursor) -> str:
             .get("serverVersion", "")
         )
         # import re
+        if server_version == "":
+            server_version= '0.0.0'
 
         sversion = re.sub(r"[^0-9.].*$", "", server_version)
         # sversion = server_version.partition("(")[0].strip()

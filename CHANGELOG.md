@@ -1,5 +1,13 @@
 # Changelog
 
+## 8th August 2026
+
+## changes
+- migration clean up
+- added whats new in UI
+- Added check for `# VITE_API_URL=http://192.168.29.118:8000  ` is user has not yet migrated
+
+
 ## 6th August 2026
 
 ## Migration

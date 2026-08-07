@@ -49,8 +49,9 @@ def get_server_version(cursor) -> str:
             .get("serverVersion", "")
         )
         # import re
-        if server_version == "" or server_version == " ":
-            server_version= '0.0.0'
+        # print(server_version)
+        # if server_version == "" or server_version == " ":
+        #     server_version= '0.0.0'
 
         sversion = re.sub(r"[^0-9.].*$", "", server_version)
         # sversion = server_version.partition("(")[0].strip()
@@ -60,14 +61,18 @@ def get_server_version(cursor) -> str:
         return sversion
     else:
         console.print("[bold red]\\[migration](runner):: No User Found ::")
-        return ""
+        return "0.0.0"
 
 
 def run_migration_v_0_63_2():
     console.print("[bold purple]\\[migration](runner):: Running Migration v0.63.2 ::")
     conn = get_db_connection_usr()
     cursor = conn.cursor()
-    version = Version(get_server_version(cursor))
+    # print(get_server_version(cursor))
+    sv= get_server_version(cursor)
+    if not sv.strip():
+        sv = "0.0.0"
+    version = Version(sv)
     cursor.close()
     conn.close()
     conn_lib = get_db_connection_lib()

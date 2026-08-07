@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useParams } from "react-router";
+import { useParams } from "react-router";
 import Label from "../../components/form/Label";
 import { Modal } from "../../components/ui/modal";
 import Input from "../../components/form/input/InputField";
@@ -11,9 +11,9 @@ import {
   fetchUserProfile,
   fetchUpdateProfile,
   UserProfileResponse,
-  getSong,
-  getCoverArtUrl,
-} from "../../API/API";
+  getCoverArt,
+  fetchUserProfileDetails,
+} from "../../API";
 
 const formatDate = (raw: string | undefined) => {
   if (!raw || raw === "never") return "No activity";
@@ -113,36 +113,6 @@ function useDarkMode() {
   return dark;
 }
 
-function getLocalAvatar(username: string): string | null {
-  try {
-    const cache = JSON.parse(
-      localStorage.getItem("tunelog_users_cache") ?? "[]",
-    );
-    return (
-      cache.find((u: any) => u.username === username)?.avatarUrl ??
-      localStorage.getItem(`tunelog_avatar_${username}`) ??
-      null
-    );
-  } catch {
-    return localStorage.getItem(`tunelog_avatar_${username}`) ?? null;
-  }
-}
-
-function getLocalDisplayName(username: string): string {
-  try {
-    const cache = JSON.parse(
-      localStorage.getItem("tunelog_users_cache") ?? "[]",
-    );
-    return (
-      cache.find((u: any) => u.username === username)?.name ??
-      localStorage.getItem(`tunelog_displayname_${username}`) ??
-      username
-    );
-  } catch {
-    return localStorage.getItem(`tunelog_displayname_${username}`) ?? username;
-  }
-}
-
 function UserAvatar({
   username,
   avatarUrl,
@@ -154,6 +124,7 @@ function UserAvatar({
 }) {
   const [failed, setFailed] = useState(false);
   const col = getAvatarColor(username);
+  console.log("avatarUrl", avatarUrl, "failed", failed, "username", username);
   if (avatarUrl && !failed) {
     return (
       <img
@@ -181,23 +152,23 @@ function UserAvatar({
 }
 
 function AlbumArt({
-  coverArtId,
+  songId,
   title,
   size = 40,
 }: {
-  coverArtId: string | null;
+  songId: string | null;
   title: string;
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     setFailed(false);
-  }, [coverArtId]);
+  }, [songId]);
 
-  if (coverArtId && !failed) {
+  if (songId && !failed) {
     return (
       <img
-        src={getCoverArtUrl(coverArtId)}
+        src={getCoverArt(songId)}
         alt={title}
         onError={() => setFailed(true)}
         className="object-cover rounded-lg flex-shrink-0"
@@ -296,6 +267,11 @@ function EditProfileModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setName(displayName);
+    setPreviewUrl(avatarUrl);
+  }, [displayName, avatarUrl, isOpen]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -403,95 +379,62 @@ function EditProfileModal({
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
-  const location = useLocation();
-  // const navigate = useNavigate();
-  const password = (location.state as { password?: string })?.password ?? "";
   const dark = useDarkMode();
 
   const [data, setData] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [coverArtMap, setCoverArtMap] = useState<Record<string, string>>({});
 
-  const currentUser = localStorage.getItem("tunelog_user") ?? "";
-  const isOwnProfile = currentUser === username;
-  const isHost = localStorage.getItem("isHost") === "true";
+  const [displayName, setDisplayName] = useState<string>(username ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const [displayName, setDisplayName] = useState<string>(() =>
-    getLocalDisplayName(username ?? ""),
-  );
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(() =>
-    getLocalAvatar(username ?? ""),
-  );
-
-  const isAdmin = (() => {
-    try {
-      const cache = JSON.parse(
-        localStorage.getItem("tunelog_users_cache") ?? "[]",
-      );
-      return cache.find((u: any) => u.username === username)?.isAdmin ?? false;
-    } catch {
-      return false;
-    }
-  })();
+  const isHost = Boolean((data as any)?.isHost);
+  const isAdmin = Boolean((data as any)?.isAdmin);
 
   useEffect(() => {
     if (!username) return;
-    fetchUserProfile(username, password)
-      .then((d) => {
-        setData(d);
-        setLoading(false);
+
+    let cancelled = false;
+
+    setLoading(true);
+    setLoadError(false);
+
+    Promise.all([fetchUserProfile(username), fetchUserProfileDetails(username)])
+      .then(([stats, profile]) => {
+        if (cancelled) return;
+
+        setData(stats);
+        setDisplayName(profile.user.name);
+        setAvatarUrl(profile.user.avatar);
       })
-      .catch(() => setLoading(false));
-  }, [username, password]);
-
-  useEffect(() => {
-    if (!data) return;
-
-    const topIds = (data.topSongs ?? []).map((s) => s.id).filter(Boolean);
-    const historyIds = (data.recentHistory ?? [])
-      .map((h) => h.id)
-      .filter(Boolean);
-    const uniqueIds = [...new Set([...topIds, ...historyIds])];
-    if (!uniqueIds.length) return;
-
-    Promise.all(
-      uniqueIds.map(async (id) => {
-        const song = await getSong(id);
-        return song?.coverArt
-          ? ([id, song.coverArt] as [string, string])
-          : null;
-      }),
-    ).then((results) => {
-      const map: Record<string, string> = {};
-      results.forEach((r) => {
-        if (r) map[r[0]] = r[1];
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-      setCoverArtMap(map);
-    });
-  }, [data]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
 
   async function handleSaveProfile(newName: string, avatarFile: File | null) {
     if (!username) return;
+
     try {
       const response = await fetchUpdateProfile({
         username,
         displayName: newName,
         avatar: avatarFile,
       });
-      if (response.status === "success" && response.user) {
-        setDisplayName(response.user.displayName);
-        if (response.user.avatarUrl) {
-          setAvatarUrl(response.user.avatarUrl);
-          localStorage.setItem(
-            `tunelog_avatar_${username}`,
-            response.user.avatarUrl,
-          );
-        }
-        localStorage.setItem(
-          `tunelog_displayname_${username}`,
-          response.user.displayName,
-        );
+
+      if (response.status === "success") {
+        const profile = await fetchUserProfileDetails(username);
+
+        setDisplayName(profile.user.name);
+        setAvatarUrl(profile.user.avatar);
         setShowEditModal(false);
       }
     } catch {
@@ -532,6 +475,16 @@ export default function UserProfilePage() {
     );
   }
 
+  if (loadError || !data) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 p-8 text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Couldn't load this profile.
+        </p>
+      </div>
+    );
+  }
+
   const accentColor = getAvatarColor(username ?? "");
 
   return (
@@ -557,21 +510,19 @@ export default function UserProfilePage() {
                 avatarUrl={avatarUrl}
                 size={72}
               />
-              {isOwnProfile && (
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-500 text-white shadow dark:border-gray-900"
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-brand-500 text-white shadow dark:border-gray-900"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3 w-3"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-3 w-3"
-                  >
-                    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
-                  </svg>
-                </button>
-              )}
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                </svg>
+              </button>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -583,7 +534,7 @@ export default function UserProfilePage() {
                     Admin
                   </span>
                 )}
-                {isHost && isOwnProfile && (
+                {isHost && (
                   <span className="rounded-md bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-500">
                     Host
                   </span>
@@ -633,14 +584,12 @@ export default function UserProfilePage() {
                 </div>
               ))}
             </div>
-            {isOwnProfile && (
-              <button
-                onClick={() => setShowEditModal(true)}
-                className="flex-shrink-0 self-start sm:self-center rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors"
-              >
-                Edit
-              </button>
-            )}
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="flex-shrink-0 self-start sm:self-center rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors"
+            >
+              Edit
+            </button>
           </div>
         </div>
 
@@ -782,19 +731,12 @@ export default function UserProfilePage() {
                 {(data?.topSongs ?? []).slice(0, 8).map((song, i) => (
                   <button
                     key={i}
-                    // onClick={() =>
-                    //   navigate(`/song/${song.id}`, { state: { song } })
-                    // }
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left group"
                   >
                     <span className="w-5 text-xs text-gray-300 dark:text-gray-600 text-right flex-shrink-0 tabular-nums">
                       {i + 1}
                     </span>
-                    <AlbumArt
-                      coverArtId={coverArtMap[song.id] ?? null}
-                      title={song.title}
-                      size={40}
-                    />
+                    <AlbumArt songId={song.id} title={song.title} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 dark:text-white/90 truncate group-hover:text-brand-500 transition-colors">
                         {song.title}
@@ -878,20 +820,13 @@ export default function UserProfilePage() {
                       <tr
                         key={i}
                         className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer"
-                        // onClick={() =>
-                        //   navigate(`/song/${h.id}`, { state: { song: h } })
-                        // }
                       >
                         <td className="hidden sm:table-cell pl-6 pr-2 py-3 text-xs text-gray-300 dark:text-gray-600 tabular-nums">
                           {i + 1}
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-3">
-                            <AlbumArt
-                              coverArtId={coverArtMap[h.id] ?? null}
-                              title={h.title}
-                              size={36}
-                            />
+                            <AlbumArt songId={h.id} title={h.title} size={36} />
                             <div className="min-w-0">
                               <p className="font-medium text-gray-800 dark:text-white/90 truncate max-w-[180px] hover:text-brand-500 transition-colors">
                                 {h.title}

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { connectNotificationStream } from "../API/API";
+import { connectNotificationStream } from "../API";
 import type {
   SongStateEvent,
   PlaylistNotifEvent,
   StarredSongEvent,
-} from "../API/API";
+} from "../API";
 
 const STORAGE_KEY = "tunelog_notifications";
 const UNREAD_KEY = "tunelog_notif_unread";

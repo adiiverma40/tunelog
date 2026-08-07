@@ -3,10 +3,10 @@ import { useNavigate } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import MiniPlayer from "../Jam/MiniPlayer";
+import { getCoverArt } from "../../API";
 
 const PAGE_SIZE = 10;
 const BASE_URL = import.meta.env.VITE_API_URL || "";
-const NAVIDROME_URL = import.meta.env.VITE_NAVIDROME_URL || "";
 
 export interface ListenBrainzEntry {
   id: number;
@@ -60,32 +60,20 @@ export interface ParsedData {
 }
 
 export async function getListenbrainzLog(): Promise<ListenBrainzEntry[]> {
-  const token =
-    localStorage.getItem("tunelog_token") ||
-    sessionStorage.getItem("tunelog_token");
   const res = await fetch(`${BASE_URL}/api/listenbrainz`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: "GET",
+    credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch listenbrainz log");
   return res.json();
 }
 
 async function deleteListenbrainzEntry(id: string): Promise<void> {
-  const token =
-    localStorage.getItem("tunelog_token") ||
-    sessionStorage.getItem("tunelog_token");
   const res = await fetch(`${BASE_URL}/api/listenbrainz/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to delete entry");
-}
-
-function getCoverArtUrl(songId: string | null): string | null {
-  if (!songId) return null;
-  const u = localStorage.getItem("tunelog_user") || "";
-  const p = localStorage.getItem("tunelog_password") || "";
-  return `${NAVIDROME_URL}/rest/getCoverArt?id=${songId}&u=${u}&p=${p}&v=1.12.0&c=tunelog`;
 }
 
 function parseScore(comment: string | null): number | null {
@@ -173,16 +161,21 @@ function useDarkMode() {
 }
 
 function AlbumArt({
-  src,
+  songId,
   alt,
   size = 38,
 }: {
-  src?: string | null;
+  songId?: string | null;
   alt: string;
   size?: number;
 }) {
   const [err, setErr] = useState(false);
-  if (!src || err) {
+
+  useEffect(() => {
+    setErr(false);
+  }, [songId]);
+
+  if (!songId || err) {
     return (
       <div
         className="rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0"
@@ -206,7 +199,7 @@ function AlbumArt({
   }
   return (
     <img
-      src={src}
+      src={getCoverArt(songId)}
       alt={alt}
       onError={() => setErr(true)}
       className="rounded-lg object-cover flex-shrink-0"
@@ -609,10 +602,7 @@ function MatchedTable({
                   </td>
                   <td className="px-4 py-3 max-w-[160px] sm:max-w-none">
                     <div className="flex items-center gap-3">
-                      <AlbumArt
-                        src={getCoverArtUrl(entry.song_id)}
-                        alt={entry.song_name}
-                      />
+                      <AlbumArt songId={entry.song_id} alt={entry.song_name} />
                       <div className="min-w-0 flex-1">
                         <p
                           className="font-medium text-gray-800 dark:text-white/90 truncate text-sm leading-tight"
@@ -778,10 +768,7 @@ function ItunesTable({ entries }: { entries: ItunesEntry[]; dark: boolean }) {
                   </td>
                   <td className="px-4 py-3 max-w-[160px] sm:max-w-none">
                     <div className="flex items-center gap-3">
-                      <AlbumArt
-                        src={getCoverArtUrl(entry.song_id)}
-                        alt={entry.song_name}
-                      />
+                      <AlbumArt songId={entry.song_id} alt={entry.song_name} />
                       <div className="min-w-0 flex-1">
                         <p
                           className="font-medium text-gray-800 dark:text-white/90 truncate text-sm leading-tight"
@@ -1064,14 +1051,6 @@ export default function ListenBrainzImport() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-    if (!token) {
-      navigate("/signin");
-      return;
-    }
-
     getListenbrainzLog()
       .then((logData) => {
         const matched: MatchedEntry[] = [];

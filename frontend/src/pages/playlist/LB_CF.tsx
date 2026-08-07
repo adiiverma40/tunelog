@@ -10,7 +10,7 @@ import {
   setLBToken,
   type LBCFConfig,
   type WeeklyLBFetch,
-} from "../../API/API";
+} from "../../API";
 
 function fmtUnix(ts: number | null | undefined): string {
   if (!ts) return "Never";

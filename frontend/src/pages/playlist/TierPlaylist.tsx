@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { tierPlaylist } from "../../API/API"; 
+import { tierPlaylist } from "../../API"; 
 import { useThemeTokens } from "./components/playlistShared"; 
 import { PlaylistComponentProps } from "./Playlist";
 

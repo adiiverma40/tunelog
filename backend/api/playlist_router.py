@@ -7,7 +7,7 @@ from core.db import (
     get_db_connection_playlist,
     get_db_connection_usr,
 )
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from metadata.genre import readJson as readJSON
 from playlists.base_playlist import (
     API_push_playlist,
@@ -32,6 +32,8 @@ from playlists.discovery_playlist import (
 from playlists.entry_point import run_tier
 from pydantic import BaseModel
 from rich.console import Console
+
+from .auth_router import get_current_user
 
 console = Console()
 
@@ -193,11 +195,9 @@ def appendPlaylist_api(data: PlaylistOptions):
         return {"status": "error", "reason": str(e)}
 
 
-@router.get("/playlist/discoveryid")
-def discoveryPlaylistId(username: str):
-    console.print(
-        "[bold green]Fetching Discovery Playlist Id for[/bold green]", username
-    )
+@router.get("/api/user/playlist-ids")
+def get_playlist_ids(username: str = Depends(get_current_user)):
+    console.print(f"[bold green]Fetching Playlist Ids for[/bold green] {username}")
     conn = get_db_connection_usr()
     row = (
         conn.cursor()
@@ -207,15 +207,14 @@ def discoveryPlaylistId(username: str):
     conn.close()
 
     if not row or not row[0]:
-        return {"status": "error", "id": None}
+        return {"status": "error", "ids": {}}
 
     try:
+        # Return the whole dictionary
         ids = json.loads(row[0])
-        print(ids)
-        print(ids.get("blend"))
-        return {"status": "success", "id": ids.get("discovery")}
+        return {"status": "success", "ids": ids}
     except Exception:
-        return {"status": "error", "id": None}
+        return {"status": "error", "ids": {}}
 
 
 @router.post("/generateDiscoveryQueue")

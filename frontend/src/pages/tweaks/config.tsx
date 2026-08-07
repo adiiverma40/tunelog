@@ -10,7 +10,7 @@ import {
   TuneConfig,
   AutoGenerateExplicit,
   TreatDataAs,
-} from "../../API/API";
+} from "../../API";
 
 interface Config {
   playlist_size: number;

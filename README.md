@@ -3,51 +3,55 @@
 TuneLog is a self-hosted music recommendation system for Navidrome. It learns from listening behavior such as skips, partial plays, full plays, and repeats to generate personalized playlists and improve search results.
 
 ### AI USAGES:
+
 - AI were used in some `sql Query`
 - Some part in debuggin and some assistance in building frontend like `socketio`
 - Assistance in some of the `research` like which python module to use and stuff
 - `Playlist` Page was re written using claude ai
+
 ## Updates
 
 ### Changed Singal Weights
-> The Singal weights used to dictate how much score a `signal` will get, But now it is chanaged to affect only the next `listen` 
 
+> The Singal weights used to dictate how much score a `signal` will get, But now it is chanaged to affect only the next `listen`
 
-To better explain, Now I am implementing a dynamic scoring system in which, The higher the `listen Count` the lower the score. 
+To better explain, Now I am implementing a dynamic scoring system in which, The higher the `listen Count` the lower the score.
 I am doing this to counter the #18 issue. In which if a song is listened multiple times, that songs get so much high score that new songs dont get place in the playlist
 
-### New Push Star Feature 
+### New Push Star Feature
+
 - Lets user update the local heart songs to listenbrainz
 
-###  Navidrome 0.62.0 Playback Reporting Support
+### Navidrome 0.62.0 Playback Reporting Support
 
 Navidrome `0.62.0` introduced the `playbackReport` API, which provides more accurate playback state reporting from clients.
 
 TuneLog now supports this new reporting mechanism, resulting in significantly improved tracking of:
 
-* Full plays
-* Partial plays
-* Skips
-* Repeats
+- Full plays
+- Partial plays
+- Skips
+- Repeats
 
 > **Recommended:** Update your Navidrome client to a version that supports `playbackReport` for the most accurate listening statistics and recommendations.
 
 ---
 
 ### New Features
+
 #### Push Local Starred(heart) to Listenbrainz
 
 This feature lets user sync there local starred song from `navidrome` to `listenbrainz`. Read here [Push Heart](https://github.com/adiiverma40/tunelog/wiki/Push-Starred-Song-to-ListenBrainz)
 
-####  Skipped Songs Tracking
+#### Skipped Songs Tracking
 
 - A new **Skipped Songs** section has been added to the Library dashboard, making it easier to review songs that are frequently skipped.
 
-####  Similar User Recommendations
+#### Similar User Recommendations
 
 - TuneLog can now generate collaborative recommendations using listening data from the most similar users on ListenBrainz.
 
-####  ListenBrainz Collaborative Filtering Integration
+#### ListenBrainz Collaborative Filtering Integration
 
 - TuneLog now supports **ListenBrainz Collaborative Filtering (CF)** recommendations.
 
@@ -55,19 +59,20 @@ This feature lets user sync there local starred song from `navidrome` to `listen
 
 > For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
 
-### Wiki: 
+### Wiki:
+
 - [Playlist](https://github.com/adiiverma40/tunelog/wiki/Playlist) : guide on playlist generation and tweaks
 - [ListenBrainz Integration](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz) : guide on Listenbrainz integration in tunelog and dev info
+
 > **Note:** Navidrome/subsonic client like `symfonium` scrobble data to navidrome and navidrome reports that to `listenbrainz`, So Do not add those apps in `pano app` scrobble list or it will create two list of same song
 
 > **ItunesFuzzy:** Songs that are new or that is not in either `itunes` or `musicbrainz`, such as of `small creators` will be marked `unmatched` as api will return `none`
 
+### Note
 
-### Note 
 - If there is any error, try copy pasting the config.json from github to your local file
 - If Fast Library sync is taking too long, that will likely due to lyrics plugins, try turning off Lyrics Plugin in navidrome and runing the sync again Or change the lyrics priorty to emmbedded or .lrc
 
-  
 ## Features
 
 - Personalized playlist generation from listening history
@@ -81,13 +86,16 @@ This feature lets user sync there local starred song from `navidrome` to `listen
 - Navidrome jam
 
 ## Changes:
+
 - No need to Mannually Add Listenbrainz token, Go to playlist > Listenbrainz cf > Add the token and save it
-- 
+-
 
 ### Navidrome jam
+
 In the dashboard there is a jam section, if you wish to use jam go to jam and `now playing` section in the dashboard
 
 **features**
+
 - sync play , pause , skip
 - Queue reorder
 - Transfer host
@@ -96,11 +104,13 @@ In the dashboard there is a jam section, if you wish to use jam go to jam and `n
 - In `config` you can toggle some features for jam like `only host reorder queue`, `only host clear queue` and more
 
 **Requirements**
+
 - Navidrome Running
 - `VITE_NAVIDROME_URL` in .env for search and album arts
 - All users in same server/dashboard
 
 **Setup**
+
 - Start the navidrome server
 - start tunelog server and frontend
 - go to dashboard
@@ -112,6 +122,7 @@ In the dashboard there is a jam section, if you wish to use jam go to jam and `n
 - join it and enjoy
 
 **user profile**
+
 - User profile can be changed by `users` section
 
 ## Requirements
@@ -130,11 +141,12 @@ curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.exa
 curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
 docker compose -f ghcr-compose.yaml up -d
 ```
+
 **Update:**
+
 ```bash
 docker compose -f ghcr-compose.yaml pull
 ```
-
 
 Edit `.env` before starting the stack.
 
@@ -170,34 +182,42 @@ npm run dev
 Update `.env` with your Navidrome details and the addresses you want to allow.
 
 ```bash
-# Navidrome Server
-BASE_URL=http://192.168.29.118:4533  # your navidrome ip
-ADMIN_USERNAME=adii                  # your admin username
-ADMIN_PASSWORD=1234                  # your admin password
+# ================================================
+#                NAVIDROME CONFIG
+# ================================================
+
+BASE_URL=http://navidrome-navidrome-1:4533      # Base URL for Navidrome Server
+ADMIN_USERNAME=adii                             # Admin Username for Navidrome Server
+ADMIN_PASSWORD=1234                             # Admin password for Navidrome Server
+
+# ===============================================
+#              DASHBOARD CONFIG
+# ==============================================
+
+VITE_URL=http://192.168.29.118:5173             # URL for Dashboard.
+VITE_SERVER_PORT=8000                           # PORT on which Uvicorn(fastapi) server will be of Dashboard
+
+# Add additional origins separated by commas, or use * to allow all.
+ALLOWED_ORIGINS=http://localhost:5173,http://192.168.29.118:5173,*
+
+# VITE_API_URL=http://192.168.29.118:8000       # NO NEED FOR THIS
+# VITE_NAVIDROME_URL=http://192.168.29.118:4533 # NO NEED FOR THIS
+MY_DOMAIN=192.168.29.118
 
 
 
-# Allowed origins to make api request to backend
-# This is to allow user to access website form diffrent ip or devices,. just add your ip here 
-ALLOWED_ORIGINS=http://localhost:5173, http://192.168.29.118
+# ================================================
+#                     LOGGING
+# ================================================
 
-# change the allowed origins as needed, use "*" for everyone
-
-
-
-#Frontend / API 
-VITE_API_URL=http://localhost:8000            # if local host doesnt work then use your server's ip
-VITE_NAVIDROME_URL=http://localhost:4534      # Give here the proxy port if you want search enchancment
-MY_DOMAIN=localhost
-
-# Logging 
-# Forces the logs to save exactly where Docker is listening for the volume mount
 LOG_DIR=/app/logs
 LOG_MAX_SIZE=10 MB
 LOG_RETENTION_DAYS=7 days
 LOG_LEVEL=DEBUG
 
-# Proxy for search result alteration in clients 
+# =================================================
+#                   PROXY
+# =================================================
 
 PROXY_PORT=4534
 

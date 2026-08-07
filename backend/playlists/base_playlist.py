@@ -1,4 +1,5 @@
 import json
+from ast import Store
 
 import requests
 from core.config import build_url_for_user, getAllUser
@@ -8,8 +9,10 @@ from core.db import (
     get_db_connection_playlist,
     get_db_connection_usr,
 )
+from fastapi import params
 from misc.misc import log
 from navidrome.state import notification_status
+from numpy._core.numeric import e
 from rich.console import Console
 
 console = Console(log_path=False, log_time=False)
@@ -201,6 +204,91 @@ def createPlaylistIfDeleteByNavidrome(base_url, name, data, user_id):
         return
 
 
+from Workers.worker_queue import ND_queue, NDWork
+
+
+def createPlaylist(token, public, name, comment):
+    payload = {"public": public, "name": name, "comment": comment}
+
+    playlistId = ND_queue.addWork(
+        NDWork(method="post", endpoint="/api/playlist", params=payload, token=token)
+    )
+    id = playlistId.get("data", "").get("id", "")
+    print("create playlist, ", id)
+    return id
+
+
+def fetch_playlist(playlist_id, token):
+    result = ND_queue.addWork(
+        NDWork(
+            method="get",
+            endpoint=f"/api/playlist/{playlist_id}",
+            params={},
+            token=token,
+        )
+    )
+    return result
+
+
+def delete_playlist_songs(playlist_id, song_count, token):
+    if not song_count:
+        return {"status": "success", "message": "No songs to delete"}
+
+    query_string = "&".join([f"id={i}" for i in range(1, song_count + 1)])
+
+    endpoint = f"/api/playlist/{playlist_id}/tracks?{query_string}"
+
+    result = ND_queue.addWork(
+        NDWork(
+            method="delete",
+            endpoint=endpoint,
+            params={},
+            token=token,
+        )
+    )
+    return True
+
+
+def update_Playlist_id_in_db(playlist_id, playType, user_id):
+    conn = get_db_connection_usr()
+    cursor = conn.cursor()
+    playlistId = cursor.execute(
+        "select playlistIds from user where username = ?", (user_id,)
+    ).fetchone()
+    if playlistId and playlistId[0]:
+        try:
+            playDict = json.loads(playlistId[0])
+
+        except json.JSONDecodeError:
+            playDict = {}
+
+    else:
+        playDict = {}
+
+    playDict[playType] = playlist_id
+    updated_playlistIds = json.dumps(playDict)
+    cursor.execute(
+        "update user set playlistIds = ? where username = ?",
+        (updated_playlistIds, user_id),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def push_song_id_to_playlist(playlist_id, song_ids, token):
+    playlod = {"ids": song_ids}
+    result = ND_queue.addWork(
+        NDWork(
+            method="post",
+            endpoint=f"/api/playlist/{playlist_id}/tracks",
+            params=playlod,
+            token=token,
+        )
+    )
+    return result
+
+
 def push_playlist(
     song_ids,
     user_id,
@@ -208,192 +296,173 @@ def push_playlist(
     playname=None,
     newPlaylist=False,
     playlist_type="blend",
+    comment="",
 ):
     USER_CREDENTIALS = getAllUser()
-    password = USER_CREDENTIALS.get(user_id)
-    if not password:
-        log(
-            "error",
-            "No credentials found for user",
-            source="playlist",
-            user_id=user_id,
-            event="error",
+    token = USER_CREDENTIALS.get(user_id)
+
+    if not token:
+        console.print(
+            f"[bold red]\\[Push playlist] Error:[/bold red] No credentials found for user '{user_id}'"
+        )
+        console.print(
+            "[bold yellow]\\[Push playlist] Warning:[/bold yellow] Cannot proceed with playlist creation."
         )
         return
 
     name = playname if playname else PLAYLIST_NAME.format(user_id)
+    comment = "Playlist Created using Tunelog"
     stored_id = None
+
+    console.print(
+        f"[bold cyan]\\[Push playlist][/bold cyan] Starting workflow for playlist: [italic]{name}[/italic] (Type: {playlist_type})"
+    )
 
     if not newPlaylist:
         stored_id = getPlaylistIdForType(user_id, playlist_type)
-        if not stored_id:
-            try:
-                fetch_url = build_url_for_user("getPlaylists", user_id, password)
-                r_lists = requests.get(fetch_url).json()
-                playlists = (
-                    r_lists.get("subsonic-response", {})
-                    .get("playlists", {})
-                    .get("playlist", [])
-                )
-                for pl in playlists:
-                    if pl.get("name") == name:
-                        stored_id = pl["id"]
-                        setPlaylistIdForType(user_id, playlist_type, stored_id)
-                        console.print(
-                            f"[yellow]Recovered playlist ID for {user_id}/{playlist_type} via name match[/yellow]"
-                        )
-                        break
-            except Exception as e:
-                console.print(f"[red]Name fallback lookup failed: {e}[/red]")
 
-    base_url = build_url_for_user("createPlaylist", user_id, password)
-    data = [("songId", sid) for sid in song_ids]
-
-    def _do_create_fresh() -> dict | None:
-        try:
-            r = requests.post(f"{base_url}&name={name}", data=data).json()
-            return r
-        except Exception as e:
-            log(
-                "error",
-                f"Failed to create fresh playlist: {e}",
-                source="playlist",
-                user_id=user_id,
-                event="error",
+        if stored_id:
+            console.print(
+                f"[bold green]\\[Push playlist][/bold green] Found existing playlist ID: [bold]{stored_id}[/bold]"
             )
-            return None
-
-    if stored_id:
-        url = f"{base_url}&playlistId={stored_id}"
-    else:
-        url = f"{base_url}&name={name}"
-
-    try:
-        r = requests.post(url, data=data).json()
-        notification_status.playlist.append(
-            {"username": user_id, "size": len(data), "type": "regenerate"}
-        )
-
-        if "subsonic-response" not in r or r["subsonic-response"]["status"] == "failed":
-            error = (
-                r.get("subsonic-response", {})
-                .get("error", {})
-                .get("message", "Unknown error")
+            console.print(
+                "[bold blue]\\[Push playlist][/bold blue] Fetching current playlist state..."
             )
 
-            if stored_id and "not found" in error.lower():
+            playlist = fetch_playlist(stored_id, token)
+
+            if playlist.get("status", "") == "error":
                 console.print(
-                    f"[yellow]Stale playlist ID '{stored_id}' for {user_id}/{playlist_type}. Recreating...[/yellow]"
+                    f"[bold red]\\[Push playlist] Error:[/bold red] Failed to fetch playlist: {playlist.get('error_msg', 'Unknown error')}"
                 )
-                setPlaylistIdForType(user_id, playlist_type, "")
-                r = _do_create_fresh()
-                if r is None:
-                    return
-                if (
-                    "subsonic-response" not in r
-                    or r["subsonic-response"]["status"] == "failed"
-                ):
-                    log(
-                        "error",
-                        f"Navidrome API failed even after recreate",
-                        source="playlist",
-                        user_id=user_id,
-                        event="error",
+                console.print(
+                    f"[bold red]\\[Push playlist] Creating:[/bold red] Trying to create a new playlist with name: {name}"
+                )
+
+                stored_id = createPlaylist(token, False, name, comment)
+
+                if stored_id:
+                    console.print(
+                        f"[bold green]\\[Push playlist] Success:[/bold green] Created new playlist '{name}' with ID: {stored_id}"
+                    )
+                else:
+                    console.print(
+                        f"[bold red]\\[Push playlist] Error:[/bold red] Failed to create new playlist '{name}'"
                     )
                     return
             else:
-                log(
-                    "error",
-                    f"Navidrome API failed: {error}",
-                    source="playlist",
-                    user_id=user_id,
-                    event="error",
+                songCount = playlist.get("data", {}).get("songCount", 0)
+
+                if songCount > 0:
+                    console.print(
+                        f"[bold magenta]\\[Push playlist][/bold magenta] Deleting {songCount} existing songs..."
+                    )
+                    isDel = delete_playlist_songs(stored_id, songCount, token)
+
+                    if isDel:
+                        console.print(
+                            "[bold green]\\[Push playlist][/bold green] Successfully cleared old songs."
+                        )
+                    else:
+                        console.print(
+                            "[bold red]\\[Push playlist] Error:[/bold red] Failed to clear old songs."
+                        )
+                else:
+                    console.print(
+                        "[bold yellow]\\[Push playlist][/bold yellow] Playlist is already empty, skipping deletion."
+                    )
+
+        else:
+            console.print(
+                f"[bold yellow]\\[Push playlist][/bold yellow] No existing playlist found for type '{playlist_type}'."
+            )
+            console.print(
+                "[bold blue]\\[Push playlist][/bold blue] Creating new playlist..."
+            )
+            stored_id = createPlaylist(token, False, name, comment)
+            if stored_id:
+                console.print(
+                    f"[bold green]\\[Push playlist][/bold green] Created new playlist. ID: {stored_id}"
                 )
-                return
 
-        final_id = r["subsonic-response"]["playlist"]["id"]
-        setPlaylistIdForType(user_id, playlist_type, final_id)
-
-        requests.get(
-            build_url_for_user("updatePlaylist", user_id, password)
-            + f"&playlistId={final_id}&public=false"
+    else:
+        console.print(
+            "[bold blue]\\[Push playlist][/bold blue] 'newPlaylist' flag is True. Creating a fresh playlist..."
         )
-
-    except Exception as e:
-        log(
-            "error",
-            f"Failed to push playlist: {e}",
-            source="playlist",
-            user_id=user_id,
-            event="error",
-        )
-        return
-
-    conn_lib = get_db_connection_lib()
-    placeholders = ",".join("?" * len(song_ids))
-    rows = conn_lib.execute(
-        f"SELECT song_id, title, artist, genre, explicit FROM library WHERE song_id IN ({placeholders})",
-        song_ids,
-    ).fetchall()
-    conn_lib.close()
-
-    lib_data = {row[0]: row for row in rows}
-    conn = get_db_connection_playlist()
-    cursor = conn.cursor()
-    cursor.execute(
-        "DELETE FROM playlist WHERE username = ? AND type = ?",
-        (user_id, playlist_type),
-    )
-
-    insert_data = []
-    for sid in song_ids:
-        row = lib_data.get(sid)
-        if row:
-            insert_data.append(
-                (
-                    user_id,
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    (
-                        song_signals.get(sid, "unheard")
-                        if isinstance(song_signals, dict)
-                        else song_signals
-                    ),
-                    row[4],
-                    playlist_type,
-                )
+        stored_id = createPlaylist(token, False, name, comment)
+        if stored_id:
+            console.print(
+                f"[bold green]\\[Push playlist][/bold green] Created fresh playlist. ID: {stored_id}"
             )
 
-    cursor.executemany(
-        "INSERT INTO playlist (username, song_id, title, artist, genre, signal, explicit, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        insert_data,
-    )
-    conn.commit()
-    conn.close()
+    if stored_id:
+        console.print(
+            f"[bold blue]\\[Push playlist][/bold blue] Pushing {len(song_ids)} songs to playlist ID: {stored_id}..."
+        )
+        result = push_song_id_to_playlist(stored_id, song_ids, token)
+
+        console.print(f"[dim]Push Result: {result}[/dim]")
+
+        console.print(
+            f"[bold green]\\[Push playlist] Success:[/bold green] Playlist '{name}' populated successfully!"
+        )
+
+        console.print(
+            "[bold blue]\\[Push playlist][/bold blue] Saving playlist ID to database..."
+        )
+        update_Playlist_id_in_db(stored_id, playlist_type, user_id)
+
+        console.print("[bold green]\\[Push playlist] FINISHED[/bold green]")
+    else:
+        console.print(
+            "[bold red]\\[Push playlist] Error:[/bold red] Failed to secure a stored_id for pushing."
+        )
 
 
 def API_push_playlist(song_ids, user_id, playname="New CSV Playlist"):
     USER_CREDENTIALS = getAllUser()
-    password = USER_CREDENTIALS.get(user_id)
-    if not password:
+    token = USER_CREDENTIALS.get(user_id)
+
+    if not token:
+        console.print(
+            f"[bold red]\\[API Push] Error:[/bold red] No credentials found for user '{user_id}'"
+        )
         return False
-    base_url = build_url_for_user("createPlaylist", user_id, password)
-    url = f"{base_url}&name={playname}"
-    payload = [("songId", sid) for sid in song_ids]
+
+    comment = "Playlist Created via API / CSV Import"
 
     try:
-        response = requests.post(url, data=payload)
-        r_json = response.json()
-        if (
-            "subsonic-response" in r_json
-            and r_json["subsonic-response"]["status"] == "ok"
-        ):
-            new_id = r_json["subsonic-response"]["playlist"]["id"]
-            update_url = build_url_for_user("updatePlaylist", user_id, password)
-            requests.get(f"{update_url}&playlistId={new_id}&public=false")
+        console.print(
+            f"[bold cyan]\\[API Push][/bold cyan] Creating new playlist '{playname}' for user: {user_id}"
+        )
+        playlist_id = createPlaylist(token, False, playname, comment)
+
+        if not playlist_id:
+            console.print(
+                f"[bold red]\\[API Push] Error:[/bold red] Playlist creation failed for: '{playname}'"
+            )
+            return False
+
+        console.print(
+            f"[bold blue]\\[API Push][/bold blue] Pushing {len(song_ids)} songs to playlist ID: {playlist_id}..."
+        )
+        result = push_song_id_to_playlist(playlist_id, song_ids, token)
+
+        console.print(f"[dim]Push Result: {result}[/dim]")
+
+        if result and result.get("status") == "success":
+            console.print(
+                f"[bold green]\\[API Push] Success:[/bold green] Playlist '{playname}' populated successfully!"
+            )
             return True
-        return False
-    except Exception:
+        else:
+            console.print(
+                f"[bold red]\\[API Push] Error:[/bold red] Failed to add tracks to playlist. Result: {result}"
+            )
+            return False
+
+    except Exception as ex:
+        console.print(
+            f"[bold red]\\[API Push] Error:[/bold red] Exception occurred: {ex}"
+        )
         return False

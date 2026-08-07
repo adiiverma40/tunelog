@@ -5,6 +5,7 @@ import time
 import traceback
 from datetime import datetime
 from profile import run
+from socket import getservbyname
 from zoneinfo import ZoneInfo
 
 import metadata.library as library
@@ -25,6 +26,9 @@ from CORN.SongScoring import songScoringCorn
 from dotenv import load_dotenv
 from metadata.itunesFuzzy import useFallBackMethods
 from metadata.library import sync_library
+from migration.runner import run_migration_v_0_63_2
+from migration.v_0_63_2 import v_0_63_2_migrate
+from navidrome.auth import checkCred_SaveCred
 from navidrome.misc import sync_ND_users
 from navidrome.state import (
     automation_config,
@@ -65,7 +69,7 @@ from scrobble.listenBrainz import fuzzyMatchingSong
 from Workers.Luffy import Sanji
 from Workers.worker_queue import ND_queue, NDWork
 
-from .config import checkCred_SaveCred, event_queue
+from .config import event_queue
 
 load_dotenv()
 console = Console()
@@ -263,7 +267,7 @@ def musicBrainzThread():
         try:
             MusicbrainzThread = threading.Thread(target=MusicbrainzSeeding, daemon=True)
             MusicbrainzThread.start()
-            time.sleep(2.0)
+            time.sleep(20.0)
 
             if not MusicbrainzThread.is_alive():
                 console.print(
@@ -409,7 +413,8 @@ def Auto_LB_CF(thread=True):
 
 
 def main():
-    proxyPort = int(os.getenv("PROXY_PORT", 4534))
+    proxyPort = int(os.getenv("PROXY_PORT", "4534"))
+    frontendPort = int(os.getenv("VITE_SERVER_PORT", "8000"))
 
     with console.status("[dim]Initializing database...[/dim]"):
         try:
@@ -436,7 +441,7 @@ def main():
     )  # I dont think sanji and robin will end up dating, i might change the names to zoro.robin
     workerThread.start()
 
-    console.print("[bold blue]\\[CRED] Checking .env Cred")
+    console.print("[bold blue]\\[CRED] Checking users credentials")
     cred = checkCred_SaveCred()
     if cred:
         console.print("[bold blue]\\[CRED] Success!")
@@ -452,7 +457,7 @@ def main():
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
                 args=("api.api_entry:socket_app",),
-                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "debug"},
+                kwargs={"host": "0.0.0.0", "port": frontendPort, "log_level": "debug"},
                 daemon=True,
             )
             ProxyThread = threading.Thread(
@@ -491,6 +496,9 @@ def main():
     console.print(
         f"[green]✓ API ready on port 8000 · Proxy ready on port {proxyPort}[/green]"
     )
+    # print("error here")
+    # v_0_63_2_migrate()
+    #
 
     with console.status("[dim]Starting watcher...[/dim]"):
         try:
@@ -514,15 +522,15 @@ def main():
             console.print(f"[red]✗ Watcher startup failed:[/red] {e}")
             sys.exit(1)
     console.print("[green]✓ Watcher running[/green]")
-
+    run_migration_v_0_63_2()
     last_auto_sync_day = None
     isGenerated = False
     is_lb_syncing = False
     last_lb_sync_timestamp = None
 
-    console.print("[bold blue]Starting Library Sync(10 sec delay)")
+    console.print("[bold blue]Starting Library Sync(20 sec delay)")
 
-    syncThread = threading.Timer(10, library.sync_library)
+    syncThread = threading.Timer(20, library.sync_library)
     syncThread.start()
     syncThread.join()
     console.print("[bold blue]Starting Scoring CORN JOB(1m delay)")

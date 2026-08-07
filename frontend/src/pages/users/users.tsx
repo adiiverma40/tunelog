@@ -1,23 +1,17 @@
-// import PageBreadcrumb from "../components/common/PageBreadCrumb";
-// import PageMeta from "../components/common/PageMeta";
+
 import { useState, useEffect } from "react";
-import { fetchGetUsers, fetchCreateUser, User } from "../../API/API";
-// import Button from "../components/ui/button/Button";
-// import { Modal } from "../components/ui/modal";
+import { fetchGetUsers, fetchCreateUser, User } from "../../API";
+// import { fetchGetUsers } from "../../API";
 import { Modal } from "../../components/ui/modal";
 import { useModal } from "../../hooks/useModal";
 import Input from "../../components/form/input/InputField";
 import Label from "../../components/form/Label";
-// import Switch from "../components/form/switch/Switch";
 import UserMetaCard from "../../components/UserProfile/UserMetaCard";
-
-
 
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import Switch from "../../components/form/switch/Switch";
-const USERS_CACHE_KEY = "tunelog_users_cache";
 
 export default function UserProfiles() {
   const [users, setUsers] = useState<User[]>([]);
@@ -42,47 +36,6 @@ export default function UserProfiles() {
     };
   };
 
-  const syncUsersToStorage = (userList: User[]) => {
-    try {
-      localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(userList));
-
-      userList.forEach((user) => {
-        const displayNameKey = `tunelog_displayname_${user.username}`;
-        const avatarKey = `tunelog_avatar_${user.username}`;
-
-        if (user.name) {
-          localStorage.setItem(displayNameKey, user.name);
-        } else {
-          localStorage.removeItem(displayNameKey);
-        }
-
-        if (user.avatarUrl) {
-          localStorage.setItem(avatarKey, user.avatarUrl);
-        } else {
-          localStorage.removeItem(avatarKey);
-        }
-      });
-    } catch (err) {
-      console.error("Failed to sync users to localStorage", err);
-    }
-  };
-
-  const loadCachedUsers = () => {
-    try {
-      const cached = localStorage.getItem(USERS_CACHE_KEY);
-      if (!cached) return false;
-
-      const parsed = JSON.parse(cached) as User[];
-      if (Array.isArray(parsed)) {
-        setUsers(parsed);
-        return true;
-      }
-    } catch (err) {
-      console.error("Failed to read cached users", err);
-    }
-    return false;
-  };
-
   const loadUsers = () => {
     setLoading(true);
     const { admin, adminPD } = getAdminCredentials();
@@ -90,9 +43,7 @@ export default function UserProfiles() {
     fetchGetUsers({ admin, adminPD })
       .then((data) => {
         if (data.status === "ok" && data.users) {
-          const userList: User[] = data.users;
-          setUsers(userList);
-          syncUsersToStorage(userList);
+          setUsers(data.users);
         }
       })
       .catch((err) => {
@@ -137,12 +88,7 @@ export default function UserProfiles() {
   };
 
   useEffect(() => {
-    const hasCached = loadCachedUsers();
     loadUsers();
-
-    if (!hasCached) {
-      setLoading(true);
-    }
   }, []);
 
   return (

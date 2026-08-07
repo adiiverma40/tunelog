@@ -1,109 +1,3 @@
-// import { Routes, Route, useNavigate } from "react-router";
-// import { useEffect } from "react";
-// import SignIn from "./pages/AuthPages/SignIn";
-// import NotFound from "./pages/OtherPage/NotFound";
-// import UserProfiles from "./pages/users/users";
-// import LibrarySync from "./pages/librarySync/librarySync";
-// import Playlist from "./pages/playlist/playlist";
-// import AppLayout from "./layout/AppLayout";
-// import { ScrollToTop } from "./components/common/ScrollToTop";
-// import Home from "./pages/Dashboard/Home";
-// import UserProfilePage from "./pages/users/userProfile";
-// import ManualMarking from "./pages/tweaks/manualMark";
-// import GenreMatch from "./pages/tweaks/genreMatching";
-// import Import from "./pages/librarySync/import";
-// import Notifications from "./pages/tweaks/notification";
-// import Config from "./pages/tweaks/config";
-// import Queue from "./pages/Jam/Queue";
-// import NowPlaying from "./pages/Jam/NowPlaying";
-// import JamUsers from "./pages/Jam/JamUsers";
-// import { fetchLogin, fetchGetUsers } from "./API/API";
-// import { useNotificationStream } from "./hooks/Usenotificationstream";
-// import ListenBrainzImport from "./pages/scrobble/listenbrainz";
-// import ListenbrainzCF from "./pages/playlist/LB_CF";
-// import ListenbrainzLibrary from "./pages/librarySync/listenbrainz";
-// import SkippedSongs from "./pages/Library/skipped";
-
-// export default function App() {
-//   const navigate = useNavigate();
-
-//   useNotificationStream();
-
-//   useEffect(() => {
-//     const token =
-//       localStorage.getItem("tunelog_token") ||
-//       sessionStorage.getItem("tunelog_token");
-
-//     const username =
-//       localStorage.getItem("tunelog_user") ||
-//       sessionStorage.getItem("tunelog_user") ||
-//       "";
-//     const password =
-//       localStorage.getItem("tunelog_password") ||
-//       sessionStorage.getItem("tunelog_password") ||
-//       "";
-//     if (token) {
-//       return;
-//     }
-//     if (username && password) {
-//       fetchLogin({ username, password })
-//         .then(() => {
-//           fetchGetUsers({ admin: username, adminPD: password }).catch(() => {});
-//         })
-//         .catch(() => {
-//           navigate("/signin");
-//         });
-//       return;
-//     }
-//     navigate("/signin");
-//   }, [navigate]);
-
-//   return (
-//     <>
-//       <ScrollToTop />
-//       <Routes>
-//         <Route element={<AppLayout />}>
-//           <Route index path="/" element={<Home />} />
-//           <Route path="/user" element={<UserProfiles />} />
-//           <Route path="/librarySync" element={<LibrarySync />} />
-
-//           <Route
-//             path="/library/listenbrainz"
-//             element={<ListenbrainzLibrary />}
-//           />
-//           <Route path="/playlist" element={<Playlist />} />
-//           <Route path="/users/:username" element={<UserProfilePage />} />
-//           <Route path="/manual" element={<ManualMarking />} />
-//           <Route path="/genre" element={<GenreMatch />} />
-//           <Route path="/notification" element={<Notifications />} />
-//           <Route path="/config" element={<Config />} />
-//           <Route path="/nowplaying" element={<NowPlaying />} />
-//           <Route path="/queue" element={<Queue />} />
-//           <Route path="/import" element={<Import />} />
-//           <Route path="/jamuser" element={<JamUsers />} />
-
-//           <Route path="/library/skipped" element={<SkippedSongs />} />
-//           <Route
-//             path="/playlist/listenbrainz/cf"
-//             element={<ListenbrainzCF />}
-//           />
-
-//           <Route
-//             path="/scrobble/listenbrainz"
-//             element={<ListenBrainzImport />}
-//           />
-
-//           {/* <Route path="/song/:songId" element={<SongPage />} /> */}
-//         </Route>
-
-//         <Route path="/signin" element={<SignIn />} />
-//         <Route path="*" element={<NotFound />} />
-//       </Routes>
-//     </>
-//   );
-// }
-
-
 import { Routes, Route, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import SignIn from "./pages/AuthPages/SignIn";
@@ -123,68 +17,41 @@ import Config from "./pages/tweaks/config";
 import Queue from "./pages/Jam/Queue";
 import NowPlaying from "./pages/Jam/NowPlaying";
 import JamUsers from "./pages/Jam/JamUsers";
-import { fetchLogin, fetchGetUsers } from "./API/API";
+import { fetchGetUsers, CheckAuth } from "./API";
 import { useNotificationStream } from "./hooks/Usenotificationstream";
 import ListenBrainzImport from "./pages/scrobble/listenbrainz";
 import ListenbrainzCF from "./pages/playlist/LB_CF";
 import ListenbrainzLibrary from "./pages/librarySync/listenbrainz";
 import SkippedSongs from "./pages/Library/skipped";
 
+import { WhatsNewModal } from "./pages/changelog";
+
 export default function App() {
   const navigate = useNavigate();
-  const [checkingAuth, setCheckingAuth] = useState(true);
   useNotificationStream();
-
   useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-
-    // Token already exists — trust it, don't call /auth/login again.
-    // (If you later add token expiry, check that here instead of
-    // just presence.)
-    if (token) {
-      setCheckingAuth(false);
-      return;
-    }
-
-    const username =
-      localStorage.getItem("tunelog_user") ||
-      sessionStorage.getItem("tunelog_user") ||
-      "";
-    const password =
-      localStorage.getItem("tunelog_password") ||
-      sessionStorage.getItem("tunelog_password") ||
-      "";
-
-    if (username && password) {
-      fetchLogin({ username, password })
-        .then(() => {
-          fetchGetUsers({ admin: username, adminPD: password }).catch(() => {});
-          setCheckingAuth(false);
-        })
-        .catch(() => {
-          navigate("/signin");
-        });
-      return;
-    }
-
-    navigate("/signin");
+    const verifyUser = async () => {
+      const auth = await CheckAuth();
+      console.log(auth);
+      fetchGetUsers().catch(() => {});
+      if (!auth) {
+        navigate("/signin");
+        return;
+      }
+    };
+    verifyUser();
   }, [navigate]);
-
-  // Avoid flashing protected routes before we know auth state.
-  if (checkingAuth) {
-    return null; // or a spinner component
-  }
 
   return (
     <>
+      <WhatsNewModal/>
       <ScrollToTop />
       <Routes>
         <Route element={<AppLayout />}>
           <Route index path="/" element={<Home />} />
           <Route path="/user" element={<UserProfiles />} />
           <Route path="/librarySync" element={<LibrarySync />} />
+
           <Route
             path="/library/listenbrainz"
             element={<ListenbrainzLibrary />}
@@ -199,16 +66,19 @@ export default function App() {
           <Route path="/queue" element={<Queue />} />
           <Route path="/import" element={<Import />} />
           <Route path="/jamuser" element={<JamUsers />} />
+
           <Route path="/library/skipped" element={<SkippedSongs />} />
           <Route
             path="/playlist/listenbrainz/cf"
             element={<ListenbrainzCF />}
           />
+
           <Route
             path="/scrobble/listenbrainz"
             element={<ListenBrainzImport />}
           />
         </Route>
+
         <Route path="/signin" element={<SignIn />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

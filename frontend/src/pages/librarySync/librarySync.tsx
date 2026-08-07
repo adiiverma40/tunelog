@@ -12,7 +12,7 @@ import {
   fetchFallbackSyncStatus,
   stopFallbackSync,
   SyncStatus,
-} from "../../API/API";
+} from "../../API";
 
 const SYNC_HOURS = Array.from({ length: 24 }, (_, i) => {
   const h = i % 12 === 0 ? 12 : i % 12;
@@ -206,16 +206,6 @@ export default function LibrarySync() {
   const textPrimary = dark ? "#f0f0ee" : "#18181a";
   const textSecondary = dark ? "#888884" : "#6b6b67";
   const textMuted = dark ? "#555552" : "#a0a09c";
-
-  useEffect(() => {
-    const token =
-      localStorage.getItem("tunelog_token") ||
-      sessionStorage.getItem("tunelog_token");
-    if (!token) {
-      navigate("/signin");
-      return;
-    }
-  }, []);
 
   useEffect(() => {
     fetchSyncStatus().then((data) => {
@@ -1216,7 +1206,7 @@ export default function LibrarySync() {
               </div>
             </div>
           </div>
-          
+
           <div style={sectionStyle}>
             <div style={sectionHeadStyle}>
               <div>
@@ -1245,7 +1235,6 @@ export default function LibrarySync() {
                 gap: 0,
               }}
             >
-              
               <div
                 style={{
                   display: "flex",
@@ -1292,7 +1281,6 @@ export default function LibrarySync() {
                   margin: "0 0 18px",
                 }}
               />
-
 
               <div style={{ paddingBottom: 18 }}>
                 <label style={labelStyle}>Timezone</label>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { getCoverArtUrl } from "../../../API/API";
+import { getCoverArt } from "../../../API";
 import {
   SIGNAL_CONFIG,
   SLOT_COLORS,
@@ -91,11 +91,11 @@ export async function fetchPlaylistFromNavidrome(
 }
 
 export function LazyAlbumArt({
-  coverArtId,
+  songId,
   title,
   size = 34,
 }: {
-  coverArtId: string | null;
+  songId: string | null;
   title: string;
   size?: number;
 }) {
@@ -118,13 +118,13 @@ export function LazyAlbumArt({
 
   useEffect(() => {
     setFailed(false);
-  }, [coverArtId]);
+  }, [songId]);
 
   return (
     <div ref={ref} style={{ width: size, height: size, flexShrink: 0 }}>
-      {visible && coverArtId && !failed ? (
+      {visible && songId && !failed ? (
         <img
-          src={getCoverArtUrl(coverArtId)}
+          src={getCoverArt(songId)}
           alt={title}
           onError={() => setFailed(true)}
           style={{
@@ -595,7 +595,6 @@ export function InfiniteScrollSentinel({
 
 export interface SongTableProps {
   songs: any[];
-  coverArtMap: Record<string, string>;
   dark: boolean;
   isMobile: boolean;
   loading: boolean;
@@ -623,7 +622,6 @@ export interface SongTableProps {
 
 export function SongTable({
   songs,
-  coverArtMap,
   dark,
   isMobile,
   loading,
@@ -699,7 +697,7 @@ export function SongTable({
           <td style={{ padding: "8px 12px", minWidth: isMobile ? 0 : 160 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <LazyAlbumArt
-                coverArtId={coverArtMap[song.song_id ?? song.id] ?? null}
+                songId={song.song_id ?? song.id ?? null}
                 title={song.title}
                 size={34}
               />

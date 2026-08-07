@@ -1,15 +1,14 @@
-from rapidfuzz import fuzz, process
-from collections import defaultdict
-from time import sleep
-import requests
 import re
 import time
 import urllib.parse
+from collections import defaultdict
+from time import sleep
 
+import requests
 from core.db import get_db_connection_lib
-from navidrome.state import app_state
+from navidrome.state import app_state, tune_config
+from rapidfuzz import fuzz, process
 from rich.console import Console
-from navidrome.state import tune_config
 
 console = Console(log_time=False, log_path=False)
 

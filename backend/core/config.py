@@ -33,7 +33,7 @@ def getAllUser():
     users = conn.execute("SELECT * FROM user").fetchall()
 
     USER_CREDENTIALS = {
-        dict(user)["username"]: dict(user)["password"] for user in users
+        dict(user)["username"]: dict(user)["ND_token"] for user in users
     }
 
     return USER_CREDENTIALS
@@ -66,47 +66,6 @@ def getJWT(admin_username=Navidrome_admin, admin_password=navidrome_password):
     except Exception as e:
         console.log(f"[red]Unexpected Error (getJWT):[/red] {e}")
         return None
-
-# This function checks the credintial provided in .env file and save it to Database
-def checkCred_SaveCred(
-    admin_username=Navidrome_admin, admin_password=navidrome_password
-):
-    try:
-        res = ND_queue.addWork(
-            NDWork(
-                method="post",
-                endpoint="/auth/login",
-                params={"username": admin_username, "password": admin_password},
-            )
-        )
-
-        if res.get("status") == "success":
-            token = res.get("data", {}).get("token")
-
-            if token:
-                conn = get_db_connection_usr()
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE user SET ND_token = ? WHERE username = ?",
-                    (token, admin_username),
-                )
-                conn.commit()
-                conn.close()
-                return True
-            else:
-                console.log(
-                    "[yellow]Login succeeded, but no token was returned.[/yellow]"
-                )
-                return False
-        elif res.get("status") == "error":
-            error_msg = res.get("error_msg")
-            console.log(f"[red]API Error (getJWT):[/red] {error_msg}")
-            return None
-
-    except Exception as e:
-        console.log(f"[red]Unexpected Error in checkCred_SaveCred:[/red] {e}")
-        return None
-
 
 # default url to pull data from api
 def build_url(endpoint):

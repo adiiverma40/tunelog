@@ -1,0 +1,1434 @@
+// // const BASE_URL = import.meta.env.VITE_API_URL;
+
+// // Changing how Base Url works, now instead of vite_api_url from .env it uses vite_url and vite_server_port to
+// // construct the BASE_URL dynamically from the VITE_URL env var
+
+// const viteUrl = new URL(import.meta.env.VITE_URL);
+// const BASE_URL = `${viteUrl.protocol}//${viteUrl.hostname}:${import.meta.env.VITE_SERVER_PORT}`;
+// export { BASE_URL };
+// import { io, Socket } from "socket.io-client";
+
+// // socket for jam
+
+// export const socket: Socket = io(BASE_URL, {
+//   auth: {
+//     username: localStorage.getItem("tunelog_user"),
+//   },
+//   autoConnect: true,
+//   transports: ["websocket"],
+// });
+
+// export function connectSocket(token: string) {
+//   socket.auth = { token };
+//   if (!socket.connected) socket.connect();
+// }
+
+// export function disconnectSocket() {
+//   if (socket.connected) socket.disconnect();
+// }
+
+// export interface UpdateProfileRequest {
+//   username: string;
+//   displayName: string;
+//   avatar?: File | null;
+// }
+
+// export interface UpdateProfileResponse {
+//   status: string;
+//   message: string;
+//   user?: {
+//     username: string;
+//     displayName: string;
+//     avatarUrl: string | null;
+//   };
+// }
+
+// export interface DiscoveryQueueParams {
+//   username: string;
+//   size: number;
+//   date_from?: string | null;
+//   date_to?: string | null;
+//   days_from?: number;
+//   days_to?: number;
+//   backtrack: boolean;
+//   explicit_filter: "strict" | "allow_cleaned" | "all";
+// }
+
+// export interface DiscoveryQueueSong {
+//   song_id: string;
+//   title: string;
+//   artist: string;
+//   genre: string | null;
+//   explicit: string | null;
+//   date_added: string;
+// }
+
+// export interface DiscoveryQueueResponse {
+//   status: "ok" | "error";
+//   songs?: DiscoveryQueueSong[];
+//   songs_added?: number;
+//   total?: number;
+//   effective_date_from?: string;
+//   effective_date_to?: string;
+//   backtracked?: boolean;
+//   backtrack_days?: number;
+//   reason?: string;
+// }
+
+// export interface Stats {
+//   total_songs: number;
+//   total_listens: number;
+//   signals: {
+//     positive: number;
+//     skip: number;
+//     partial: number;
+//     repeat: number;
+//   };
+//   most_played_artists: Record<string, number>;
+//   most_played_songs: {
+//     title: string;
+//     artist: string;
+//     play_count: number;
+//   }[];
+// }
+
+// export interface SyncStatus {
+//   is_syncing: boolean;
+//   progress: number;
+//   start_sync: boolean;
+//   auto_sync: number;
+//   use_itunes: boolean;
+//   total_songs: number;
+//   explicit_songs: number;
+//   last_sync: string | null;
+//   songs_needing_itunes: number;
+//   timezone: string;
+//   explicit_counts: {
+//     explicit: number;
+//     notExplicit: number;
+//     cleaned: number;
+//     notInItunes: number;
+//     manual: number;
+//     pending: number;
+//   };
+// }
+
+// export interface SyncStartResponse {
+//   status: "started" | "already_syncing";
+// }
+
+// export interface SyncSettingResponse {
+//   status: "ok";
+// }
+
+// export interface SyncStopResponse {
+//   status: string;
+//   response: string;
+// }
+
+// export interface LoginRequest {
+//   username: string;
+//   password: string;
+// }
+
+// export interface LoginResponse {
+//   status: "success" | "failed";
+//   message?: string;
+//   reason?: string;
+// }
+
+// export interface CreateUserRequest {
+//   username: string;
+//   password: string;
+//   isAdmin: boolean;
+//   admin: string;
+//   adminPD: string;
+//   email: string;
+//   name: string;
+//   isUpdate: boolean;
+// }
+
+// export interface CreateUserResponse {
+//   status: "success" | "failed";
+//   reason?: string;
+//   username?: string;
+// }
+
+// export interface AdminAuthRequest {
+//   admin: string;
+//   adminPD: string;
+// }
+
+// export interface User {
+//   username: string;
+//   password: string;
+//   isAdmin: boolean;
+//   name: string;
+//   avatarUrl: string | null;
+// }
+
+// export interface GetUsersResponse {
+//   status: "ok" | "failed";
+//   users?: User[];
+//   reason?: string;
+// }
+
+// export interface UserDataResponse {
+//   status: "ok" | "failed";
+//   totalListens: number;
+//   skips: number;
+//   repeat: number;
+//   complete: number;
+//   partial: number;
+//   lastLogged: string;
+//   reason?: string;
+// }
+
+// export interface UserProfileResponse {
+//   status: "ok" | "failed";
+//   totalListens: number;
+//   skips: number;
+//   partial: number;
+//   complete: number;
+//   repeat: number;
+//   lastLogged: string;
+//   topSongs: {
+//     id: string;
+//     title: string;
+//     artist: string;
+//     count: number;
+//     signal: string;
+//   }[];
+//   topArtists: {
+//     artist: string;
+//     count: number;
+//   }[];
+//   topGenres: {
+//     genre: string;
+//     count: number;
+//   }[];
+//   recentHistory: {
+//     id: string;
+//     title: string;
+//     artist: string;
+//     genre: string;
+//     signal: string;
+//     listened_at: string;
+//   }[];
+// }
+
+// export interface PlaylistSong {
+//   song_id: string;
+//   title: string;
+//   artist: string;
+//   genre: string;
+//   signal: string;
+//   explicit: string;
+// }
+
+// export interface PlaylistStats {
+//   last_generated: string;
+//   total_songs: number;
+//   top_genre: string;
+// }
+
+// export interface PlaylistSongsResponse {
+//   status: string;
+//   stats: PlaylistStats;
+//   songs: PlaylistSong[];
+// }
+
+// export interface PlaylistGenerateResponse {
+//   status: "ok" | "error";
+//   songs_added?: number;
+//   size_requested?: number;
+//   message?: string;
+//   reason?: string;
+// }
+
+// export interface MonthlyListen {
+//   month: string;
+//   count: number;
+// }
+
+// export interface ManualMarkingSong {
+//   song_id: string;
+//   title: string;
+//   artist: string;
+//   album: string;
+//   genre: string | null;
+//   duration: number | null;
+//   explicit: string | null;
+// }
+
+// export interface FallbackSyncStatus {
+//   status: string;
+//   is_running: boolean;
+//   processed: number;
+//   total: number;
+//   progress: number;
+// }
+
+// export interface GenreResponse {
+//   status: string;
+//   Genre: Record<string, string[]>;
+// }
+
+// export interface GenreListResponse {
+//   status: string;
+//   genres: string[];
+// }
+// export interface AutoMatchResponse {
+//   status: string;
+//   unmapped: GenreListResponse;
+//   genre_updated: number;
+// }
+
+// export interface ImportResponse {
+//   status: "success" | "failed";
+//   message?: string;
+//   reason?: string;
+//   data?: {
+//     matched_ids: string[];
+//     results: {
+//       title: string;
+//       artist: string;
+//       found: boolean;
+//       song_id: string | null;
+//     }[];
+//     summary: {
+//       total: number;
+//       matched: number;
+//       not_found: number;
+//     };
+//   };
+// }
+
+// export type NotificationField = "songState" | "playlist" | "starredSong";
+
+// export interface SongStateEvent {
+//   username: string;
+//   song: string;
+//   state: "started" | "stopped";
+// }
+
+// export interface PlaylistNotifEvent {
+//   username: string;
+//   size: number;
+//   type: "append" | "regenerate";
+// }
+
+// export interface StarredSongEvent {
+//   username: string;
+//   song: string;
+//   star: number | string;
+// }
+
+// export interface NotificationPayload {
+//   songState?: SongStateEvent[];
+//   playlist?: PlaylistNotifEvent[];
+//   starredSong?: StarredSongEvent[];
+// }
+
+// export interface PlaylistCreateRequest {
+//   username: string[];
+//   song_ids: string[];
+//   playlist_name: string;
+// }
+
+// export type AutoGenerateExplicit =
+//   "all" | "cleaned" | "explicit" | "notExplicit";
+
+// export type TreatDataAs = "partial" | "complete" | "skip";
+
+// export interface PlaylistGenerationConfig {
+//   playlist_size: number;
+//   wildcard_day: number;
+//   auto_generate_playlist: boolean;
+//   auto_generate_time: number;
+//   auto_generate_when_complete: boolean;
+//   auto_generate_completion_percent: number;
+//   auto_generate_explicit: AutoGenerateExplicit;
+//   auto_generate_for: string[];
+//   auto_generate_injection: boolean;
+//   last_auto_generate: string;
+
+//   signal_weights: {
+//     repeat: number;
+//     positive: number;
+//     partial: number;
+//     skip: number;
+//   };
+//   slot_ratios: {
+//     positive: number;
+//     repeat: number;
+//     partial: number;
+//     skip: number;
+//   };
+//   injection_breakdown: {
+//     signal: number;
+//     unheard: number;
+//     wildcard: number;
+//   };
+// }
+
+// export interface BehavioralScoringConfig {
+//   long_song_duration: number;
+//   skip_threshold_pct: number;
+//   positive_threshold_pct: number;
+//   repeat_time_window_min: number;
+//   stale_session_timeout_sec: number;
+//   min_listens_for_star: number;
+//   historical_decay_factor: number;
+// }
+
+// export interface SyncAndAutomationConfig {
+//   auto_sync_hour: number;
+//   timezone: string;
+//   use_itunes_fallback: boolean;
+//   auto_sync_after_navidrome: boolean;
+// }
+
+// export interface ApiAndPerformanceConfig {
+//   max_fuzzy_iterations: number;
+//   api_max_retries: number;
+//   api_retry_delay_sec: number;
+//   itunes_search_depth: number;
+//   sync_confidence: {
+//     min_match_score: number;
+//     metadata_overwrite_score: number;
+//     genre_map_strictness: number;
+//     duration_tolerance_pct: number;
+//   };
+// }
+
+// export interface ListenBrainzConfig {
+//   enabled: boolean;
+//   username: string;
+//   treat_data_as: TreatDataAs;
+//   pool_listen_brainz: number;
+//   for_users: string[];
+//   dedup_window_seconds: number;
+//   last_synced: number;
+//   PushLovedSongs: boolean;
+// }
+
+// export interface TuneConfig {
+//   playlist_generation: PlaylistGenerationConfig;
+//   behavioral_scoring: BehavioralScoringConfig;
+//   sync_and_automation: SyncAndAutomationConfig;
+//   api_and_performance: ApiAndPerformanceConfig;
+//   jam?: {
+//     same_song_in_queue: boolean;
+//     only_host_change_queue: boolean;
+//     only_host_clear_queue: boolean;
+//     only_host_add_queue: boolean;
+//   };
+//   listenbrainz?: ListenBrainzConfig;
+// }
+
+// export interface UpdateConfigResponse {
+//   status: string;
+//   message: string;
+// }
+
+// export type ExplicitTag = "explicit" | "cleaned" | "notExplicit";
+
+// export async function fetchLogin(data: LoginRequest): Promise<LoginResponse> {
+//   const formData = new URLSearchParams();
+//   formData.append("username", data.username);
+//   formData.append("password", data.password);
+
+//   const res = await fetch(`${BASE_URL}/auth/login`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//     body: formData,
+//     credentials: "include",
+//   });
+
+//   if (!res.ok) {
+//     throw new Error(`HTTP error! status: ${res.status}`);
+//   }
+
+//   const json = await res.json();
+//   console.log(json);
+
+//   if (json.status !== "success") {
+//     throw new Error(json.reason || "Login failed");
+//   }
+//   console.log("success");
+//   return json;
+// }
+
+// export async function CheckAuth(): Promise<boolean> {
+//   try {
+//     const res = await fetch(`${BASE_URL}/api/ping`, {
+//       method: "GET",
+//       credentials: "include",
+//     });
+//     return res.ok;
+//   } catch (error) {
+//     console.error(error);
+//     return false;
+//   }
+// }
+
+// export async function logout(): Promise<void> {
+//   try {
+//     await fetch(`${BASE_URL}/auth/logout`, {
+//       method: "POST",
+//       credentials: "include",
+//     });
+//   } catch (error) {
+//     console.error(error);
+//   }
+// }
+
+// export async function fetchPing(): Promise<{ status: string }> {
+//   const res = await fetch(`${BASE_URL}/api/ping`, {
+//     method: "GET",
+//     credentials: "include",
+//   });
+//   if (!res.ok) throw new Error("Ping failed");
+//   return res.json();
+// }
+
+// export async function fetchStats(): Promise<Stats> {
+//   const res = await fetch(`${BASE_URL}/api/stats`);
+//   if (!res.ok) throw new Error("Failed to fetch stats");
+//   return res.json();
+// }
+
+// export async function fetchSyncStatus(): Promise<SyncStatus> {
+//   const res = await fetch(`${BASE_URL}/api/sync/status`);
+//   if (!res.ok) throw new Error("Failed to fetch sync status");
+//   return res.json();
+// }
+
+// export async function fetchSyncStart(
+//   use_itunes: boolean,
+// ): Promise<SyncStartResponse> {
+//   const res = await fetch(
+//     `${BASE_URL}/api/sync/start?use_itunes=${use_itunes}`,
+//   );
+//   if (!res.ok) throw new Error("Failed to start sync");
+//   return res.json();
+// }
+
+// export async function fetchSyncStop(): Promise<SyncStopResponse> {
+//   const res = await fetch(`${BASE_URL}/api/sync/stop`);
+//   if (!res.ok) throw new Error("Failed to stop sync");
+//   return res.json();
+// }
+
+// export async function fetchSyncSettings(
+//   autoSyncHour: number,
+//   useItunes: boolean,
+//   timezone: string = "Asia/Kolkata",
+// ): Promise<{ status: string }> {
+//   const res = await fetch(
+//     `${BASE_URL}/api/sync/setting?auto_sync_hour=${autoSyncHour}&use_itunes=${useItunes}&timezone=${encodeURIComponent(timezone)}`,
+//   );
+//   if (!res.ok) throw new Error("Failed to save settings");
+//   return res.json();
+// }
+
+// export async function fetchCreateUser(
+//   data: CreateUserRequest,
+// ): Promise<CreateUserResponse> {
+//   const res = await fetch(`${BASE_URL}/admin/create-user`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify(data),
+//   });
+//   if (!res.ok) throw new Error("Failed to create user");
+//   return res.json();
+// }
+
+// const USERS_CACHE_KEY = "tunelog_users_cache";
+
+// export async function fetchGetUsers(): Promise<GetUsersResponse> {
+//   const cached = localStorage.getItem(USERS_CACHE_KEY);
+//   const cachedUsers: User[] = cached ? JSON.parse(cached) : [];
+
+//   const fetchPromise = fetch(`${BASE_URL}/admin/get-users`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     credentials: "include",
+//   })
+//     .then((res) => {
+//       if (!res.ok) throw new Error("Failed to get users");
+//       return res.json() as Promise<GetUsersResponse>;
+//     })
+//     .then((fresh) => {
+//       if (fresh.status === "ok" && fresh.users) {
+//         const freshStr = JSON.stringify(fresh.users);
+//         if (freshStr !== JSON.stringify(cachedUsers)) {
+//           localStorage.setItem(USERS_CACHE_KEY, freshStr);
+//         }
+//       }
+//       return fresh;
+//     });
+
+//   if (cachedUsers.length > 0) {
+//     return { status: "ok", users: cachedUsers };
+//   }
+
+//   return fetchPromise;
+// }
+
+// export async function fetchUserData(
+//   username: string,
+//   password: string,
+// ): Promise<UserDataResponse> {
+//   const res = await fetch(`${BASE_URL}/admin/getUserData?username=${encodeURIComponent(username)}`, {
+//     method: "GET",
+
+//   });
+//   if (!res.ok) throw new Error("Failed to fetch user data");
+//   return res.json();
+// }
+
+// export async function fetchUserProfile(
+//   username: string,
+//   password: string,
+// ): Promise<UserProfileResponse> {
+//   const res = await fetch(
+//     `${BASE_URL}/api/user/profile?username=${encodeURIComponent(username)}`,
+//   );
+//   if (!res.ok) throw new Error("Failed to fetch user profile");
+//   return res.json();
+// }
+
+// export async function fetchPlaylistSongs(
+//   username: string,
+// ): Promise<PlaylistSongsResponse> {
+//   const res = await fetch(
+//     `${BASE_URL}/api/playlist/songs?username=${username}`,
+//   );
+//   if (!res.ok) throw new Error("Failed to fetch playlist songs");
+//   return res.json();
+// }
+
+// export async function fetchMonthlyListens(): Promise<MonthlyListen[]> {
+//   const res = await fetch(`${BASE_URL}/api/library/getMonthlyListens`);
+//   if (!res.ok) throw new Error("Failed to fetch monthly listens");
+//   return res.json();
+// }
+
+// export async function fetchPlaylistGenerate(
+//   username: string,
+//   explicit_filter: string = "allow_cleaned",
+//   size: number = 50,
+//   slots?: Record<string, number>,
+//   weights?: Record<string, number>,
+//   injection: boolean = true,
+// ): Promise<PlaylistGenerateResponse> {
+//   const res = await fetch(`${BASE_URL}/api/playlist/generate`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({
+//       username,
+//       explicit_filter,
+//       size,
+//       slots,
+//       weights,
+//       injection,
+//     }),
+//   });
+//   if (!res.ok) throw new Error("Failed to generate playlist");
+//   return res.json();
+// }
+
+// export async function appendPlaylist(
+//   username: string,
+//   explicit_filter: string = "allow_cleaned",
+//   size: number = 50,
+//   slots?: Record<string, number>,
+//   weights?: Record<string, number>,
+//   injection: boolean = true,
+// ): Promise<PlaylistGenerateResponse> {
+//   try {
+//     const res = await fetch(`${BASE_URL}/api/playlist/append`, {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({
+//         username,
+//         explicit_filter,
+//         size,
+//         slots,
+//         weights,
+//         injection,
+//       }),
+//     });
+//     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+//     return res.json();
+//   } catch (error) {
+//     console.error("[API] Append Playlist failed:", error);
+//     return {
+//       status: "error",
+//       reason: error instanceof Error ? error.message : "Unknown network error",
+//     };
+//   }
+// }
+
+// export async function fetchManualMarkingSongs(): Promise<{
+//   status: string;
+//   songs: ManualMarkingSong[];
+// }> {
+//   const res = await fetch(`${BASE_URL}/api/library/marking`);
+//   if (!res.ok) throw new Error("Failed to fetch marking songs");
+//   return res.json();
+// }
+
+// export async function updateExplicitTag(
+//   song_id: string,
+//   explicit: ExplicitTag,
+// ): Promise<{ status: string; song_id: string; explicit: string }> {
+//   const res = await fetch(`${BASE_URL}/api/library/marking`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ song_id, explicit }),
+//   });
+//   if (!res.ok) throw new Error("Failed to update explicit tag");
+//   return res.json();
+// }
+
+// export async function startFallbackSync(
+//   tries: number = 500,
+// ): Promise<{ status: string; total?: number; reason?: string }> {
+//   const res = await fetch(`${BASE_URL}/api/sync/fallback?tries=${tries}`, {
+//     method: "POST",
+//   });
+//   if (!res.ok) throw new Error("Failed to start fallback sync");
+//   return res.json();
+// }
+
+// export async function fetchFallbackSyncStatus(): Promise<FallbackSyncStatus> {
+//   const res = await fetch(`${BASE_URL}/api/sync/fallback/status`);
+//   if (!res.ok) throw new Error("Failed to fetch fallback sync status");
+//   return res.json();
+// }
+
+// export async function stopFallbackSync(): Promise<{ status: string }> {
+//   const res = await fetch(`${BASE_URL}/api/sync/fallback/stop`);
+//   if (!res.ok) throw new Error("Failed to stop fallback sync");
+//   return res.json();
+// }
+
+// export async function fetchGenres(): Promise<GenreResponse> {
+//   const res = await fetch(`${BASE_URL}/api/genre/read`);
+//   if (!res.ok) throw new Error("Failed to fetch genres");
+//   return res.json();
+// }
+
+// export async function writeGenre(
+//   genre: string,
+//   noisyGenre: string,
+// ): Promise<GenreResponse> {
+//   const res = await fetch(
+//     `${BASE_URL}/api/genre/write?genre=${encodeURIComponent(genre)}&noisyGenre=${encodeURIComponent(noisyGenre)}`,
+//   );
+//   if (!res.ok) throw new Error("Failed to write genre");
+//   return res.json();
+// }
+
+// export async function deleteGenre(
+//   category: string,
+//   value?: string,
+// ): Promise<GenreResponse> {
+//   let url = `${BASE_URL}/api/genre/delete?category=${encodeURIComponent(category)}`;
+//   if (value) url += `&value=${encodeURIComponent(value)}`;
+//   const res = await fetch(url);
+//   if (!res.ok) throw new Error("Failed to delete genre");
+//   return res.json();
+// }
+
+// export async function fetchGenresFromDb(): Promise<GenreListResponse> {
+//   const res = await fetch(`${BASE_URL}/api/genre/get`);
+//   if (!res.ok) throw new Error("Failed to fetch genres from DB");
+//   return res.json();
+// }
+
+// export async function autoMatchGenres(): Promise<AutoMatchResponse> {
+//   const res = await fetch(`${BASE_URL}/api/genre/auto`);
+//   if (!res.ok) throw new Error("Failed to auto match genres");
+//   return res.json();
+// }
+
+// export async function fetchImportCSV(file: File): Promise<ImportResponse> {
+//   const formData = new FormData();
+//   formData.append("file", file);
+//   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/import/csv`, {
+//     method: "POST",
+//     body: formData,
+//   });
+//   if (!res.ok) throw new Error("Failed to upload CSV");
+//   return res.json();
+// }
+
+// export async function fetchCreatePlaylistFromIds(
+//   data: PlaylistCreateRequest,
+// ): Promise<{ status: string; message: string; reason?: string }> {
+//   const res = await fetch(
+//     `${import.meta.env.VITE_API_URL}/api/import/csvPlaylist`,
+//     {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify(data),
+//     },
+//   );
+//   console.log(data);
+//   if (!res.ok) throw new Error("Failed to create playlist");
+//   return res.json();
+// }
+
+// export function connectNotificationStream(
+//   onMessage: (payload: NotificationPayload) => void,
+//   onError?: (err: Event) => void,
+// ): EventSource {
+//   const es = new EventSource(`${BASE_URL}/notifications/stream`);
+//   console.log("api called notification/stream");
+//   es.onmessage = (event) => {
+//     try {
+//       const payload: NotificationPayload = JSON.parse(event.data);
+//       onMessage(payload);
+//     } catch (e) {
+//       console.error("[SSE] Failed to parse notification:", e);
+//     }
+//   };
+//   if (onError) es.onerror = onError;
+//   return es;
+// }
+
+// export async function fetchGetConfig(): Promise<TuneConfig> {
+//   const res = await fetch(`${BASE_URL}/api/config`);
+//   if (!res.ok) throw new Error("Failed to fetch configuration");
+//   return res.json();
+// }
+
+// export async function fetchUpdateConfig(
+//   data: TuneConfig,
+// ): Promise<UpdateConfigResponse> {
+//   const res = await fetch(`${BASE_URL}/api/config/update`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify(data),
+//   });
+//   if (!res.ok) throw new Error("Failed to update configuration");
+//   return res.json();
+// }
+
+// export async function fetchUpdateProfile(
+//   data: UpdateProfileRequest,
+// ): Promise<UpdateProfileResponse> {
+//   const formData = new FormData();
+//   formData.append("username", data.username);
+//   formData.append("displayName", data.displayName);
+//   if (data.avatar) {
+//     formData.append("avatar", data.avatar);
+//   }
+//   const response = await fetch(`${BASE_URL}/api/user/profile/update`, {
+//     method: "POST",
+//     body: formData,
+//   });
+//   if (!response.ok) {
+//     throw new Error(`Failed to update profile: ${response.statusText}`);
+//   }
+//   return response.json();
+// }
+
+// export interface NavidromeSong {
+//   id: string;
+//   title: string;
+//   artist: string;
+//   album: string;
+//   coverArt: string;
+//   duration: number;
+//   track?: number;
+//   year?: number;
+//   genre?: string;
+//   albumId?: string;
+//   artistId?: string;
+//   bitRate?: number;
+//   path?: string;
+//   created?: string;
+// }
+
+// export async function getSong(songId: string): Promise<NavidromeSong | null> {
+//   try {
+//     const baseUrl = import.meta.env.VITE_NAVIDROME_URL;
+//     const username = localStorage.getItem("tunelog_user") ?? "";
+//     const password = localStorage.getItem("tunelog_password") ?? "";
+
+//     if (!baseUrl || !username || !password) return null;
+
+//     const params = new URLSearchParams({
+//       u: username,
+//       p: password,
+//       v: "1.16.1",
+//       c: "tunelog",
+//       f: "json",
+//       id: songId,
+//     });
+
+//     const res = await fetch(`${baseUrl}/rest/getSong?${params}`);
+//     const data = await res.json();
+
+//     const song = data?.["subsonic-response"]?.song;
+//     if (!song) return null;
+//     console.log("get song");
+//     console.log(song);
+//     return song as NavidromeSong;
+//   } catch {
+//     return null;
+//   }
+// }
+
+// export function getCoverArtUrl(coverArtId: string): string {
+//   const baseUrl = import.meta.env.VITE_NAVIDROME_URL ?? "";
+//   const username = localStorage.getItem("tunelog_user") ?? "";
+//   const password = localStorage.getItem("tunelog_password") ?? "";
+
+//   const params = new URLSearchParams({
+//     u: username,
+//     p: password,
+//     v: "1.16.1",
+//     c: "tunelog",
+//     id: coverArtId,
+//     size: "80",
+//   });
+
+//   const url = `${baseUrl}/rest/getCoverArt?${params}`;
+//   console.log(url);
+//   return url;
+// }
+
+// export async function generateDiscoveryQueue(
+//   params: DiscoveryQueueParams,
+// ): Promise<DiscoveryQueueResponse> {
+//   const token =
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     "";
+
+//   const res = await fetch(`${BASE_URL}/generateDiscoveryQueue`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+//     },
+//     body: JSON.stringify(params),
+//   });
+
+//   if (!res.ok) {
+//     throw new Error(`Discovery Queue request failed: HTTP ${res.status}`);
+//   }
+
+//   return res.json() as Promise<DiscoveryQueueResponse>;
+// }
+
+// interface PlaylistResponse {
+//   status: "success" | "error";
+//   id: string | null;
+// }
+
+// export async function fetchDiscoveryPlaylistId(
+//   username: string,
+// ): Promise<PlaylistResponse> {
+//   const endpoint = "playlist/discoveryid";
+//   const url = `${BASE_URL}/${endpoint}?username=${encodeURIComponent(username)}`;
+
+//   try {
+//     const response = await fetch(url, {
+//       method: "GET",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+
+//     const data: PlaylistResponse = await response.json();
+//     return data;
+//   } catch (error) {
+//     console.error("Failed to fetch discovery playlist ID:", error);
+//     return {
+//       status: "error",
+//       id: null,
+//     };
+//   }
+// }
+
+// export interface ListenBrainzEntry {
+//   id: number;
+//   song_id: string | null;
+//   title: string | null;
+//   artist: string | null;
+//   album: string | null;
+//   signal: string | null;
+//   tag: string | null;
+//   comment: string | null;
+//   timestamp: string;
+// }
+
+// export async function getListenbrainzLog(): Promise<ListenBrainzEntry[]> {
+//   const res = await fetch(`${BASE_URL}/api/listenbrainz`);
+//   if (!res.ok) throw new Error("Failed to fetch listenbrainz log");
+//   return res.json();
+// }
+
+// export interface LBPlaylist {
+//   id: string;
+//   title: string;
+//   creator: string;
+//   track_count: number;
+//   type: "user" | "created_for_you";
+// }
+
+// export interface LBTrack {
+//   title: string;
+//   artist: string;
+//   album?: string;
+//   mbid?: string;
+//   navidrome_id?: string | null;
+//   cover_art_url?: string;
+// }
+
+// export interface LBMatchResponse {
+//   status: "ok" | "error";
+//   tracks: LBTrack[];
+//   matched_count: number;
+//   reason?: string;
+// }
+
+// export const matchTracksWithNavidrome = async (
+//   tracks: LBTrack[],
+// ): Promise<LBMatchResponse> => {
+//   const res = await fetch(`${BASE_URL}/api/listenbrainz/match`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ tracks }),
+//   });
+//   return res.json();
+// };
+
+// const getDashboardUser = (): string => {
+//   return localStorage.getItem("tunelog_user") || "";
+// };
+
+// export const fetchListenbrainzPlaylists = async (
+//   lb_username: string,
+// ): Promise<{ status: string; playlists: LBPlaylist[]; reason?: string }> => {
+//   const dashboard_user = getDashboardUser();
+//   const url = `${BASE_URL}/api/listenbrainz/playlists?lb_username=${encodeURIComponent(lb_username)}&dashboard_user=${encodeURIComponent(dashboard_user)}`;
+//   const res = await fetch(url);
+//   return res.json();
+// };
+
+// export const fetchListenbrainzPlaylistTracks = async (
+//   playlistId: string,
+//   lb_username: string,
+// ): Promise<{ status: string; tracks: LBTrack[]; reason?: string }> => {
+//   const dashboard_user = getDashboardUser();
+//   const url = `${BASE_URL}/api/listenbrainz/playlist/${playlistId}/tracks?lb_username=${encodeURIComponent(lb_username)}&dashboard_user=${encodeURIComponent(dashboard_user)}`;
+//   const res = await fetch(url);
+//   return res.json();
+// };
+
+// export const createNavidromePlaylist = async (
+//   name: string,
+//   songIds: string[],
+// ): Promise<{ status: string; reason?: string }> => {
+//   const dashboard_user = getDashboardUser();
+//   const res = await fetch(`${BASE_URL}/api/navidrome/playlist/create`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ name, song_ids: songIds, dashboard_user }),
+//   });
+//   return res.json();
+// };
+
+// export interface LBCFConfig {
+//   size: number;
+//   heard: number;
+//   unheard: number;
+//   unheard_genre_injection: boolean;
+//   heard_genre_injection: boolean;
+//   last_generated: number;
+//   auto_generate_time: number;
+//   Name: string;
+//   backfill_unheard_song: boolean;
+//   use_blend: boolean;
+//   heard_last_score: number;
+//   unheard_last_score: number;
+//   fallbackScore: boolean;
+//   for_users: string[];
+// }
+
+// export interface WeeklyLBFetch {
+//   last_synced: number;
+//   check_interval: number;
+// }
+
+// export interface LBCFConfigPayload {
+//   cf_playlist_config: LBCFConfig;
+//   weekly_LB_fetch: WeeklyLBFetch;
+// }
+
+// export async function fetchLBCFConfig(): Promise<
+//   | {
+//       status: "ok";
+//       cf_playlist_config: LBCFConfig;
+//       weekly_LB_fetch: WeeklyLBFetch;
+//     }
+//   | { status: "error"; reason: string }
+// > {
+//   const token =
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     "";
+
+//   const res = await fetch(`${BASE_URL}/api/lb-cf/config`, {
+//     method: "GET",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${token}`,
+//     },
+//   });
+
+//   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+//   return res.json();
+// }
+
+// export async function saveLBCFConfig(
+//   payload: LBCFConfigPayload,
+// ): Promise<{ status: "ok" } | { status: "error"; reason: string }> {
+//   const token =
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     "";
+
+//   const res = await fetch(`${BASE_URL}/api/lb-cf/config`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${token}`,
+//     },
+//     body: JSON.stringify(payload),
+//   });
+
+//   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+//   return res.json();
+// }
+
+// export async function generateLBCFPlaylist(): Promise<
+//   { status: "ok"; playlist_id?: string } | { status: "error"; reason: string }
+// > {
+//   const token =
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     "";
+
+//   const res = await fetch(`${BASE_URL}/api/lb-cf/generate`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${token}`,
+//     },
+//   });
+
+//   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+//   return res.json();
+// }
+
+// function getToken(): string {
+//   return (
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     ""
+//   );
+// }
+
+// function getCurrentUser(): string {
+//   return (
+//     localStorage.getItem("tunelog_user") ??
+//     sessionStorage.getItem("tunelog_user") ??
+//     ""
+//   );
+// }
+
+// export async function fetchLBHasToken(): Promise<
+//   { status: "ok"; has_token: boolean } | { status: "error"; reason: string }
+// > {
+//   const user = getCurrentUser();
+//   const res = await fetch(
+//     `${BASE_URL}/api/lb-cf/has-token?user=${encodeURIComponent(user)}`,
+//     { headers: { Authorization: `Bearer ${getToken()}` } },
+//   );
+//   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+//   return res.json();
+// }
+
+// export async function setLBToken(
+//   lbToken: string,
+// ): Promise<{ status: "ok" } | { status: "error"; reason: string }> {
+//   const user = getCurrentUser();
+//   const res = await fetch(`${BASE_URL}/api/lb-cf/set-token`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${getToken()}`,
+//     },
+//     body: JSON.stringify({ user, token: lbToken }),
+//   });
+//   if (!res.ok) return { status: "error", reason: `HTTP ${res.status}` };
+//   return res.json();
+// }
+
+// export interface LBLibrarySong {
+//   navidrome_id: string;
+//   title: string;
+//   artist: string;
+//   album: string | null;
+//   recording_mbid: string;
+//   for_user: string;
+//   score: number;
+// }
+
+// export interface LBMissingSong {
+//   recording_mbid: string;
+//   release_mbid: string | null;
+//   title: string;
+//   artist: string;
+//   album: string | null;
+//   for_user: string;
+//   score: number;
+// }
+
+// export interface LBLibraryResponse {
+//   status: "ok" | "error";
+//   in_library: LBLibrarySong[];
+//   not_in_library: LBMissingSong[];
+//   reason?: string;
+// }
+
+// export async function fetchLBLibraryRecommendations(): Promise<LBLibraryResponse> {
+//   const token =
+//     localStorage.getItem("tunelog_token") ??
+//     sessionStorage.getItem("tunelog_token") ??
+//     "";
+
+//   const res = await fetch(`${BASE_URL}/api/lb-cf/library`, {
+//     headers: { Authorization: `Bearer ${token}` },
+//   });
+
+//   if (!res.ok)
+//     return {
+//       status: "error",
+//       in_library: [],
+//       not_in_library: [],
+//       reason: `HTTP ${res.status}`,
+//     };
+//   return res.json();
+// }
+
+// export interface SkippedSong {
+//   id: number;
+//   song_id: string | null;
+//   title: string | null;
+//   artist: string | null;
+//   album: string | null;
+//   duration: number | null;
+//   signal: string | null;
+//   genre: string | null;
+//   timestamp: string;
+//   user_id: string | null;
+// }
+
+// export type ShellType = "bash" | "mac" | "powershell";
+// export type ScriptAction = "delete" | "move";
+
+// export interface SkippedSong {
+//   id: number;
+//   song_id: string | null;
+//   title: string | null;
+//   artist: string | null;
+//   album: string | null;
+//   duration: number | null;
+//   genre: string | null;
+//   skip_count: number | null;
+//   timestamp: string;
+//   user_id: string | null;
+// }
+
+// export interface RecommendedSong {
+//   song_id: string | null;
+//   title: string | null;
+//   artist: string | null;
+//   album: string | null;
+//   reason: string | null;
+//   skip_count: number | null;
+// }
+
+// export interface GenerateScriptRequest {
+//   song_ids: string[];
+//   shell: ShellType;
+//   base_path: string;
+//   action: ScriptAction;
+// }
+
+// export interface GenerateScriptResponse {
+//   script: string;
+// }
+
+// export async function getSkippedSongs(): Promise<SkippedSong[]> {
+//   const res = await fetch(`${BASE_URL}/api/listens/skipped`, {
+//     headers: { Authorization: `Bearer ${getToken()}` },
+//   });
+//   if (!res.ok)
+//     throw new Error(
+//       `Failed to fetch skipped songs: ${res.status} ${res.statusText}`,
+//     );
+//   return res.json() as Promise<SkippedSong[]>;
+// }
+
+// export async function getRecommendedDeletes(): Promise<RecommendedSong[]> {
+//   const res = await fetch(`${BASE_URL}/api/library/recommend-delete`, {
+//     headers: { Authorization: `Bearer ${getToken()}` },
+//   });
+//   if (!res.ok)
+//     throw new Error(
+//       `Failed to fetch recommendations: ${res.status} ${res.statusText}`,
+//     );
+//   return res.json() as Promise<RecommendedSong[]>;
+// }
+
+// export async function generateScript(
+//   req: GenerateScriptRequest,
+// ): Promise<GenerateScriptResponse> {
+//   const res = await fetch(`${BASE_URL}/api/library/generate-script`, {
+//     method: "POST",
+//     headers: {
+//       Authorization: `Bearer ${getToken()}`,
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify(req),
+//   });
+//   if (!res.ok)
+//     throw new Error(
+//       `Failed to generate script: ${res.status} ${res.statusText}`,
+//     );
+//   return res.json() as Promise<GenerateScriptResponse>;
+// }
+
+// export interface SkippedSettings {
+//   shell: ShellType;
+//   basePath: string;
+//   action: ScriptAction;
+// }
+
+// export async function getScriptSettings(): Promise<SkippedSettings | null> {
+//   const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
+//     headers: { Authorization: `Bearer ${getToken()}` },
+//   });
+
+//   if (res.status === 404) {
+//     return null;
+//   }
+
+//   if (!res.ok) {
+//     throw new Error(
+//       `Failed to fetch script settings: ${res.status} ${res.statusText}`,
+//     );
+//   }
+
+//   return res.json() as Promise<SkippedSettings>;
+// }
+
+// export async function saveScriptSettings(
+//   settings: SkippedSettings,
+// ): Promise<void> {
+//   const res = await fetch(`${BASE_URL}/api/library/script-settings`, {
+//     method: "PUT",
+//     headers: {
+//       Authorization: `Bearer ${getToken()}`,
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify(settings),
+//   });
+
+//   if (!res.ok) {
+//     throw new Error(
+//       `Failed to save script settings: ${res.status} ${res.statusText}`,
+//     );
+//   }
+// }
+
+// export interface TierPlaylist {
+//   username: string;
+//   size: number;
+// }
+
+// export interface TierPlaylistResponse {
+//   status: string;
+// }
+
+// export async function tierPlaylist(
+//   data: TierPlaylist,
+// ): Promise<TierPlaylistResponse> {
+//   const res = await fetch(`${BASE_URL}/api/import/tierPlaylist`, {
+//     method: "POST",
+//     headers: {
+//       Authorization: `Bearer ${getToken()}`,
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify(data),
+//   });
+
+//   if (!res.ok) {
+//     throw new Error(
+//       `Failed to create tier playlist: ${res.status} ${res.statusText}`,
+//     );
+//   }
+
+//   const result: TierPlaylistResponse = await res.json();
+
+//   if (result.status !== "success") {
+//     throw new Error(result.status);
+//   }
+
+//   return result;
+// }
+
+// api/index.ts
+//
+// Barrel file. Re-exports everything from every module in this folder,
+// so anywhere in the app that currently does:
+//
+//   import { fetchStats, socket, type Stats } from "./api";
+//   // or "../api", "@/api", etc.
+//
+// keeps working exactly as before — because a bare `./api` import
+// resolves to `./api/index.ts` automatically. You don't need to touch
+// a single import statement anywhere else in the codebase.
+
+export * from "./client";
+export * from "./socket";
+export * from "./types";
+export * from "./auth";
+export * from "./admin";
+export * from "./stats";
+export * from "./sync";
+export * from "./user";
+export * from "./playlist";
+export * from "./library";
+export * from "./genre";
+export * from "./importCsv";
+export * from "./notifications";
+export * from "./config";
+export * from "./navidrome";
+export * from "./discovery";
+export * from "./listenbrainz";

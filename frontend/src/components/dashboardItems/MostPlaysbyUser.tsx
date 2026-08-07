@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchGetUsers, fetchUserData, UserDataResponse } from "../../API/API";
+import { fetchGetUsers, fetchUserData, UserDataResponse } from "../../API";
 
 interface CachedUser {
   username: string;
@@ -73,7 +73,6 @@ export default function MostPlaysbyUser() {
       try {
         const admin = localStorage.getItem("tunelog_user") || "";
         const adminPD = localStorage.getItem("tunelog_password") || "";
-        if (!admin || !adminPD) return;
 
         const cachedRaw = localStorage.getItem("tunelog_users_cache");
         const cachedUsers: CachedUser[] = cachedRaw

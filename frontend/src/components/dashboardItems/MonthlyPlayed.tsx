@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchMonthlyListens, MonthlyListen } from "../../API/API";
+import { fetchMonthlyListens, MonthlyListen } from "../../API";
 
 interface MonthlyListenDisplay extends MonthlyListen {
   displayMonth: string;

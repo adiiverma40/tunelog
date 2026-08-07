@@ -1,13 +1,37 @@
 import os
 import shutil
+import time
+from calendar import c
+from datetime import datetime, timedelta
 from pathlib import Path
+from sqlite3.dbapi2 import Cursor
+from webbrowser import get
 
 import requests
 from core.config import Navidrome_url, getJWT
+from core.crypto import decrypt_token, encrypt_token, get_secret_key
 from core.db import get_db_connection, get_db_connection_lib, get_db_connection_usr
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from rich.console import Console
+
+from .auth_router import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_access_token,
+    get_current_user,
+)
 
 console = Console()
 router = APIRouter(tags=["user_and_admin"])
@@ -38,59 +62,57 @@ class AdminAuth(BaseModel):
 
 
 times = 0
-import time
-
 AUTH_CACHE = {}
 CACHE_TTL = 3600
 
 
-@router.post("/auth/login")
-def login(data: LoginData):
-    try:
-        admin = data.username
-        password = data.password
-        current_time = time.time()
-        time.sleep(2)
-        if admin in AUTH_CACHE:
-            cached_data = AUTH_CACHE[admin]
-            if (current_time - cached_data["timestamp"]) < CACHE_TTL:
-                console.log(f"[dim]Returning cached login response for: {admin}[/dim]")
-                return cached_data["response"]
+@router.post("/user/me")
+def get_current_user_me(username: str = Depends(get_current_user)):
+    console.log(f"[bold]username: {username}")
+    conn = get_db_connection_usr()
+    cursor = conn.cursor()
+    user = cursor.execute(
+        "SELECT username, name, avatar FROM user WHERE username = ?", (username,)
+    ).fetchone()
+    if user:
+        return {"username": user[0], "name": user[1], "avatar": user[2]}
+    return None
 
-        res = getJWT(admin, password)
 
-        if not res:
-            return {
-                "status": "failed",
-                "reason": "Invalid credentials or Navidrome offline",
-            }
+@router.get("/api/user/profile/{username}")
+def get_user_profile(
+    username: str,
+    auth: str = Depends(get_current_user),
+):
+    conn = get_db_connection_usr()
 
-        success_response = {"status": "success", "JWT": res}
+    user = conn.execute(
+        """
+        SELECT username, name, avatar
+        FROM user
+        WHERE username = ?
+        """,
+        (username,),
+    ).fetchone()
 
-        AUTH_CACHE[admin] = {"response": success_response, "timestamp": current_time}
+    conn.close()
 
-        conn = get_db_connection_usr()
-        cursor = conn.cursor()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+        )
 
-        existing = cursor.execute(
-            "SELECT * FROM user WHERE username = ?", (admin,)
-        ).fetchone()
+    avatar_url = f"{SERVER_URL.rstrip('/')}{user['avatar']}" if user["avatar"] else None
 
-        if not existing:
-            cursor.execute(
-                "INSERT INTO user (username, password, isAdmin) VALUES (?, ?, ?)",
-                (admin, password, True),
-            )
-            conn.commit()
-            console.log(f"[green]New User Created:[/green] {admin}")
-
-        conn.close()
-
-        return success_response
-
-    except Exception as e:
-        console.log(f"[bold red]Login Route Error:[/bold red] {e}")
-        return {"status": "failed", "reason": "Internal Error"}
+    return {
+        "status": "ok",
+        "user": {
+            "username": user["username"],
+            "name": user["name"],
+            "avatar": avatar_url,
+        },
+    }
 
 
 @router.post("/api/user/profile/update")
@@ -98,6 +120,7 @@ async def update_user_profile(
     username: str = Form(...),
     displayName: str = Form(...),
     avatar: UploadFile = File(None),
+    auth: str = Depends(get_current_user),
 ):
     try:
         save_dir = Path(CONFIG_DIR)
@@ -151,13 +174,22 @@ async def update_user_profile(
 
 
 @router.post("/admin/get-users")
-def getUsers(data: AdminAuth):
-    token = getJWT(data.admin, data.adminPD)
-    if not token:
-        return {"status": "failed", "reason": "Invalid admin credentials"}
+def getUsers(current_user: str = Depends(get_current_user)):
 
     conn = get_db_connection_usr()
-    users = conn.execute("SELECT * FROM user").fetchall()
+    users = conn.execute(
+        """
+        SELECT username, name, avatar, isAdmin, LB_username
+        FROM user
+        WHERE
+            username = ?
+            OR (
+                (SELECT isAdmin
+                 FROM user
+                 WHERE username = ?) = 1
+            );""",
+        (current_user, current_user),
+    ).fetchall()
     conn.close()
 
     user_list = []
@@ -183,10 +215,10 @@ def getUsers(data: AdminAuth):
 
 
 @router.get("/admin/getUserData")
-def getUserData(username: str = "", password: str = ""):
+def getUserData(username: str = ""):
     conn = get_db_connection()
     cursor = conn.cursor()
-    if username != "" and password != "":
+    if username != "":
         rows = cursor.execute(
             """
             SELECT signal, COUNT(signal)
@@ -331,7 +363,7 @@ def createUser(data: CreateUserData):
 
 
 @router.get("/api/user/profile")
-def getUserProfile(username: str, password: str):
+def getUserProfile(username: str = "", auth: str = Depends(get_current_user)):
     conn_listen = get_db_connection()
     conn_library = get_db_connection_lib()
     lc = conn_listen.cursor()

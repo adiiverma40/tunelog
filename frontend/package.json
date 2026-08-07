@@ -32,7 +32,10 @@
     "react-dropzone": "^14.3.5",
     "react-helmet-async": "^2.0.5",
     "react-hot-toast": "^2.6.0",
+    "react-markdown": "^10.1.0",
     "react-router": "^7.1.5",
+    "remark-gfm": "^4.0.1",
+    "remark-github-blockquote-alert": "^2.1.0",
     "socket.io-client": "^4.8.3",
     "swiper": "^11.2.3",
     "tailwind-merge": "^3.0.1"
@@ -40,6 +43,7 @@
   "devDependencies": {
     "@eslint/js": "^9.19.0",
     "@tailwindcss/postcss": "^4.0.8",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/react": "^19.0.12",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19.0.4",

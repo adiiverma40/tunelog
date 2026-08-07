@@ -2,7 +2,7 @@
 layer(base);
 
 @import "tailwindcss";
-
+@plugin "@tailwindcss/typography";
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -789,4 +789,29 @@ span.flatpickr-weekday,
 
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
+}
+
+
+/*react to Markdown css code */
+
+.markdown-alert {
+  @apply my-3 rounded-lg border-l-4 px-4 py-3 text-sm;
+}
+.markdown-alert-title {
+  @apply mb-1 flex items-center gap-1.5 font-medium;
+}
+.markdown-alert-note {
+  @apply border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-blue-300;
+}
+.markdown-alert-tip {
+  @apply border-green-500 bg-green-50 text-green-800 dark:bg-green-500/10 dark:text-green-300;
+}
+.markdown-alert-important {
+  @apply border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-500/10 dark:text-brand-300;
+}
+.markdown-alert-warning {
+  @apply border-yellow-500 bg-yellow-50 text-yellow-800 dark:bg-yellow-500/10 dark:text-yellow-300;
+}
+.markdown-alert-caution {
+  @apply border-red-500 bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-300;
 }

@@ -24,6 +24,8 @@ import ListenbrainzCF from "./pages/playlist/LB_CF";
 import ListenbrainzLibrary from "./pages/librarySync/listenbrainz";
 import SkippedSongs from "./pages/Library/skipped";
 
+import { WhatsNewModal } from "./pages/changelog";
+
 export default function App() {
   const navigate = useNavigate();
   useNotificationStream();
@@ -42,6 +44,7 @@ export default function App() {
 
   return (
     <>
+      <WhatsNewModal/>
       <ScrollToTop />
       <Routes>
         <Route element={<AppLayout />}>

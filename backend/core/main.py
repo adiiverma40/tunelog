@@ -267,7 +267,7 @@ def musicBrainzThread():
         try:
             MusicbrainzThread = threading.Thread(target=MusicbrainzSeeding, daemon=True)
             MusicbrainzThread.start()
-            time.sleep(2.0)
+            time.sleep(20.0)
 
             if not MusicbrainzThread.is_alive():
                 console.print(
@@ -413,7 +413,8 @@ def Auto_LB_CF(thread=True):
 
 
 def main():
-    proxyPort = int(os.getenv("PROXY_PORT", 4534))
+    proxyPort = int(os.getenv("PROXY_PORT", "4534"))
+    frontendPort = int(os.getenv("VITE_SERVER_PORT", "8000"))
 
     with console.status("[dim]Initializing database...[/dim]"):
         try:
@@ -456,7 +457,7 @@ def main():
             uvicornThread = threading.Thread(
                 target=uvicorn.run,
                 args=("api.api_entry:socket_app",),
-                kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "debug"},
+                kwargs={"host": "0.0.0.0", "port": frontendPort, "log_level": "debug"},
                 daemon=True,
             )
             ProxyThread = threading.Thread(
@@ -497,7 +498,7 @@ def main():
     )
     # print("error here")
     # v_0_63_2_migrate()
-    # 
+    #
 
     with console.status("[dim]Starting watcher...[/dim]"):
         try:
@@ -544,7 +545,7 @@ def main():
         console.print("[bold red]Starred Song Syncing Disabled, SKIPPING")
 
     console.print("Checking Musicbrainz Remaining Seedings")
-    # musicBrainzThread()
+    musicBrainzThread()
 
     while True:
         Auto_LB_CF()

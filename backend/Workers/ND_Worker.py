@@ -134,7 +134,7 @@ def ND_Worker():
         try:
             work = ND_queue.getWork(timeout=timeout)
             result = None
-            print(f"Working on: {work}")
+            # print(f"Working on: {work}")
 
             if work.method.lower() == "get":
                 result = method_get(work, session)

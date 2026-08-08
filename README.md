@@ -66,10 +66,23 @@ Edit `.env` before starting the stack.
 
 ### Option 2: Build from source
 
+> [!NOTE]
+> You will have to manually Added or change the docker compose files for volume mounts
+
 ```bash
+mkdir -p tunelog && cd tunelog
 git clone https://github.com/adiiverma40/tunelog-backend
+git clone https://github.com/adiiverma40/tunelog-frontend
+curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
+```
+**Backend**
+```bash
 cd tunelog-backend
-cp .env.example .env
+docker compose up --build
+```
+**Frontend**
+```bash
+cd tunelog-frontend
 docker compose up --build
 ```
 

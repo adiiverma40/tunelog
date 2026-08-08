@@ -1,6 +1,6 @@
 services:
   tunelog-backend:
-    image: ghcr.io/adiiverma40/tunelog/backend:main
+    image: ghcr.io/adiiverma40/tunelog-backend/backend:main
     container_name: tunelog-backend
     restart: unless-stopped
     tty: true 
@@ -20,7 +20,7 @@ services:
       - "4534:4534"
 
   tunelog-frontend:
-    image: ghcr.io/adiiverma40/tunelog/frontend:main
+    image: ghcr.io/adiiverma40/tunelog-frontend/frontend:main
     container_name: tunelog-frontend
     restart: unless-stopped
     tty: true

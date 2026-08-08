@@ -9,31 +9,10 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - Assistance in some of the `research` like which python module to use and stuff
 - `Playlist` Page was re written using claude ai
 
-## Updates
+---
 
-### Changed Singal Weights
-
-> The Singal weights used to dictate how much score a `signal` will get, But now it is chanaged to affect only the next `listen`
-
-To better explain, Now I am implementing a dynamic scoring system in which, The higher the `listen Count` the lower the score.
-I am doing this to counter the #18 issue. In which if a song is listened multiple times, that songs get so much high score that new songs dont get place in the playlist
-
-### New Push Star Feature
-
-- Lets user update the local heart songs to listenbrainz
-
-### Navidrome 0.62.0 Playback Reporting Support
-
-Navidrome `0.62.0` introduced the `playbackReport` API, which provides more accurate playback state reporting from clients.
-
-TuneLog now supports this new reporting mechanism, resulting in significantly improved tracking of:
-
-- Full plays
-- Partial plays
-- Skips
-- Repeats
-
-> **Recommended:** Update your Navidrome client to a version that supports `playbackReport` for the most accurate listening statistics and recommendations.
+> [!important]
+> Migrated from Mono Repo to Multi Repo
 
 ---
 
@@ -58,6 +37,110 @@ This feature lets user sync there local starred song from `navidrome` to `listen
 > This feature uses ListenBrainz recommendation data and matches it against songs already available in your library to automatically generate personalized playlists.
 
 > For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
+
+
+## Requirements
+
+- Navidrome instance with API access
+- Docker and Docker Compose, or Python 3.10+
+- Node.js for the frontend if running manually
+
+## Installation
+
+### Option 1: Docker Compose
+
+```bash
+mkdir tunelog && cd tunelog
+curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
+curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
+docker compose -f ghcr-compose.yaml up -d
+```
+
+**Update:**
+
+```bash
+docker compose -f ghcr-compose.yaml pull
+```
+
+Edit `.env` before starting the stack.
+
+### Option 2: Build from source
+
+```bash
+git clone https://github.com/adiiverma40/tunelog-backend
+cd tunelog-backend
+cp .env.example .env
+docker compose up --build
+```
+
+### Option 3: Run without Docker
+
+Backend:
+
+```bash
+git clone https://github.com/adiiverma40/tunelog-backend
+cd tunelog-backend
+cp .env.example .env
+pip install -r requirements.txt
+python3 error.py
+```
+
+Frontend:
+
+```bash
+git clone https://github.com/adiiverma40/tunelog-frontend
+cd tunelog-frontend
+npm install
+npm run dev
+```
+
+## Configuration
+
+Update `.env` with your Navidrome details and the addresses you want to allow.
+
+```bash
+# ================================================
+#                NAVIDROME CONFIG
+# ================================================
+
+BASE_URL=http://navidrome-navidrome-1:4533      # Base URL for Navidrome Server
+ADMIN_USERNAME=adii                             # Admin Username for Navidrome Server
+ADMIN_PASSWORD=1234                             # Admin password for Navidrome Server
+
+# ===============================================
+#              DASHBOARD CONFIG
+# ==============================================
+
+VITE_URL=http://192.168.29.118:5173             # URL for Dashboard.
+VITE_SERVER_PORT=8000                           # PORT on which Uvicorn(fastapi) server will be of Dashboard
+
+# Add additional origins separated by commas, or use * to allow all.
+ALLOWED_ORIGINS=http://localhost:5173,http://192.168.29.118:5173,*
+
+# VITE_API_URL=http://192.168.29.118:8000       # NO NEED FOR THIS
+# VITE_NAVIDROME_URL=http://192.168.29.118:4533 # NO NEED FOR THIS
+MY_DOMAIN=192.168.29.118
+
+
+
+# ================================================
+#                     LOGGING
+# ================================================
+
+LOG_DIR=/app/logs
+LOG_MAX_SIZE=10 MB
+LOG_RETENTION_DAYS=7 days
+LOG_LEVEL=DEBUG
+
+# =================================================
+#                   PROXY
+# =================================================
+
+PROXY_PORT=4534
+
+```
+
+
 
 ### Wiki:
 
@@ -124,104 +207,6 @@ In the dashboard there is a jam section, if you wish to use jam go to jam and `n
 **user profile**
 
 - User profile can be changed by `users` section
-
-## Requirements
-
-- Navidrome instance with API access
-- Docker and Docker Compose, or Python 3.10+
-- Node.js for the frontend if running manually
-
-## Installation
-
-### Option 1: Docker Compose
-
-```bash
-mkdir tunelog && cd tunelog
-curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
-curl -o ghcr-compose.yaml https://raw.githubusercontent.com/adiiverma40/tunelog/main/ghcr-compose.yaml
-docker compose -f ghcr-compose.yaml up -d
-```
-
-**Update:**
-
-```bash
-docker compose -f ghcr-compose.yaml pull
-```
-
-Edit `.env` before starting the stack.
-
-### Option 2: Build from source
-
-```bash
-git clone https://github.com/adiiverma40/tunelog
-cd tunelog
-cp .env.example .env
-docker compose up --build
-```
-
-### Option 3: Run without Docker
-
-Backend:
-
-```bash
-cd backend
-pip install -r requirements.txt
-python3 main.py
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Configuration
-
-Update `.env` with your Navidrome details and the addresses you want to allow.
-
-```bash
-# ================================================
-#                NAVIDROME CONFIG
-# ================================================
-
-BASE_URL=http://navidrome-navidrome-1:4533      # Base URL for Navidrome Server
-ADMIN_USERNAME=adii                             # Admin Username for Navidrome Server
-ADMIN_PASSWORD=1234                             # Admin password for Navidrome Server
-
-# ===============================================
-#              DASHBOARD CONFIG
-# ==============================================
-
-VITE_URL=http://192.168.29.118:5173             # URL for Dashboard.
-VITE_SERVER_PORT=8000                           # PORT on which Uvicorn(fastapi) server will be of Dashboard
-
-# Add additional origins separated by commas, or use * to allow all.
-ALLOWED_ORIGINS=http://localhost:5173,http://192.168.29.118:5173,*
-
-# VITE_API_URL=http://192.168.29.118:8000       # NO NEED FOR THIS
-# VITE_NAVIDROME_URL=http://192.168.29.118:4533 # NO NEED FOR THIS
-MY_DOMAIN=192.168.29.118
-
-
-
-# ================================================
-#                     LOGGING
-# ================================================
-
-LOG_DIR=/app/logs
-LOG_MAX_SIZE=10 MB
-LOG_RETENTION_DAYS=7 days
-LOG_LEVEL=DEBUG
-
-# =================================================
-#                   PROXY
-# =================================================
-
-PROXY_PORT=4534
-
-```
 
 ### Optional Navidrome tag mapping
 

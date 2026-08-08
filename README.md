@@ -9,7 +9,6 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 - Assistance in some of the `research` like which python module to use and stuff
 - `Playlist` Page was re written using claude ai
 
----
 
 > [!important]
 > Migrated from Mono Repo to Multi Repo
@@ -39,13 +38,14 @@ This feature lets user sync there local starred song from `navidrome` to `listen
 > For setup instructions and details, see the [ListenBrainz Collaborative Filtering documentation](https://github.com/adiiverma40/tunelog/wiki/ListenBrainz#listenbrainz-cf-collaborative-filtering-integration).
 
 
+## Installation
+
+
 ## Requirements
 
 - Navidrome instance with API access
 - Docker and Docker Compose, or Python 3.10+
 - Node.js for the frontend if running manually
-
-## Installation
 
 ### Option 1: Docker Compose
 

@@ -1,6 +1,12 @@
+# FOR DEVS
+# Add the location of tunelog-frontend and tunelog-backend folder location in the build section 
+# I didnt wanted to clutter my IDE with frontend and backend code so i created a new folder for them and added location 
+# NETWORK : media is my internal docker network for my navidrome, remove it or change it as u need 
+
+
 services:
   tunelog-backend:
-    build: ./backend
+    build: /home/adii/Projects/tunelog-backend/  
     container_name: tunelog-backend
     restart: unless-stopped
     tty: true 
@@ -22,7 +28,7 @@ services:
       - media
 
   tunelog-frontend:
-    build: ./frontend
+    build: /home/adii/Projects/tunelog-frontend/
     container_name: tunelog-frontend
     restart: unless-stopped
     tty: true

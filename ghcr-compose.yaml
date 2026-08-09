@@ -18,6 +18,8 @@ services:
     ports:
       - "8000:8000"
       - "4534:4534"
+    networks:
+        - media
 
   tunelog-frontend:
     image: ghcr.io/adiiverma40/tunelog-frontend/frontend:main
@@ -30,3 +32,7 @@ services:
       - .env
     depends_on:
       - tunelog-backend
+
+networks:
+  media:
+    external: true   

@@ -88,6 +88,10 @@ docker compose up --build
 ```
 
 ### Option 3: Run without Docker
+> [!note]
+> Note for **Windows** Users : 
+> PowerShell's default curl command may throw an SSL/Revocation error. If the curl commands below fail, simply download the .env.example file manually from the repository, place it in the respective folders, and rename it to .env.
+> Or create .env file and paste the below config in both folders
 
 Backend:
 

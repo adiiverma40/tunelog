@@ -94,6 +94,7 @@ Backend:
 ```bash
 git clone https://github.com/adiiverma40/tunelog-backend
 cd tunelog-backend
+curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
 cp .env.example .env
 pip install -r requirements.txt
 python3 error.py
@@ -104,6 +105,7 @@ Frontend:
 ```bash
 git clone https://github.com/adiiverma40/tunelog-frontend
 cd tunelog-frontend
+curl -o .env https://raw.githubusercontent.com/adiiverma40/tunelog/main/.env.example
 npm install
 npm run dev
 ```

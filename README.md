@@ -14,6 +14,9 @@ TuneLog is a self-hosted music recommendation system for Navidrome. It learns fr
 > Migrated from Mono Repo to Multi Repo
 > Please Re download the ghcr-docker-compose.yaml file
 
+> [!note]
+> If this project may look abandoned, That  may not be the case, I have shifted from mono-repo to poly-repo.
+> please check `tunelog-backend`, `tunelog-frontend` for more updates
 ---
 
 ### New Features

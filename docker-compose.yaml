@@ -25,6 +25,7 @@ services:
       - "8000:8000"
       - "4534:4534"
     networks:
+      - default
       - media
 
   tunelog-frontend:

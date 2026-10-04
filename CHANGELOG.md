@@ -1,5 +1,11 @@
 # Changelog
 
+## [DEVS]
+
+### Changes:
+- Added a test environment, before i was doing everything in my  main database
+
+
 ## 8th August 2026
 
 ## changes

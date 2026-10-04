@@ -7,7 +7,7 @@
 services:
   tunelog-backend:
     build: /home/adii/Projects/tunelog-backend/  
-    container_name: tunelog-backend
+    container_name: tunelog-backend-test
     restart: unless-stopped
     tty: true 
     stdin_open: true
@@ -22,7 +22,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8000:8000"
+      - "8001:8000"
       - "4534:4534"
     networks:
       - default
@@ -30,11 +30,11 @@ services:
 
   tunelog-frontend:
     build: /home/adii/Projects/tunelog-frontend/
-    container_name: tunelog-frontend
+    container_name: tunelog-frontend-test
     restart: unless-stopped
     tty: true
     ports:
-      - "5173:5173"
+      - "5174:5173"
     env_file:
       - .env
     depends_on:
